@@ -1,0 +1,240 @@
+import axios from 'axios';
+
+/**
+ * Integração com API do N8N para provisionamento automático de workflows
+ * 
+ * Documentação da API do N8N:
+ * https://docs.n8n.io/api/
+ */
+
+interface N8NConfig {
+  baseUrl: string;
+  apiKey: string;
+}
+
+interface WorkflowCloneResult {
+  workflowId: string;
+  workflowName: string;
+  success: boolean;
+  error?: string;
+}
+
+interface WorkflowCredentials {
+  dbHost: string;
+  dbPort: number;
+  dbName: string;
+  dbUser: string;
+  dbPassword: string;
+  supabaseUrl?: string;
+  supabaseKey?: string;
+}
+
+/**
+ * Obtém a configuração do N8N a partir das variáveis de ambiente
+ */
+function getN8NConfig(): N8NConfig {
+  const baseUrl = process.env.N8N_API_URL || 'http://localhost:5678';
+  const apiKey = process.env.N8N_API_KEY || '';
+  
+  if (!apiKey) {
+    console.warn('[N8N] API Key not configured. Set N8N_API_KEY environment variable.');
+  }
+  
+  return { baseUrl, apiKey };
+}
+
+/**
+ * Cria um cliente axios configurado para a API do N8N
+ */
+function createN8NClient() {
+  const config = getN8NConfig();
+  
+  return axios.create({
+    baseURL: config.baseUrl,
+    headers: {
+      'X-N8N-API-KEY': config.apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+/**
+ * Clona um workflow template e configura as credenciais para o novo cliente
+ */
+export async function cloneWorkflowForTenant(
+  templateWorkflowId: string,
+  tenantId: number,
+  tenantName: string,
+  credentials: WorkflowCredentials
+): Promise<WorkflowCloneResult> {
+  try {
+    const client = createN8NClient();
+    
+    // 1. Buscar o workflow template
+    const templateResponse = await client.get(`/api/v1/workflows/${templateWorkflowId}`);
+    const templateWorkflow = templateResponse.data;
+    
+    // 2. Criar uma cópia do workflow com novo nome
+    const newWorkflowName = `${tenantName} - Agente IA (Tenant ${tenantId})`;
+    const newWorkflow = {
+      ...templateWorkflow,
+      id: undefined, // Remove o ID para criar novo
+      name: newWorkflowName,
+      active: false, // Inicia desativado
+    };
+    
+    // 3. Atualizar as credenciais do banco de dados nos nós do workflow
+    if (newWorkflow.nodes) {
+      newWorkflow.nodes = newWorkflow.nodes.map((node: any) => {
+        // Atualizar nós Supabase com novas credenciais
+        if (node.type === 'n8n-nodes-base.supabase') {
+          return {
+            ...node,
+            credentials: {
+              supabaseApi: {
+                host: credentials.dbHost,
+                port: credentials.dbPort,
+                database: credentials.dbName,
+                user: credentials.dbUser,
+                password: credentials.dbPassword,
+              }
+            }
+          };
+        }
+        
+        // Atualizar nós PostgreSQL com novas credenciais
+        if (node.type === 'n8n-nodes-base.postgres') {
+          return {
+            ...node,
+            credentials: {
+              postgres: {
+                host: credentials.dbHost,
+                port: credentials.dbPort,
+                database: credentials.dbName,
+                user: credentials.dbUser,
+                password: credentials.dbPassword,
+              }
+            }
+          };
+        }
+        
+        return node;
+      });
+    }
+    
+    // 4. Criar o novo workflow
+    const createResponse = await client.post('/api/v1/workflows', newWorkflow);
+    const createdWorkflow = createResponse.data;
+    
+    console.log(`[N8N] Workflow clonado com sucesso: ${createdWorkflow.id} - ${newWorkflowName}`);
+    
+    return {
+      workflowId: createdWorkflow.id,
+      workflowName: newWorkflowName,
+      success: true,
+    };
+    
+  } catch (error: any) {
+    console.error('[N8N] Erro ao clonar workflow:', error.response?.data || error.message);
+    
+    return {
+      workflowId: '',
+      workflowName: '',
+      success: false,
+      error: error.response?.data?.message || error.message,
+    };
+  }
+}
+
+/**
+ * Ativa um workflow
+ */
+export async function activateWorkflow(workflowId: string): Promise<boolean> {
+  try {
+    const client = createN8NClient();
+    
+    await client.patch(`/api/v1/workflows/${workflowId}`, {
+      active: true,
+    });
+    
+    console.log(`[N8N] Workflow ${workflowId} ativado com sucesso`);
+    return true;
+    
+  } catch (error: any) {
+    console.error('[N8N] Erro ao ativar workflow:', error.response?.data || error.message);
+    return false;
+  }
+}
+
+/**
+ * Desativa um workflow
+ */
+export async function deactivateWorkflow(workflowId: string): Promise<boolean> {
+  try {
+    const client = createN8NClient();
+    
+    await client.patch(`/api/v1/workflows/${workflowId}`, {
+      active: false,
+    });
+    
+    console.log(`[N8N] Workflow ${workflowId} desativado com sucesso`);
+    return true;
+    
+  } catch (error: any) {
+    console.error('[N8N] Erro ao desativar workflow:', error.response?.data || error.message);
+    return false;
+  }
+}
+
+/**
+ * Deleta um workflow
+ */
+export async function deleteWorkflow(workflowId: string): Promise<boolean> {
+  try {
+    const client = createN8NClient();
+    
+    await client.delete(`/api/v1/workflows/${workflowId}`);
+    
+    console.log(`[N8N] Workflow ${workflowId} deletado com sucesso`);
+    return true;
+    
+  } catch (error: any) {
+    console.error('[N8N] Erro ao deletar workflow:', error.response?.data || error.message);
+    return false;
+  }
+}
+
+/**
+ * Obtém estatísticas de execução de um workflow
+ */
+export async function getWorkflowExecutionStats(workflowId: string): Promise<{
+  totalExecutions: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+} | null> {
+  try {
+    const client = createN8NClient();
+    
+    // Buscar execuções do workflow
+    const response = await client.get(`/api/v1/executions`, {
+      params: {
+        workflowId,
+        limit: 1000, // Últimas 1000 execuções
+      }
+    });
+    
+    const executions = response.data.data || [];
+    
+    const stats = {
+      totalExecutions: executions.length,
+      successfulExecutions: executions.filter((e: any) => e.finished === true && !e.stoppedAt).length,
+      failedExecutions: executions.filter((e: any) => e.stoppedAt).length,
+    };
+    
+    return stats;
+    
+  } catch (error: any) {
+    console.error('[N8N] Erro ao buscar estatísticas:', error.response?.data || error.message);
+    return null;
+  }
+}

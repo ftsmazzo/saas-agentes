@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, email, companyName, passwordHash, isActivated FROM tenants WHERE email = 'teste2@example.com'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Z2xfqxX78EXkQD.3e93e365fc3b --database UchDrAb2pdrhyYabHBioe3 --execute SELECT id, email, companyName, passwordHash, isActivated FROM tenants WHERE email = 'teste2@example.com'",
+  "rows": [
+    {
+      "id": "120001",
+      "email": "teste2@example.com",
+      "companyName": "Empresa Teste 2",
+      "passwordHash": "$2b$10$lJ1ylFwd5tQJptr6xcA22OvPZ9UUwH6kWq.V2S0W658EBNJsSiWpe",
+      "isActivated": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tcompanyName\tpasswordHash\tisActivated\n120001\tteste2@example.com\tEmpresa Teste 2\t$2b$10$lJ1ylFwd5tQJptr6xcA22OvPZ9UUwH6kWq.V2S0W658EBNJsSiWpe\t1\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

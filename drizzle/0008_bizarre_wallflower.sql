@@ -1,0 +1,3 @@
+ALTER TABLE `platformLogs` MODIFY COLUMN `eventType` enum('tenant_created','tenant_activated','tenant_suspended','tenant_deleted','payment_success','payment_failed','usage_limit_reached','workflow_provisioned','workflow_failed','db_provisioned','db_failed','evolution_provisioned','evolution_failed','config_updated','provisioning_failed','n8n_failed','email_failed') NOT NULL;--> statement-breakpoint
+ALTER TABLE `activationTokens` ADD `usedAt` timestamp;--> statement-breakpoint
+ALTER TABLE `activationTokens` ADD CONSTRAINT `activationTokens_tenantId_unique` UNIQUE(`tenantId`);

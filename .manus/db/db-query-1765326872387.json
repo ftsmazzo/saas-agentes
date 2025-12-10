@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, name, stripePriceId, priceMonthly FROM plans ORDER BY priceMonthly;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Z2xfqxX78EXkQD.3e93e365fc3b --database UchDrAb2pdrhyYabHBioe3 --execute SELECT id, name, stripePriceId, priceMonthly FROM plans ORDER BY priceMonthly;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Plano Básico",
+      "stripePriceId": "prod_TZba5A2jcpSXEJ",
+      "priceMonthly": "25000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tstripePriceId\tpriceMonthly\n1\tPlano Básico\tprod_TZba5A2jcpSXEJ\t25000\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO plans (name, description, stripePriceId, priceMonthly, maxWorkflowExecutions, maxConversations, maxStorageGB, isActive) VALUES ('Plano Profissional', 'Ideal para empresas em crescimento', 'price_1ScacVKoCeJjoiGpzleApdC5', 38500, 5000, 50000, 20, true);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Z2xfqxX78EXkQD.3e93e365fc3b --database UchDrAb2pdrhyYabHBioe3 --execute INSERT INTO plans (name, description, stripePriceId, priceMonthly, maxWorkflowExecutions, maxConversations, maxStorageGB, isActive) VALUES ('Plano Profissional', 'Ideal para empresas em crescimento', 'price_1ScacVKoCeJjoiGpzleApdC5', 38500, 5000, 50000, 20, true);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 101
+}

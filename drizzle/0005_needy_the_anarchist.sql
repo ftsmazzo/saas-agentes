@@ -1,0 +1,1 @@
+ALTER TABLE `platformLogs` MODIFY COLUMN `eventType` enum('tenant_created','tenant_suspended','tenant_deleted','payment_success','payment_failed','usage_limit_reached','workflow_provisioned','workflow_failed','db_provisioned','db_failed','evolution_provisioned','evolution_failed','config_updated') NOT NULL;

@@ -1,0 +1,17 @@
+{
+  "query": "SELECT t.id, t.email, t.companyName, at.token as activationToken, at.expiresAt \nFROM tenants t \nLEFT JOIN activationTokens at ON t.id = at.tenantId \nWHERE t.email = 'cliente@teste.com' \nORDER BY t.createdAt DESC \nLIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Z2xfqxX78EXkQD.3e93e365fc3b --database UchDrAb2pdrhyYabHBioe3 --execute SELECT t.id, t.email, t.companyName, at.token as activationToken, at.expiresAt \nFROM tenants t \nLEFT JOIN activationTokens at ON t.id = at.tenantId \nWHERE t.email = 'cliente@teste.com' \nORDER BY t.createdAt DESC \nLIMIT 1;",
+  "rows": [
+    {
+      "id": "120003",
+      "email": "cliente@teste.com",
+      "companyName": "Empresa Teste Final",
+      "activationToken": "ec57a16fb5e81738f30a6c39fe553c37cada4462b00db18c149fcc3a39d876c5",
+      "expiresAt": "2025-12-17 04:51:36"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tcompanyName\tactivationToken\texpiresAt\n120003\tcliente@teste.com\tEmpresa Teste Final\tec57a16fb5e81738f30a6c39fe553c37cada4462b00db18c149fcc3a39d876c5\t2025-12-17 04:51:36\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}
