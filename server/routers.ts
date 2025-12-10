@@ -371,12 +371,15 @@ export const appRouter = router({
           
           // 4. Clonar workflow N8N
           console.log('🔧 [STEP 5] Clonando workflow N8N...');
+          let n8nWebhookUrl = '';
           try {
             const workflowResult = await cloneWorkflowForTenant(
               tenant.id,
               input.companyName,
               evolutionInstanceName
             );
+            
+            n8nWebhookUrl = workflowResult.webhookUrl;
             
             await db.updateTenant(tenant.id, {
               n8nWorkflowId: workflowResult.workflowId,
@@ -388,6 +391,34 @@ export const appRouter = router({
               severity: 'info',
               message: `Workflow N8N clonado: ${workflowResult.workflowId}`,
             });
+            
+            console.log('✅ [STEP 5] Workflow N8N clonado!');
+            
+            // 5. Criar webhook no Chatwoot apontando para o N8N
+            if (n8nWebhookUrl) {
+              console.log('🔧 [STEP 6] Criando webhook no Chatwoot...');
+              try {
+                const webhookResult = await createChatwootWebhook(tenant.id, n8nWebhookUrl);
+                
+                await db.createPlatformLog({
+                  tenantId: tenant.id,
+                  eventType: 'chatwoot_webhook_created',
+                  severity: 'info',
+                  message: `Webhook Chatwoot criado: ${webhookResult.webhookUrl}`,
+                });
+                
+                console.log('✅ [STEP 6] Webhook Chatwoot criado:', webhookResult.webhookUrl);
+              } catch (error: any) {
+                await db.createPlatformLog({
+                  tenantId: tenant.id,
+                  eventType: 'chatwoot_webhook_failed',
+                  severity: 'warning',
+                  message: `Falha ao criar webhook Chatwoot: ${error.message}. Pode ser criado manualmente depois.`,
+                });
+                console.log('⚠️ [STEP 6] Erro ao criar webhook Chatwoot:', error.message);
+                // Não lançar erro - webhook pode ser criado manualmente depois
+              }
+            }
           } catch (error: any) {
             await db.createPlatformLog({
               tenantId: tenant.id,
@@ -398,8 +429,6 @@ export const appRouter = router({
             console.log('⚠️ [STEP 5] Erro ao clonar workflow:', error.message);
             // Não lançar erro aqui - tenant já foi criado
           }
-          
-          console.log('✅ [STEP 5] Workflow N8N clonado!');
           
           // 7. Criar configura\u00e7\u00e3o padr\u00e3o do agente
           console.log('🔧 [STEP 7] Criando configura\u00e7\u00e3o do agente...');
