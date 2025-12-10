@@ -74,7 +74,9 @@ export default function Home() {
             </Button>
           ) : (
             <Button variant="outline" onClick={() => window.location.href = import.meta.env.VITE_OAUTH_PORTAL_URL}>
-              Fazer Login
+              <a href="/client/login" className="text-white hover:text-gray-200">
+                Fazer Login
+              </a>
             </Button>
           )}
         </div>

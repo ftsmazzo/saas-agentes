@@ -56,6 +56,54 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     
+    // Login de admin (email + senha)
+    adminLogin: publicProcedure
+      .input(z.object({
+        email: z.string().trim().toLowerCase().email({
+          message: "Email inválido. Por favor, verifique o formato do email.",
+        }),
+        password: z.string().min(1, {
+          message: "Senha é obrigatória",
+        }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { loginAdmin, createAuthToken } = await import('./_core/auth');
+        
+        const result = await loginAdmin(input.email, input.password);
+        
+        if (!result.success || !result.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: result.error || 'Email ou senha inválidos',
+          });
+        }
+        
+        // Criar sessão JWT
+        const sessionToken = await createAuthToken({
+          type: 'admin',
+          userId: result.user.id,
+          email: result.user.email || input.email,
+          name: result.user.name || 'Admin',
+        });
+        
+        // Definir cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
+        
+        return {
+          success: true,
+          user: {
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
+            role: result.user.role,
+          },
+        };
+      }),
+    
     // Login de cliente (email + senha)
     clientLogin: publicProcedure
       .input(z.object({
