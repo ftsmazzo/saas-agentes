@@ -13,7 +13,7 @@
 3. Adicione:
    - **Nome**: `N8N_CREATE_WEBHOOK_WORKFLOW_URL`
    - **Valor**: `https://seu-n8n.com/webhook/webhook-chatwoot` (a URL que você copiou)
-4. Salve e reinicie o container
+4. Salve e clique em **Restart** (não precisa fazer deploy, só reiniciar)
 
 ## Passo 3: Configurar o Workflow N8N
 
