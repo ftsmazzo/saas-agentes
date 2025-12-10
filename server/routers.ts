@@ -402,7 +402,7 @@ export const appRouter = router({
                 
                 await db.createPlatformLog({
                   tenantId: tenant.id,
-                  eventType: 'chatwoot_webhook_created',
+                  eventType: 'workflow_provisioned',
                   severity: 'info',
                   message: `Webhook Chatwoot criado: ${webhookResult.webhookUrl}`,
                 });
@@ -411,7 +411,7 @@ export const appRouter = router({
               } catch (error: any) {
                 await db.createPlatformLog({
                   tenantId: tenant.id,
-                  eventType: 'chatwoot_webhook_failed',
+                  eventType: 'workflow_failed',
                   severity: 'warning',
                   message: `Falha ao criar webhook Chatwoot: ${error.message}. Pode ser criado manualmente depois.`,
                 });
