@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone, Play } from "lucide-react";
 import ClientLayout from "@/components/ClientLayout";
 
 export default function WhatsAppQRCode() {
@@ -38,6 +38,16 @@ export default function WhatsAppQRCode() {
     await Promise.all([refetchStatus(), refetchQR()]);
     setIsRefreshing(false);
   };
+
+  const activateAgentMutation = trpc.clientPanel.activateAgent.useMutation({
+    onSuccess: () => {
+      alert("Agente ativado com sucesso! 🚀");
+    },
+    onError: (error) => {
+      console.error("Erro ao ativar agente:", error);
+      alert(`Erro ao ativar agente: ${error.message}`);
+    },
+  });
 
   const disconnectMutation = trpc.clientPanel.disconnectWhatsApp.useMutation({
     onSuccess: async () => {
@@ -137,6 +147,24 @@ export default function WhatsAppQRCode() {
                   WhatsApp conectado e pronto para uso!
                 </AlertDescription>
               </Alert>
+              <Button
+                onClick={() => activateAgentMutation.mutate()}
+                disabled={activateAgentMutation.isPending}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                {activateAgentMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Ativando agente...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Ligar Agente de IA
+                  </>
+                )}
+              </Button>
               <Button
                 onClick={handleDisconnect}
                 disabled={isRefreshing || disconnectMutation.isPending}

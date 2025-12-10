@@ -48,8 +48,7 @@ export async function createChatwootWebhookViaN8N(
     console.log(`[N8N] Webhook URL do tenant: ${n8nWebhookUrl}`);
     console.log(`[N8N] Workflow URL: ${createWebhookWorkflowUrl}`);
 
-    // Payload que será enviado para o workflow N8N
-    // O workflow receberá esses dados e usará para criar o webhook no Chatwoot
+    // Payload enviado para o workflow N8N
     const payload = {
       tenantId: tenantId,
       webhookUrl: n8nWebhookUrl, // URL do webhook do agente do tenant
