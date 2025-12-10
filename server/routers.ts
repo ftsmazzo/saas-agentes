@@ -14,6 +14,7 @@ import { getInboxConversations, getConversationMessages, getInboxStats, createCh
 import { createChatwootWebhookViaN8N } from "./n8n-chatwoot-webhook";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
+import axios from 'axios';
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
 if (stripeApiKey === 'sk_test_dummy') {
