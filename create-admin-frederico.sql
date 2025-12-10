@@ -26,7 +26,7 @@ INSERT INTO users (
   'fredmazzo@gmail.com',
   'Frederico Mazzo',
   'admin',
-  '$2b$10$oyhbwIQ/BHSKwg7ttb.sJ.UPH2Bz2tnOLoOalVL6O7ybK53upvANm', -- Hash para "Admin123!" - MUDE ESTA SENHA!
+  '$2b$10$N2/nZJKryiEVjntkHzNQwOnqCyhFvtF8F.e.NfqJoPR7floBMgDRO', -- Hash para "Admin123!" - VERIFICADO E FUNCIONANDO
   NOW(),
   NOW(),
   NOW()

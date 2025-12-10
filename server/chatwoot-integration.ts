@@ -140,28 +140,61 @@ export async function createChatwootWebhook(
 ): Promise<{ webhookId: number; webhookUrl: string }> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const chatwootUrl = process.env.CHATWOOT_URL;
+    const chatwootToken = process.env.CHATWOOT_API_TOKEN;
+    
+    if (!accountId || !chatwootUrl || !chatwootToken) {
+      throw new Error("CHATWOOT_ACCOUNT_ID, CHATWOOT_URL ou CHATWOOT_API_TOKEN não configurados");
+    }
+    
+    console.log("[Chatwoot] Tentando criar webhook...", {
+      accountId,
+      chatwootUrl,
+      tenantId,
+      n8nWebhookUrl,
+      endpoint: `${chatwootUrl}/api/v1/accounts/${accountId}/webhooks`
+    });
     
     // Criar webhook no Chatwoot
     // API: POST /api/v1/accounts/{account_id}/webhooks
-    const response = await chatwootApi.post(`/accounts/${accountId}/webhooks`, {
+    // Formato baseado na documentação do Chatwoot
+    const payload = {
       webhook_url: n8nWebhookUrl,
-      webhook_name: `tenant_${tenantId}`,
-      subscriptions: ["message_created"] // Evento: Message created (conversation_created)
+      subscriptions: ["message_created"] // Evento: Message created
+    };
+    
+    console.log("[Chatwoot] Payload:", JSON.stringify(payload, null, 2));
+    
+    const response = await chatwootApi.post(`/accounts/${accountId}/webhooks`, payload);
+    
+    console.log("[Chatwoot] Resposta completa:", JSON.stringify(response.data, null, 2));
+    console.log("[Chatwoot] ✅ Webhook criado com sucesso:", {
+      id: response.data.id || response.data.webhook?.id,
+      url: response.data.webhook_url || response.data.webhook?.webhook_url || n8nWebhookUrl,
+      subscriptions: response.data.subscriptions || response.data.webhook?.subscriptions
     });
 
-    console.log("[Chatwoot] Webhook criado:", {
-      id: response.data.id,
-      url: response.data.webhook_url,
-      name: response.data.webhook_name
-    });
+    const webhookId = response.data.id || response.data.webhook?.id;
+    const webhookUrl = response.data.webhook_url || response.data.webhook?.webhook_url || n8nWebhookUrl;
+    
+    if (!webhookId) {
+      console.warn("[Chatwoot] ⚠️ Webhook criado mas ID não retornado. Resposta:", response.data);
+    }
 
     return {
-      webhookId: response.data.id,
-      webhookUrl: response.data.webhook_url || n8nWebhookUrl
+      webhookId: webhookId || 0,
+      webhookUrl: webhookUrl
     };
   } catch (error: any) {
-    console.error("[Chatwoot] Erro ao criar webhook:", error.response?.data || error.message);
-    throw new Error(`Falha ao criar webhook Chatwoot: ${error.response?.data?.message || error.message}`);
+    console.error("[Chatwoot] ❌ Erro detalhado ao criar webhook:");
+    console.error("  - Status:", error.response?.status);
+    console.error("  - Status Text:", error.response?.statusText);
+    console.error("  - Data:", JSON.stringify(error.response?.data, null, 2));
+    console.error("  - Message:", error.message);
+    console.error("  - Stack:", error.stack);
+    
+    const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
+    throw new Error(`Falha ao criar webhook Chatwoot: ${errorMessage}`);
   }
 }
 

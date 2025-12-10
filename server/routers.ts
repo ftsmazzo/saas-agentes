@@ -11,6 +11,7 @@ import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
 import { getInboxConversations, getConversationMessages, getInboxStats, createChatwootWebhook, deleteChatwootWebhook } from "./chatwoot-integration";
+import { createChatwootWebhookViaN8N } from "./n8n-chatwoot-webhook";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 
