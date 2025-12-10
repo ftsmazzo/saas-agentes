@@ -8,10 +8,11 @@
 import axios from "axios";
 
 const n8nApi = axios.create({
-  baseURL: process.env.N8N_API_URL,
+  baseURL: `${process.env.N8N_API_URL || ""}/api/v1`,
   headers: {
     "X-N8N-API-KEY": process.env.N8N_API_KEY || "",
   },
+  timeout: 30000,
 });
 
 export interface CreateWebhookViaN8NParams {
