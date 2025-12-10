@@ -963,9 +963,69 @@ export const appRouter = router({
   }),
 
     /**
+     * Ativa o agente enviando POST para o webhook do N8N
+     */
+    activateAgent: clientProcedure.mutation(async ({ ctx }) => {
+      const tenant = ctx.tenant;
+      
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      if (!tenant.n8nWorkflowId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Workflow N8N não provisionado',
+        });
+      }
+
+      // URL do webhook do agente do tenant
+      const webhookUrl = `${process.env.N8N_API_URL}/webhook/tenant_${tenant.id}`;
+      
+      try {
+        // Enviar POST para o webhook do N8N para ativar o agente
+        const response = await axios.post(webhookUrl, {
+          action: 'activate',
+          tenantId: tenant.id,
+          timestamp: new Date().toISOString(),
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        });
+
+        console.log(`[Client] Agente ativado para tenant ${tenant.id}. Resposta:`, response.status);
+
+        return {
+          success: true,
+          message: 'Agente ativado com sucesso!',
+        };
+      } catch (error: any) {
+        console.error(`[Client] Erro ao ativar agente:`, error.response?.data || error.message);
+        
+        // Não falhar se o webhook não responder - pode ser que o workflow não esteja pronto
+        if (error.response?.status === 404) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Webhook do agente não encontrado. Verifique se o workflow está ativo no N8N.',
+          });
+        }
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Erro ao ativar agente: ${error.message}`,
+        });
+      }
+    }),
+
+    /**
      * Desconecta WhatsApp e permite regenerar QR Code
      */
-    disconnectWhatsApp: protectedProcedure.mutation(async ({ ctx }) => {
+    disconnectWhatsApp: clientProcedure.mutation(async ({ ctx }) => {
     // Se for cliente, usar tenant direto
     let tenant = ctx.tenant;
     
