@@ -395,20 +395,49 @@ export const appRouter = router({
             
             console.log('✅ [STEP 5] Workflow N8N clonado!');
             
-            // 5. Criar webhook no Chatwoot apontando para o N8N
+            // 5. Criar webhook no Chatwoot via N8N (mais confiável)
             if (n8nWebhookUrl) {
-              console.log('🔧 [STEP 6] Criando webhook no Chatwoot...');
+              console.log('🔧 [STEP 6] Criando webhook no Chatwoot via N8N...');
               try {
-                const webhookResult = await createChatwootWebhook(tenant.id, n8nWebhookUrl);
-                
-                await db.createPlatformLog({
+                const webhookResult = await createChatwootWebhookViaN8N({
                   tenantId: tenant.id,
-                  eventType: 'workflow_provisioned',
-                  severity: 'info',
-                  message: `Webhook Chatwoot criado: ${webhookResult.webhookUrl}`,
+                  n8nWebhookUrl: n8nWebhookUrl,
+                  chatwootAccountId: process.env.CHATWOOT_ACCOUNT_ID || "1",
+                  chatwootUrl: process.env.CHATWOOT_URL || "",
+                  chatwootToken: process.env.CHATWOOT_API_TOKEN || "",
                 });
                 
-                console.log('✅ [STEP 6] Webhook Chatwoot criado:', webhookResult.webhookUrl);
+                if (webhookResult.success) {
+                  await db.createPlatformLog({
+                    tenantId: tenant.id,
+                    eventType: 'workflow_provisioned',
+                    severity: 'info',
+                    message: `Webhook Chatwoot criado via N8N: ${n8nWebhookUrl}`,
+                  });
+                  
+                  console.log('✅ [STEP 6] Webhook Chatwoot criado via N8N:', n8nWebhookUrl);
+                } else {
+                  // Tentar método direto como fallback
+                  console.log('⚠️ [STEP 6] N8N falhou, tentando método direto...');
+                  try {
+                    const directResult = await createChatwootWebhook(tenant.id, n8nWebhookUrl);
+                    await db.createPlatformLog({
+                      tenantId: tenant.id,
+                      eventType: 'workflow_provisioned',
+                      severity: 'info',
+                      message: `Webhook Chatwoot criado (método direto): ${directResult.webhookUrl}`,
+                    });
+                    console.log('✅ [STEP 6] Webhook Chatwoot criado (método direto):', directResult.webhookUrl);
+                  } catch (directError: any) {
+                    await db.createPlatformLog({
+                      tenantId: tenant.id,
+                      eventType: 'workflow_failed',
+                      severity: 'warning',
+                      message: `Falha ao criar webhook Chatwoot: ${webhookResult.error || directError.message}. Pode ser criado manualmente depois.`,
+                    });
+                    console.log('⚠️ [STEP 6] Erro ao criar webhook Chatwoot (ambos métodos falharam):', webhookResult.error || directError.message);
+                  }
+                }
               } catch (error: any) {
                 await db.createPlatformLog({
                   tenantId: tenant.id,

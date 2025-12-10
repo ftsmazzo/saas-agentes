@@ -113,35 +113,43 @@ export async function createChatwootWebhookViaN8N(
 
     console.log(`[N8N] Workflow criado com ID: ${workflowId}`);
 
-    // Executar workflow imediatamente
+    // Ativar workflow primeiro
+    console.log(`[N8N] Ativando workflow ${workflowId}...`);
+    await n8nApi.post(`/workflows/${workflowId}/activate`);
+    
+    // Executar workflow imediatamente via webhook ou trigger manual
+    // Como o workflow tem nó Start, vamos usar a API de execução
     console.log(`[N8N] Executando workflow ${workflowId}...`);
-    const executeResponse = await n8nApi.post(`/workflows/${workflowId}/execute`, {
-      data: {},
-    });
-
-    console.log(`[N8N] Workflow executado. Resposta:`, JSON.stringify(executeResponse.data, null, 2));
-
-    // Extrair webhook ID da resposta
-    let webhookId: number | undefined;
-    if (executeResponse.data?.data?.resultData?.main?.[0]?.[0]?.json) {
-      const result = executeResponse.data.data.resultData.main[0][0].json;
-      webhookId = result.id || result.webhook?.id;
-    }
-
-    // Deletar workflow temporário após execução
     try {
-      await n8nApi.delete(`/workflows/${workflowId}`);
-      console.log(`[N8N] Workflow temporário ${workflowId} deletado`);
-    } catch (deleteError) {
-      console.warn(`[N8N] Erro ao deletar workflow temporário:`, deleteError);
-      // Não é crítico, pode deletar manualmente depois
-    }
-
-    if (webhookId) {
-      return { success: true, webhookId };
-    } else {
-      // Mesmo sem webhookId, se não deu erro, provavelmente funcionou
-      return { success: true };
+      // Tentar executar via API de execução
+      const executeResponse = await n8nApi.post(`/workflows/${workflowId}/execute`, {});
+      console.log(`[N8N] Workflow executado. Resposta:`, JSON.stringify(executeResponse.data, null, 2));
+      
+      // Extrair webhook ID da resposta
+      let webhookId: number | undefined;
+      if (executeResponse.data?.data?.resultData?.main?.[0]?.[0]?.json) {
+        const result = executeResponse.data.data.resultData.main[0][0].json;
+        webhookId = result.id || result.webhook?.id;
+      }
+      
+      // Deletar workflow temporário após execução
+      try {
+        await n8nApi.delete(`/workflows/${workflowId}`);
+        console.log(`[N8N] Workflow temporário ${workflowId} deletado`);
+      } catch (deleteError) {
+        console.warn(`[N8N] Erro ao deletar workflow temporário:`, deleteError);
+      }
+      
+      if (webhookId) {
+        return { success: true, webhookId };
+      } else {
+        return { success: true };
+      }
+    } catch (executeError: any) {
+      console.warn(`[N8N] Erro ao executar workflow via API, tentando método alternativo...`, executeError.message);
+      // Se não conseguir executar via API, o workflow pode ser executado manualmente depois
+      // Ou podemos fazer a chamada HTTP direta como fallback
+      return { success: false, error: "Não foi possível executar workflow automaticamente" };
     }
   } catch (error: any) {
     console.error("[N8N] Erro ao criar webhook via N8N:", error.response?.data || error.message);
