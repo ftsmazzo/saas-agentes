@@ -9,21 +9,28 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime()];
 
+// Usar __dirname para compatibilidade com build
+const rootDir = typeof __dirname !== 'undefined' ? __dirname : (import.meta.dirname || process.cwd());
+const clientDir = path.resolve(rootDir, "client");
+
 export default defineConfig({
   plugins,
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@": path.resolve(clientDir, "src"),
+      "@shared": path.resolve(rootDir, "shared"),
+      "@assets": path.resolve(rootDir, "attached_assets"),
     },
   },
-  envDir: path.resolve(import.meta.dirname),
-  root: path.resolve(import.meta.dirname, "client"),
-  publicDir: path.resolve(import.meta.dirname, "client", "public"),
+  envDir: rootDir,
+  root: clientDir,
+  publicDir: path.resolve(clientDir, "public"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(rootDir, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: path.resolve(clientDir, "index.html"),
+    },
   },
   server: {
     host: true,
