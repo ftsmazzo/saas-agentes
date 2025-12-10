@@ -17,7 +17,8 @@ export async function createContext(
   const { user, tenant, authType } = await authenticateRequest(opts.req);
 
   // Se não autenticou com novo sistema, tentar OAuth antigo (compatibilidade)
-  if (!user && !tenant) {
+  // Só tentar se OAuth estiver configurado
+  if (!user && !tenant && process.env.OAUTH_SERVER_URL) {
     try {
       const { sdk } = await import("./sdk");
       const oauthUser = await sdk.authenticateRequest(opts.req);
