@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, createChatwootWebhook, deleteChatwootWebhook } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 
@@ -401,18 +401,18 @@ export const appRouter = router({
           
           console.log('✅ [STEP 5] Workflow N8N clonado!');
           
-          // 6. Criar configura\u00e7\u00e3o padr\u00e3o do agente
-          console.log('🔧 [STEP 6] Criando configura\u00e7\u00e3o do agente...');
+          // 7. Criar configura\u00e7\u00e3o padr\u00e3o do agente
+          console.log('🔧 [STEP 7] Criando configura\u00e7\u00e3o do agente...');
           await db.createAgentConfig({
             tenantId: tenant.id,
             systemPrompt: 'Você é um assistente virtual prestativo e profissional.',
             companyInfo: JSON.stringify({ name: input.companyName }),
             welcomeMessage: 'Olá! Como posso ajudá-lo hoje?',
           });
-          console.log('✅ [STEP 6] Configura\u00e7\u00e3o criada!');
+          console.log('✅ [STEP 7] Configura\u00e7\u00e3o criada!');
           
-          // 7. Notificar o propriet\u00e1rio
-              console.log('📧 [STEP 7] Notificando proprietário...');
+          // 8. Notificar o propriet\u00e1rio
+              console.log('📧 [STEP 8] Notificando proprietário...');
           await notifyOwner({
             title: 'Novo Cliente Cadastrado',
             content: `Um novo cliente foi cadastrado: ${input.companyName} (${input.email})`,

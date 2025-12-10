@@ -129,3 +129,51 @@ export async function deleteChatwootInbox(inboxId: number): Promise<void> {
     throw new Error(`Falha ao deletar inbox Chatwoot: ${error.response?.data?.message || error.message}`);
   }
 }
+
+/**
+ * Cria webhook no Chatwoot para um tenant
+ * O webhook aponta para o N8N workflow do tenant
+ */
+export async function createChatwootWebhook(
+  tenantId: number,
+  n8nWebhookUrl: string
+): Promise<{ webhookId: number; webhookUrl: string }> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    // Criar webhook no Chatwoot
+    // API: POST /api/v1/accounts/{account_id}/webhooks
+    const response = await chatwootApi.post(`/accounts/${accountId}/webhooks`, {
+      webhook_url: n8nWebhookUrl,
+      webhook_name: `tenant_${tenantId}`,
+      subscriptions: ["message_created"] // Evento: Message created (conversation_created)
+    });
+
+    console.log("[Chatwoot] Webhook criado:", {
+      id: response.data.id,
+      url: response.data.webhook_url,
+      name: response.data.webhook_name
+    });
+
+    return {
+      webhookId: response.data.id,
+      webhookUrl: response.data.webhook_url || n8nWebhookUrl
+    };
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao criar webhook:", error.response?.data || error.message);
+    throw new Error(`Falha ao criar webhook Chatwoot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Deleta webhook do Chatwoot
+ */
+export async function deleteChatwootWebhook(webhookId: number): Promise<void> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    await chatwootApi.delete(`/accounts/${accountId}/webhooks/${webhookId}`);
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao deletar webhook:", error.response?.data || error.message);
+    // Não lançar erro - webhook pode não existir
+  }
+}
