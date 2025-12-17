@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pause, Play, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Pause, Play, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function TenantsPage() {
@@ -136,13 +136,64 @@ export default function TenantsPage() {
             </p>
           </div>
 
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Cliente
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Limpar Testes
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Deletar Todos os Clientes de Teste</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá deletar permanentemente todos os clientes identificados como teste (emails com "test", "teste", "demo", etc.). Esta ação é irreversível.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteAllTestClientsMutation.mutate()}
+                    className="bg-orange-600 hover:bg-orange-700"
+                  >
+                    Deletar Testes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Deletar Todos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>⚠️ ATENÇÃO: Deletar TODOS os Clientes</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá deletar PERMANENTEMENTE TODOS os clientes, incluindo Evolution, Chatwoot e N8N. Esta ação é IRREVERSÍVEL e deve ser usada apenas em desenvolvimento ou limpeza completa.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteAllClientsMutation.mutate()}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Deletar Todos
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo Cliente
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Criar Novo Cliente</DialogTitle>
