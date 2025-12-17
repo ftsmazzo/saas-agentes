@@ -91,6 +91,26 @@ export default function TenantsPage() {
     },
   });
 
+  const deleteAllTestClientsMutation = trpc.tenants.deleteAllTestClients.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message || "Clientes de teste deletados com sucesso!");
+      utils.tenants.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao deletar clientes de teste: ${error.message}`);
+    },
+  });
+
+  const deleteAllClientsMutation = trpc.tenants.deleteAllClients.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message || "Todos os clientes foram deletados!");
+      utils.tenants.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao deletar todos os clientes: ${error.message}`);
+    },
+  });
+
   const handleCreate = () => {
     createMutation.mutate(formData);
   };

@@ -34,6 +34,60 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+// Função auxiliar para deletar um tenant completamente (N8N, Evolution, Chatwoot, Banco)
+async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boolean; errors: string[] }> {
+  const errors: string[] = [];
+
+  // 1. Deletar workflow do N8N
+  if (tenant.n8nWorkflowId) {
+    try {
+      await deleteWorkflow(tenant.n8nWorkflowId);
+      console.log(`[Delete] ✅ Workflow N8N ${tenant.n8nWorkflowId} deletado`);
+    } catch (error: any) {
+      const errorMsg = `N8N: ${error.message}`;
+      console.error(`[Delete] ❌ Erro ao deletar workflow N8N:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 2. Deletar instância Evolution
+  if (tenant.evolutionInstanceName) {
+    try {
+      await deleteEvolutionInstance(tenant.evolutionInstanceName);
+      console.log(`[Delete] ✅ Instância Evolution ${tenant.evolutionInstanceName} deletada`);
+    } catch (error: any) {
+      const errorMsg = `Evolution: ${error.message}`;
+      console.error(`[Delete] ❌ Erro ao deletar Evolution:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 3. Deletar inbox do Chatwoot
+  if (tenant.chatwootInboxId) {
+    try {
+      await deleteChatwootInbox(tenant.chatwootInboxId);
+      console.log(`[Delete] ✅ Inbox Chatwoot ${tenant.chatwootInboxId} deletado`);
+    } catch (error: any) {
+      const errorMsg = `Chatwoot: ${error.message}`;
+      console.error(`[Delete] ❌ Erro ao deletar Chatwoot:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 4. Deletar do banco de dados (SEMPRE, mesmo se recursos externos falharem)
+  try {
+    await db.deleteTenant(tenant.id);
+    console.log(`[Delete] ✅ Tenant ${tenant.id} deletado do banco de dados`);
+  } catch (error: any) {
+    const errorMsg = `Banco: ${error.message}`;
+    console.error(`[Delete] ❌ Erro ao deletar do banco:`, errorMsg);
+    errors.push(errorMsg);
+    throw error; // Se falhar no banco, lançar erro
+  }
+
+  return { success: errors.length === 0, errors };
+}
+
 export const appRouter = router({
   system: systemRouter,
   config: configRouter,
@@ -480,6 +534,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
+
     // Deletar tenant (hard delete - remove completamente)
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
@@ -490,68 +545,25 @@ export const appRouter = router({
         }
 
         const companyName = tenant.companyName;
-        const errors: string[] = [];
-
-        // 1. Deletar workflow do N8N
-        if (tenant.n8nWorkflowId) {
-          try {
-            await deleteWorkflow(tenant.n8nWorkflowId);
-            console.log(`[Delete] Workflow N8N ${tenant.n8nWorkflowId} deletado`);
-          } catch (error: any) {
-            console.error(`[Delete] Erro ao deletar workflow N8N:`, error.message);
-            errors.push(`N8N: ${error.message}`);
-          }
-        }
-
-        // 2. Deletar instância Evolution
-        if (tenant.evolutionInstanceName) {
-          try {
-            await deleteEvolutionInstance(tenant.evolutionInstanceName);
-            console.log(`[Delete] Instância Evolution ${tenant.evolutionInstanceName} deletada`);
-          } catch (error: any) {
-            console.error(`[Delete] Erro ao deletar Evolution:`, error.message);
-            errors.push(`Evolution: ${error.message}`);
-          }
-        }
-
-        // 3. Deletar inbox do Chatwoot
-        if (tenant.chatwootInboxId) {
-          try {
-            await deleteChatwootInbox(tenant.chatwootInboxId);
-            console.log(`[Delete] Inbox Chatwoot ${tenant.chatwootInboxId} deletado`);
-          } catch (error: any) {
-            console.error(`[Delete] Erro ao deletar Chatwoot:`, error.message);
-            errors.push(`Chatwoot: ${error.message}`);
-          }
-        }
-
-        // 4. Deletar do banco de dados (hard delete)
-        try {
-          await db.deleteTenant(input.id);
-          console.log(`[Delete] Tenant ${input.id} deletado do banco de dados`);
-        } catch (error: any) {
-          console.error(`[Delete] Erro ao deletar do banco:`, error.message);
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: `Erro ao deletar tenant do banco: ${error.message}`,
-          });
-        }
+        
+        // Usar função auxiliar para deletar completamente
+        const result = await deleteTenantCompletely(tenant);
         
         // Log de sucesso (mesmo que alguns recursos externos tenham falhado)
         await db.createPlatformLog({
           tenantId: input.id,
           eventType: 'tenant_deleted',
-          severity: errors.length > 0 ? 'warning' : 'info',
-          message: `Tenant ${companyName} foi deletado${errors.length > 0 ? `. Avisos: ${errors.join(', ')}` : ''}`,
-          metadata: JSON.stringify({ errors }),
+          severity: result.errors.length > 0 ? 'warning' : 'info',
+          message: `Tenant ${companyName} foi deletado${result.errors.length > 0 ? `. Avisos: ${result.errors.join(', ')}` : ''}`,
+          metadata: JSON.stringify({ errors: result.errors }),
         });
 
         return { 
           success: true,
-          message: errors.length > 0 
-            ? `Tenant deletado, mas alguns recursos podem não ter sido removidos: ${errors.join(', ')}`
+          message: result.errors.length > 0 
+            ? `Tenant deletado, mas alguns recursos podem não ter sido removidos: ${result.errors.join(', ')}`
             : 'Tenant deletado com sucesso',
-          errors: errors.length > 0 ? errors : undefined,
+          errors: result.errors.length > 0 ? result.errors : undefined,
         };
       }),
 
@@ -592,41 +604,15 @@ export const appRouter = router({
 
       for (const tenant of testTenants) {
         try {
-          // Deletar workflow do N8N
-          if (tenant.n8nWorkflowId) {
-            try {
-              await deleteWorkflow(tenant.n8nWorkflowId);
-            } catch (error: any) {
-              console.error(`[DeleteAll] Erro ao deletar workflow ${tenant.n8nWorkflowId}:`, error.message);
-            }
-          }
-
-          // Deletar instância Evolution
-          if (tenant.evolutionInstanceName) {
-            try {
-              await deleteEvolutionInstance(tenant.evolutionInstanceName);
-            } catch (error: any) {
-              console.error(`[DeleteAll] Erro ao deletar Evolution ${tenant.evolutionInstanceName}:`, error.message);
-            }
-          }
-
-          // Deletar inbox do Chatwoot
-          if (tenant.chatwootInboxId) {
-            try {
-              await deleteChatwootInbox(tenant.chatwootInboxId);
-            } catch (error: any) {
-              console.error(`[DeleteAll] Erro ao deletar Chatwoot ${tenant.chatwootInboxId}:`, error.message);
-            }
-          }
-
-          // Deletar do banco
-          await db.deleteTenant(tenant.id);
+          const result = await deleteTenantCompletely(tenant);
           results.deleted++;
-          
-          console.log(`[DeleteAll] Tenant ${tenant.id} (${tenant.companyName}) deletado`);
+          if (result.errors.length > 0) {
+            results.errors.push(...result.errors.map(e => `${tenant.companyName}: ${e}`));
+          }
+          console.log(`[DeleteAll] ✅ Tenant ${tenant.id} (${tenant.companyName}) deletado`);
         } catch (error: any) {
           const errorMsg = `Erro ao deletar tenant ${tenant.id} (${tenant.companyName}): ${error.message}`;
-          console.error(`[DeleteAll] ${errorMsg}`);
+          console.error(`[DeleteAll] ❌ ${errorMsg}`);
           results.errors.push(errorMsg);
         }
       }
@@ -642,6 +628,54 @@ export const appRouter = router({
       return {
         success: true,
         message: `${results.deleted} cliente(s) de teste deletado(s)${results.errors.length > 0 ? `. ${results.errors.length} erro(s).` : ''}`,
+        deleted: results.deleted,
+        errors: results.errors.length > 0 ? results.errors : undefined,
+      };
+    }),
+
+    // Deletar TODOS os clientes (CUIDADO!)
+    deleteAllClients: adminProcedure.mutation(async () => {
+      const allTenants = await db.getAllTenants();
+
+      if (allTenants.length === 0) {
+        return { 
+          success: true, 
+          message: 'Nenhum cliente encontrado',
+          deleted: 0 
+        };
+      }
+
+      const results = {
+        deleted: 0,
+        errors: [] as string[],
+      };
+
+      for (const tenant of allTenants) {
+        try {
+          const result = await deleteTenantCompletely(tenant);
+          results.deleted++;
+          if (result.errors.length > 0) {
+            results.errors.push(...result.errors.map(e => `${tenant.companyName}: ${e}`));
+          }
+          console.log(`[DeleteAll] ✅ Tenant ${tenant.id} (${tenant.companyName}) deletado`);
+        } catch (error: any) {
+          const errorMsg = `Erro ao deletar tenant ${tenant.id} (${tenant.companyName}): ${error.message}`;
+          console.error(`[DeleteAll] ❌ ${errorMsg}`);
+          results.errors.push(errorMsg);
+        }
+      }
+
+      await db.createPlatformLog({
+        tenantId: 0, // Log global
+        eventType: 'bulk_delete_all_clients',
+        severity: results.errors.length > 0 ? 'warning' : 'info',
+        message: `${results.deleted} clientes deletados${results.errors.length > 0 ? `. ${results.errors.length} erros.` : ''}`,
+        metadata: JSON.stringify({ deleted: results.deleted, errors: results.errors }),
+      });
+
+      return {
+        success: true,
+        message: `${results.deleted} cliente(s) deletado(s)${results.errors.length > 0 ? `. ${results.errors.length} erro(s).` : ''}`,
         deleted: results.deleted,
         errors: results.errors.length > 0 ? results.errors : undefined,
       };
