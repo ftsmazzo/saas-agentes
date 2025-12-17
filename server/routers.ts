@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -480,7 +480,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Deletar tenant
+    // Deletar tenant (hard delete - remove completamente)
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
@@ -489,26 +489,163 @@ export const appRouter = router({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
         }
 
-        // Deletar workflow do N8N
+        const companyName = tenant.companyName;
+        const errors: string[] = [];
+
+        // 1. Deletar workflow do N8N
         if (tenant.n8nWorkflowId) {
-          await deleteWorkflow(tenant.n8nWorkflowId);
+          try {
+            await deleteWorkflow(tenant.n8nWorkflowId);
+            console.log(`[Delete] Workflow N8N ${tenant.n8nWorkflowId} deletado`);
+          } catch (error: any) {
+            console.error(`[Delete] Erro ao deletar workflow N8N:`, error.message);
+            errors.push(`N8N: ${error.message}`);
+          }
         }
 
-        // Desprov isionar recursos do tenant
-        await deprovisionTenant(input.id);
+        // 2. Deletar instância Evolution
+        if (tenant.evolutionInstanceName) {
+          try {
+            await deleteEvolutionInstance(tenant.evolutionInstanceName);
+            console.log(`[Delete] Instância Evolution ${tenant.evolutionInstanceName} deletada`);
+          } catch (error: any) {
+            console.error(`[Delete] Erro ao deletar Evolution:`, error.message);
+            errors.push(`Evolution: ${error.message}`);
+          }
+        }
 
-        // Marcar como deletado
-        await db.deleteTenant(input.id);
+        // 3. Deletar inbox do Chatwoot
+        if (tenant.chatwootInboxId) {
+          try {
+            await deleteChatwootInbox(tenant.chatwootInboxId);
+            console.log(`[Delete] Inbox Chatwoot ${tenant.chatwootInboxId} deletado`);
+          } catch (error: any) {
+            console.error(`[Delete] Erro ao deletar Chatwoot:`, error.message);
+            errors.push(`Chatwoot: ${error.message}`);
+          }
+        }
+
+        // 4. Deletar do banco de dados (hard delete)
+        try {
+          await db.deleteTenant(input.id);
+          console.log(`[Delete] Tenant ${input.id} deletado do banco de dados`);
+        } catch (error: any) {
+          console.error(`[Delete] Erro ao deletar do banco:`, error.message);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao deletar tenant do banco: ${error.message}`,
+          });
+        }
         
+        // Log de sucesso (mesmo que alguns recursos externos tenham falhado)
         await db.createPlatformLog({
           tenantId: input.id,
           eventType: 'tenant_deleted',
-          severity: 'info',
-          message: `Tenant ${tenant.companyName} foi deletado`,
+          severity: errors.length > 0 ? 'warning' : 'info',
+          message: `Tenant ${companyName} foi deletado${errors.length > 0 ? `. Avisos: ${errors.join(', ')}` : ''}`,
+          metadata: JSON.stringify({ errors }),
         });
 
-        return { success: true };
+        return { 
+          success: true,
+          message: errors.length > 0 
+            ? `Tenant deletado, mas alguns recursos podem não ter sido removidos: ${errors.join(', ')}`
+            : 'Tenant deletado com sucesso',
+          errors: errors.length > 0 ? errors : undefined,
+        };
       }),
+
+    // Limpar todos os clientes de teste
+    deleteAllTestClients: adminProcedure.mutation(async () => {
+      const allTenants = await db.getAllTenants();
+      
+      // Filtrar clientes de teste (geralmente têm email de teste ou nome específico)
+      const testTenants = allTenants.filter(tenant => {
+        const email = tenant.email.toLowerCase();
+        const companyName = tenant.companyName.toLowerCase();
+        
+        // Critérios para identificar clientes de teste
+        return (
+          email.includes('test') ||
+          email.includes('teste') ||
+          email.includes('demo') ||
+          companyName.includes('test') ||
+          companyName.includes('teste') ||
+          companyName.includes('demo') ||
+          email.includes('@example.com') ||
+          email.includes('@test.com')
+        );
+      });
+
+      if (testTenants.length === 0) {
+        return { 
+          success: true, 
+          message: 'Nenhum cliente de teste encontrado',
+          deleted: 0 
+        };
+      }
+
+      const results = {
+        deleted: 0,
+        errors: [] as string[],
+      };
+
+      for (const tenant of testTenants) {
+        try {
+          // Deletar workflow do N8N
+          if (tenant.n8nWorkflowId) {
+            try {
+              await deleteWorkflow(tenant.n8nWorkflowId);
+            } catch (error: any) {
+              console.error(`[DeleteAll] Erro ao deletar workflow ${tenant.n8nWorkflowId}:`, error.message);
+            }
+          }
+
+          // Deletar instância Evolution
+          if (tenant.evolutionInstanceName) {
+            try {
+              await deleteEvolutionInstance(tenant.evolutionInstanceName);
+            } catch (error: any) {
+              console.error(`[DeleteAll] Erro ao deletar Evolution ${tenant.evolutionInstanceName}:`, error.message);
+            }
+          }
+
+          // Deletar inbox do Chatwoot
+          if (tenant.chatwootInboxId) {
+            try {
+              await deleteChatwootInbox(tenant.chatwootInboxId);
+            } catch (error: any) {
+              console.error(`[DeleteAll] Erro ao deletar Chatwoot ${tenant.chatwootInboxId}:`, error.message);
+            }
+          }
+
+          // Deletar do banco
+          await db.deleteTenant(tenant.id);
+          results.deleted++;
+          
+          console.log(`[DeleteAll] Tenant ${tenant.id} (${tenant.companyName}) deletado`);
+        } catch (error: any) {
+          const errorMsg = `Erro ao deletar tenant ${tenant.id} (${tenant.companyName}): ${error.message}`;
+          console.error(`[DeleteAll] ${errorMsg}`);
+          results.errors.push(errorMsg);
+        }
+      }
+
+      await db.createPlatformLog({
+        tenantId: 0, // Log global
+        eventType: 'bulk_delete_test_clients',
+        severity: results.errors.length > 0 ? 'warning' : 'info',
+        message: `${results.deleted} clientes de teste deletados${results.errors.length > 0 ? `. ${results.errors.length} erros.` : ''}`,
+        metadata: JSON.stringify({ deleted: results.deleted, errors: results.errors }),
+      });
+
+      return {
+        success: true,
+        message: `${results.deleted} cliente(s) de teste deletado(s)${results.errors.length > 0 ? `. ${results.errors.length} erro(s).` : ''}`,
+        deleted: results.deleted,
+        errors: results.errors.length > 0 ? results.errors : undefined,
+      };
+    }),
 
     // Atualizar subdomínio
     updateSubdomain: adminProcedure

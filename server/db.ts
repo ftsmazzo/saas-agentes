@@ -178,7 +178,17 @@ export async function getAllTenants(): Promise<Tenant[]> {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(tenants).orderBy(desc(tenants.createdAt));
+  // Filtrar apenas tenants que não foram deletados
+  // Hard delete remove completamente, então não aparecerá na query
+  // Soft delete (status = 'deleted') também não será mostrado
+  return await db.select()
+    .from(tenants)
+    .where(
+      // Excluir tenants com status 'deleted' (soft delete)
+      // Hard delete já remove completamente, então não precisa filtrar
+      ne(tenants.status, 'deleted')
+    )
+    .orderBy(desc(tenants.createdAt));
 }
 
 export async function updateTenant(id: number, updates: Partial<InsertTenant>): Promise<void> {
@@ -192,7 +202,14 @@ export async function deleteTenant(id: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(tenants).set({ status: "deleted" }).where(eq(tenants.id, id));
+  // Hard delete - deletar fisicamente do banco
+  await db.delete(tenants).where(eq(tenants.id, id));
+  
+  // Também deletar configurações do agente relacionadas
+  await db.delete(agentConfigs).where(eq(agentConfigs.tenantId, id));
+  
+  // Deletar tokens de ativação
+  await db.delete(activationTokens).where(eq(activationTokens.tenantId, id));
 }
 
 // ========== PLAN OPERATIONS ==========
