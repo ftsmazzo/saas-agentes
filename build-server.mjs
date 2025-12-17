@@ -13,8 +13,11 @@ await build({
   outfile: 'dist/index.js',
   packages: 'external',
   alias: {
-    '@shared': resolve(__dirname, 'shared'),
+    '@shared/const': resolve(__dirname, 'shared/const.ts'),
+    '@shared/_core/errors': resolve(__dirname, 'shared/_core/errors.ts'),
   },
   logLevel: 'info',
+}).catch(() => {
+  process.exit(1);
 });
 
