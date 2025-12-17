@@ -20,6 +20,9 @@ export default function WelcomePage() {
   // REMOVIDO: SetupWizard não é mais necessário
   // As configurações já estão no EasyPanel (variáveis de ambiente)
   // Planos podem ser criados diretamente em /admin/plans
+  
+  // Debug: verificar se código atualizado
+  console.log("[WelcomePage] Componente carregado - SetupWizard REMOVIDO");
 
   // TODO: Implementar verificação real do status de configuração
   const configStatus = {

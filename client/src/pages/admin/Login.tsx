@@ -14,6 +14,9 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  
+  // Debug: verificar se código atualizado
+  console.log("[AdminLogin] Componente carregado - versão atualizada");
 
   const loginMutation = trpc.auth.adminLogin.useMutation({
     onSuccess: (data) => {

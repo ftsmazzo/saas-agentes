@@ -68,7 +68,10 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    console.log(`🚀 Server running on http://localhost:${port}/`);
+    console.log(`📦 Build version: ${process.env.GIT_SHA || 'dev'}`);
+    console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`✅ SetupWizard REMOVIDO - Configurações no EasyPanel`);
   });
 }
 
