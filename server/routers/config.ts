@@ -30,8 +30,8 @@ export const configRouter = router({
   testN8N: adminProcedure
     .input(
       z.object({
-        apiUrl: z.string().url().optional(),
-        apiKey: z.string().optional(),
+        apiUrl: z.union([z.string().url(), z.string().length(0), z.undefined()]).optional(),
+        apiKey: z.union([z.string().min(1), z.string().length(0), z.undefined()]).optional(),
       })
     )
     .mutation(async ({ input }) => {
