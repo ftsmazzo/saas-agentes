@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-import { readFileSync } from 'fs';
+import { dirname, resolve, extname } from 'path';
+import { readFileSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,8 +22,18 @@ const aliasPlugin = {
     // Resolver @shared/* para shared/*
     build.onResolve({ filter: /^@shared\// }, (args) => {
       const aliasPath = args.path.replace('@shared/', '');
+      let resolvedPath = resolve(__dirname, 'shared', aliasPath);
+      
+      // Se não tem extensão, tentar adicionar .ts
+      if (!extname(resolvedPath)) {
+        const withTs = `${resolvedPath}.ts`;
+        if (existsSync(withTs)) {
+          resolvedPath = withTs;
+        }
+      }
+      
       return {
-        path: resolve(__dirname, 'shared', aliasPath),
+        path: resolvedPath,
       };
     });
   },
