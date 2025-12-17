@@ -1,7 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, adminProcedure as adminProc } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, adminProcedure } from "./_core/trpc";
 import { configRouter } from "./routers/config";
 import { plansRouter } from "./routers/plans";
 import { TRPCError } from "@trpc/server";
@@ -23,16 +23,8 @@ const stripe = new Stripe(stripeApiKey, {
   apiVersion: '2025-11-17.clover',
 });
 
-// Middleware para verificar se o usuário é admin
-const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== 'admin') {
-    throw new TRPCError({ 
-      code: 'FORBIDDEN',
-      message: 'Acesso negado. Apenas administradores podem acessar este recurso.'
-    });
-  }
-  return next({ ctx });
-});
+// Importar adminProcedure do trpc (já tem verificação correta de ctx.user)
+// Não redefinir aqui para evitar duplicação e bugs
 
 // Função auxiliar para deletar um tenant completamente (N8N, Evolution, Chatwoot, Banco)
 async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boolean; errors: string[] }> {

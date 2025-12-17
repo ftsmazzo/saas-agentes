@@ -194,7 +194,7 @@ export default function TenantsPage() {
                   Novo Cliente
                 </Button>
               </DialogTrigger>
-            <DialogContent>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Criar Novo Cliente</DialogTitle>
                 <DialogDescription>
