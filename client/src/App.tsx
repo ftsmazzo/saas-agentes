@@ -8,7 +8,6 @@ import Home from "./pages/Home";
 
 // Admin pages
 import AdminLogin from "./pages/admin/Login";
-import SetupWizard from "./pages/admin/SetupWizard";
 import WelcomePage from "./pages/admin/Welcome";
 import AdminDashboard from "./pages/admin/Dashboard";
 import TenantsPage from "./pages/admin/Tenants";
@@ -35,7 +34,6 @@ function Router() {
       
       {/* Admin Routes */}
       <Route path={"/admin/login"} component={AdminLogin} />
-      <Route path={"/admin/setup"} component={SetupWizard} />
       <Route path={"/admin"} component={WelcomePage} />
       <Route path={"/admin/dashboard"} component={AdminDashboard} />
       <Route path={"/admin/tenants"} component={TenantsPage} />

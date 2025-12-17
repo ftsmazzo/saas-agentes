@@ -14,34 +14,12 @@ import {
   Workflow,
   Database
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { useEffect } from "react";
+import { Link } from "wouter";
 
 export default function WelcomePage() {
-  const [, setLocation] = useLocation();
-  const { data: isSetupCompleted, isLoading } = trpc.config.isSetupCompleted.useQuery();
-
-  // Redirect to setup wizard if not completed (usando useEffect para evitar erro de render)
-  useEffect(() => {
-    if (!isLoading && !isSetupCompleted) {
-      setLocation("/admin/setup");
-    }
-  }, [isLoading, isSetupCompleted, setLocation]);
-
-  // Mostrar loading enquanto verifica
-  if (isLoading) {
-    return (
-      <AdminLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground">Verificando configuração...</p>
-          </div>
-        </div>
-      </AdminLayout>
-    );
-  }
+  // REMOVIDO: SetupWizard não é mais necessário
+  // As configurações já estão no EasyPanel (variáveis de ambiente)
+  // Planos podem ser criados diretamente em /admin/plans
 
   // TODO: Implementar verificação real do status de configuração
   const configStatus = {

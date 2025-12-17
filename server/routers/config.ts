@@ -199,10 +199,12 @@ export const configRouter = router({
 
   /**
    * Check if setup is completed
+   * SEMPRE retorna true - SetupWizard foi removido
+   * Configurações estão no EasyPanel (variáveis de ambiente)
    */
   isSetupCompleted: adminProcedure.query(async () => {
-    const completed = await getConfig(CONFIG_KEYS.SETUP_COMPLETED);
-    return completed === "true";
+    // Sempre retornar true - não precisamos mais do wizard
+    return true;
   }),
 
   /**
