@@ -967,8 +967,10 @@ export const appRouter = router({
         });
       }
 
-      // Validar se N8N_API_URL está configurado
+      // Validar variáveis de ambiente necessárias
       const n8nApiUrl = process.env.N8N_API_URL;
+      const createWebhookWorkflowUrl = process.env.N8N_CREATE_WEBHOOK_WORKFLOW_URL;
+      
       if (!n8nApiUrl) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
@@ -976,49 +978,88 @@ export const appRouter = router({
         });
       }
 
-      // URL do webhook do N8N para este tenant
-      const webhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
+      if (!createWebhookWorkflowUrl) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'N8N_CREATE_WEBHOOK_WORKFLOW_URL não está configurado. Verifique as variáveis de ambiente.',
+        });
+      }
+
+      // URL do webhook do N8N para este tenant (que será criado no Chatwoot)
+      const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
       
+      // Validar variáveis do Chatwoot
+      const chatwootUrl = process.env.CHATWOOT_URL;
+      const chatwootToken = process.env.CHATWOOT_API_TOKEN;
+      const chatwootAccountId = process.env.CHATWOOT_ACCOUNT_ID;
+      
+      if (!chatwootUrl || !chatwootToken || !chatwootAccountId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Variáveis do Chatwoot não configuradas (CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID).',
+        });
+      }
+
       try {
-        // Enviar POST para o webhook do N8N
-        // O N8N vai processar e criar o webhook no Chatwoot
-        const response = await axios.post(webhookUrl, {
-          action: 'activate',
+        // Chamar o workflow do N8N que cria o webhook no Chatwoot
+        // Este workflow recebe os parâmetros e faz a chamada à API do Chatwoot
+        const response = await axios.post(createWebhookWorkflowUrl, {
           tenantId: tenant.id,
+          webhookUrl: tenantWebhookUrl,
+          chatwootAccountId,
+          chatwootUrl,
+          chatwootToken,
+          action: 'activate',
           timestamp: new Date().toISOString(),
         }, {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 10000,
+          timeout: 30000, // 30 segundos (criação de webhook pode demorar)
         });
 
-        console.log(`[Client] Agente ativado para tenant ${tenant.id}. Resposta:`, response.status);
+        console.log(`[Client] ✅ Agente ativado para tenant ${tenant.id}`);
+        console.log(`[Client] Resposta do workflow N8N:`, response.status, response.data);
 
         await db.createPlatformLog({
           tenantId: tenant.id,
           eventType: 'agent_activated',
           severity: 'info',
-          message: 'Agente de IA ativado via webhook N8N',
+          message: `Agente de IA ativado via workflow N8N. Webhook criado no Chatwoot: ${tenantWebhookUrl}`,
+          metadata: JSON.stringify({
+            workflowUrl: createWebhookWorkflowUrl,
+            tenantWebhookUrl,
+            responseStatus: response.status,
+          }),
         });
 
         return {
           success: true,
-          message: 'Agente ativado com sucesso!',
+          message: 'Agente ativado com sucesso! O webhook foi criado no Chatwoot.',
         };
       } catch (error: any) {
-        console.error(`[Client] Erro ao ativar agente:`, error.response?.data || error.message);
+        console.error(`[Client] ❌ Erro ao ativar agente para tenant ${tenant.id}:`);
+        console.error(`[Client] URL chamada: ${createWebhookWorkflowUrl}`);
+        console.error(`[Client] Erro:`, error.response?.data || error.message);
+        console.error(`[Client] Status:`, error.response?.status);
         
         if (error.response?.status === 404) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Webhook do agente não encontrado. Verifique se o workflow está ativo no N8N.',
+            message: `Workflow de criação de webhook não encontrado. Verifique se N8N_CREATE_WEBHOOK_WORKFLOW_URL está correto: ${createWebhookWorkflowUrl}`,
+          });
+        }
+
+        if (error.response?.status === 400) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Erro na requisição ao workflow N8N: ${error.response?.data?.message || error.message}`,
           });
         }
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Erro ao ativar agente: ${error.message}`,
+          message: `Erro ao ativar agente: ${error.response?.data?.message || error.message}`,
         });
       }
     }),
