@@ -85,6 +85,15 @@ export default function WhatsAppQRCode() {
   
   // Debug: log do status e forçar refetch quando status mudar
   useEffect(() => {
+    console.log("[Client] Debug - Status completo:", {
+      status,
+      statusValue: status?.status,
+      isConnected,
+      isLoading,
+      qrLoading,
+      statusLoading,
+    });
+    
     if (status) {
       console.log("[Client] Status atual:", status);
       // Se o status mudou para "open", atualizar também o QR Code
@@ -92,7 +101,7 @@ export default function WhatsAppQRCode() {
         refetchQR();
       }
     }
-  }, [status, refetchQR]);
+  }, [status, isConnected, isLoading, qrLoading, statusLoading, refetchQR]);
 
   return (
     <ClientLayout>
@@ -134,6 +143,12 @@ export default function WhatsAppQRCode() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Debug info - remover em produção */}
+          {status && (
+            <div className="mb-2 p-2 bg-gray-100 rounded text-xs font-mono">
+              Debug: status = "{status?.status}", isConnected = {String(isConnected)}
+            </div>
+          )}
           {isLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
