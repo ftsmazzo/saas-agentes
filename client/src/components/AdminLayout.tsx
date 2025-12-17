@@ -31,10 +31,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   // TODOS OS HOOKS DEVEM VIR PRIMEIRO (regra do React)
-  const { user, logout, loading } = useAuth({ 
-    redirectOnUnauthenticated: true,
-    redirectPath: "/admin/login"
-  });
+  const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const logoutMutation = trpc.auth.logout.useMutation({

@@ -10,11 +10,6 @@ function getQueryParam(req: Request, key: string): string | undefined {
 }
 
 export function registerOAuthRoutes(app: Express) {
-  // Só registrar rotas OAuth se estiver configurado
-  if (!process.env.OAUTH_SERVER_URL) {
-    return; // OAuth não configurado, pular registro de rotas
-  }
-  
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");

@@ -10,8 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, createChatwootWebhook, deleteChatwootWebhook } from "./chatwoot-integration";
-import { createChatwootWebhookViaN8N } from "./n8n-chatwoot-webhook";
+import { getInboxConversations, getConversationMessages, getInboxStats } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -57,54 +56,6 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-    
-    // Login de admin (email + senha)
-    adminLogin: publicProcedure
-      .input(z.object({
-        email: z.string().trim().toLowerCase().email({
-          message: "Email inválido. Por favor, verifique o formato do email.",
-        }),
-        password: z.string().min(1, {
-          message: "Senha é obrigatória",
-        }),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const { loginAdmin, createAuthToken } = await import('./_core/auth');
-        
-        const result = await loginAdmin(input.email, input.password);
-        
-        if (!result.success || !result.user) {
-          throw new TRPCError({
-            code: 'UNAUTHORIZED',
-            message: result.error || 'Email ou senha inválidos',
-          });
-        }
-        
-        // Criar sessão JWT
-        const sessionToken = await createAuthToken({
-          type: 'admin',
-          userId: result.user.id,
-          email: result.user.email || input.email,
-          name: result.user.name || 'Admin',
-        });
-        
-        // Definir cookie
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: ONE_YEAR_MS,
-        });
-        
-        return {
-          success: true,
-          user: {
-            id: result.user.id,
-            email: result.user.email,
-            name: result.user.name,
-            role: result.user.role,
-          },
-        };
-      }),
     
     // Login de cliente (email + senha)
     clientLogin: publicProcedure
@@ -373,15 +324,12 @@ export const appRouter = router({
           
           // 4. Clonar workflow N8N
           console.log('🔧 [STEP 5] Clonando workflow N8N...');
-          let n8nWebhookUrl = '';
           try {
             const workflowResult = await cloneWorkflowForTenant(
               tenant.id,
               input.companyName,
               evolutionInstanceName
             );
-            
-            n8nWebhookUrl = workflowResult.webhookUrl;
             
             await db.updateTenant(tenant.id, {
               n8nWorkflowId: workflowResult.workflowId,
@@ -393,63 +341,6 @@ export const appRouter = router({
               severity: 'info',
               message: `Workflow N8N clonado: ${workflowResult.workflowId}`,
             });
-            
-            console.log('✅ [STEP 5] Workflow N8N clonado!');
-            
-            // 5. Criar webhook no Chatwoot via N8N (mais confiável)
-            if (n8nWebhookUrl) {
-              console.log('🔧 [STEP 6] Criando webhook no Chatwoot via N8N...');
-              try {
-                const webhookResult = await createChatwootWebhookViaN8N({
-                  tenantId: tenant.id,
-                  n8nWebhookUrl: n8nWebhookUrl,
-                  chatwootAccountId: process.env.CHATWOOT_ACCOUNT_ID || "1",
-                  chatwootUrl: process.env.CHATWOOT_URL || "",
-                  chatwootToken: process.env.CHATWOOT_API_TOKEN || "",
-                });
-                
-                if (webhookResult.success) {
-                  await db.createPlatformLog({
-                    tenantId: tenant.id,
-                    eventType: 'workflow_provisioned',
-                    severity: 'info',
-                    message: `Webhook Chatwoot criado via N8N: ${n8nWebhookUrl}`,
-                  });
-                  
-                  console.log('✅ [STEP 6] Webhook Chatwoot criado via N8N:', n8nWebhookUrl);
-                } else {
-                  // Tentar método direto como fallback
-                  console.log('⚠️ [STEP 6] N8N falhou, tentando método direto...');
-                  try {
-                    const directResult = await createChatwootWebhook(tenant.id, n8nWebhookUrl);
-                    await db.createPlatformLog({
-                      tenantId: tenant.id,
-                      eventType: 'workflow_provisioned',
-                      severity: 'info',
-                      message: `Webhook Chatwoot criado (método direto): ${directResult.webhookUrl}`,
-                    });
-                    console.log('✅ [STEP 6] Webhook Chatwoot criado (método direto):', directResult.webhookUrl);
-                  } catch (directError: any) {
-                    await db.createPlatformLog({
-                      tenantId: tenant.id,
-                      eventType: 'workflow_failed',
-                      severity: 'warning',
-                      message: `Falha ao criar webhook Chatwoot: ${webhookResult.error || directError.message}. Pode ser criado manualmente depois.`,
-                    });
-                    console.log('⚠️ [STEP 6] Erro ao criar webhook Chatwoot (ambos métodos falharam):', webhookResult.error || directError.message);
-                  }
-                }
-              } catch (error: any) {
-                await db.createPlatformLog({
-                  tenantId: tenant.id,
-                  eventType: 'workflow_failed',
-                  severity: 'warning',
-                  message: `Falha ao criar webhook Chatwoot: ${error.message}. Pode ser criado manualmente depois.`,
-                });
-                console.log('⚠️ [STEP 6] Erro ao criar webhook Chatwoot:', error.message);
-                // Não lançar erro - webhook pode ser criado manualmente depois
-              }
-            }
           } catch (error: any) {
             await db.createPlatformLog({
               tenantId: tenant.id,
@@ -461,18 +352,20 @@ export const appRouter = router({
             // Não lançar erro aqui - tenant já foi criado
           }
           
-          // 7. Criar configura\u00e7\u00e3o padr\u00e3o do agente
-          console.log('🔧 [STEP 7] Criando configura\u00e7\u00e3o do agente...');
+          console.log('✅ [STEP 5] Workflow N8N clonado!');
+          
+          // 6. Criar configura\u00e7\u00e3o padr\u00e3o do agente
+          console.log('🔧 [STEP 6] Criando configura\u00e7\u00e3o do agente...');
           await db.createAgentConfig({
             tenantId: tenant.id,
             systemPrompt: 'Você é um assistente virtual prestativo e profissional.',
             companyInfo: JSON.stringify({ name: input.companyName }),
             welcomeMessage: 'Olá! Como posso ajudá-lo hoje?',
           });
-          console.log('✅ [STEP 7] Configura\u00e7\u00e3o criada!');
+          console.log('✅ [STEP 6] Configura\u00e7\u00e3o criada!');
           
-          // 8. Notificar o propriet\u00e1rio
-              console.log('📧 [STEP 8] Notificando proprietário...');
+          // 7. Notificar o propriet\u00e1rio
+              console.log('📧 [STEP 7] Notificando proprietário...');
           await notifyOwner({
             title: 'Novo Cliente Cadastrado',
             content: `Um novo cliente foi cadastrado: ${input.companyName} (${input.email})`,
@@ -963,69 +856,9 @@ export const appRouter = router({
   }),
 
     /**
-     * Ativa o agente enviando POST para o webhook do N8N
-     */
-    activateAgent: clientProcedure.mutation(async ({ ctx }) => {
-      const tenant = ctx.tenant;
-      
-      if (!tenant) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Cliente não encontrado',
-        });
-      }
-
-      if (!tenant.n8nWorkflowId) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Workflow N8N não provisionado',
-        });
-      }
-
-      // URL do webhook do agente do tenant
-      const webhookUrl = `${process.env.N8N_API_URL}/webhook/tenant_${tenant.id}`;
-      
-      try {
-        // Enviar POST para o webhook do N8N para ativar o agente
-        const response = await axios.post(webhookUrl, {
-          action: 'activate',
-          tenantId: tenant.id,
-          timestamp: new Date().toISOString(),
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        });
-
-        console.log(`[Client] Agente ativado para tenant ${tenant.id}. Resposta:`, response.status);
-
-        return {
-          success: true,
-          message: 'Agente ativado com sucesso!',
-        };
-      } catch (error: any) {
-        console.error(`[Client] Erro ao ativar agente:`, error.response?.data || error.message);
-        
-        // Não falhar se o webhook não responder - pode ser que o workflow não esteja pronto
-        if (error.response?.status === 404) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Webhook do agente não encontrado. Verifique se o workflow está ativo no N8N.',
-          });
-        }
-
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Erro ao ativar agente: ${error.message}`,
-        });
-      }
-    }),
-
-    /**
      * Desconecta WhatsApp e permite regenerar QR Code
      */
-    disconnectWhatsApp: clientProcedure.mutation(async ({ ctx }) => {
+    disconnectWhatsApp: protectedProcedure.mutation(async ({ ctx }) => {
     // Se for cliente, usar tenant direto
     let tenant = ctx.tenant;
     
@@ -1058,6 +891,73 @@ export const appRouter = router({
       });
     }
   }),
+
+    /**
+     * Ativa o agente de IA enviando POST para webhook do N8N
+     * Isso cria o webhook no Chatwoot automaticamente
+     */
+    activateAgent: protectedProcedure.mutation(async ({ ctx }) => {
+      const tenant = ctx.tenant;
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      if (!tenant.n8nWorkflowId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Workflow N8N não provisionado',
+        });
+      }
+
+      // URL do webhook do N8N para este tenant
+      const webhookUrl = `${process.env.N8N_API_URL}/webhook/tenant_${tenant.id}`;
+      
+      try {
+        // Enviar POST para o webhook do N8N
+        // O N8N vai processar e criar o webhook no Chatwoot
+        const response = await axios.post(webhookUrl, {
+          action: 'activate',
+          tenantId: tenant.id,
+          timestamp: new Date().toISOString(),
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        });
+
+        console.log(`[Client] Agente ativado para tenant ${tenant.id}. Resposta:`, response.status);
+
+        await db.createPlatformLog({
+          tenantId: tenant.id,
+          eventType: 'agent_activated',
+          severity: 'info',
+          message: 'Agente de IA ativado via webhook N8N',
+        });
+
+        return {
+          success: true,
+          message: 'Agente ativado com sucesso!',
+        };
+      } catch (error: any) {
+        console.error(`[Client] Erro ao ativar agente:`, error.response?.data || error.message);
+        
+        if (error.response?.status === 404) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Webhook do agente não encontrado. Verifique se o workflow está ativo no N8N.',
+          });
+        }
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Erro ao ativar agente: ${error.message}`,
+        });
+      }
+    }),
 
     /**
      * Atualiza configuração do agente (prompt)

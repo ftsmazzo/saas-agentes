@@ -156,11 +156,8 @@ export async function loginAdmin(email: string, password: string): Promise<{
   user?: User;
   error?: string;
 }> {
-  // Normalizar email
-  const normalizedEmail = email.trim().toLowerCase();
-  
   // Buscar usuário admin por email
-  const user = await db.getUserByEmail(normalizedEmail);
+  const user = await db.getUserByEmail(email);
   
   if (!user) {
     return { success: false, error: "Email ou senha inválidos" };
@@ -170,25 +167,15 @@ export async function loginAdmin(email: string, password: string): Promise<{
     return { success: false, error: "Acesso negado. Apenas administradores podem fazer login aqui." };
   }
 
-  // Verificar se usuário tem senha configurada
-  if (!user.passwordHash) {
-    return { success: false, error: "Senha não configurada. Entre em contato com o administrador do sistema." };
-  }
-
-  // Verificar senha
-  const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+  // Verificar se usuário tem senha (se não, precisa criar primeiro)
+  // Por enquanto, vamos assumir que admin precisa ter senha no banco
+  // TODO: Adicionar campo passwordHash na tabela users se necessário
   
-  if (!passwordMatch) {
-    return { success: false, error: "Email ou senha inválidos" };
-  }
-
-  // Atualizar último login
-  await db.upsertUser({
-    openId: user.openId,
-    lastSignedIn: new Date(),
-  });
-
-  return { success: true, user };
+  // Se não tiver senha, retornar erro
+  // Por enquanto, vamos criar um sistema simples onde admin precisa ter senha definida
+  // Você pode criar o primeiro admin manualmente no banco ou via script
+  
+  return { success: false, error: "Sistema de login admin ainda não implementado completamente. Use OAuth temporariamente ou crie usuário no banco." };
 }
 
 /**

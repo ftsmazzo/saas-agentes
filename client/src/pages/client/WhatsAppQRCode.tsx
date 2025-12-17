@@ -87,14 +87,12 @@ export default function WhatsAppQRCode() {
   useEffect(() => {
     if (status) {
       console.log("[Client] Status atual:", status);
-      console.log("[Client] isConnected:", isConnected);
-      console.log("[Client] status?.status:", status?.status);
       // Se o status mudou para "open", atualizar também o QR Code
       if (status.status === "open") {
         refetchQR();
       }
     }
-  }, [status, refetchQR, isConnected]);
+  }, [status, refetchQR]);
 
   return (
     <ClientLayout>
@@ -136,12 +134,6 @@ export default function WhatsAppQRCode() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Debug info */}
-          {process.env.NODE_ENV === 'development' && status && (
-            <div className="mb-2 text-xs text-muted-foreground">
-              Debug: status = {JSON.stringify(status?.status)}, isConnected = {String(isConnected)}
-            </div>
-          )}
           {isLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -169,7 +161,7 @@ export default function WhatsAppQRCode() {
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Ligar Agente de IA
+                    Ativar Agente
                   </>
                 )}
               </Button>
