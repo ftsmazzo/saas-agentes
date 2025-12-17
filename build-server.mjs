@@ -6,9 +6,14 @@ import { readFileSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Ler tsconfig.json para pegar os paths
-const tsconfig = JSON.parse(readFileSync(resolve(__dirname, 'tsconfig.json'), 'utf-8'));
-const paths = tsconfig.compilerOptions.paths || {};
+// Ler tsconfig.json para pegar os paths (se existir)
+let paths = {};
+try {
+  const tsconfig = JSON.parse(readFileSync(resolve(__dirname, 'tsconfig.json'), 'utf-8'));
+  paths = tsconfig.compilerOptions?.paths || {};
+} catch (error) {
+  console.warn('⚠️  tsconfig.json não encontrado, usando aliases padrão');
+}
 
 // Criar plugin para resolver aliases
 const aliasPlugin = {

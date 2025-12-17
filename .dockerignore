@@ -55,7 +55,7 @@ pnpm-debug.log*
 vitest.config.ts
 
 # Development files
-tsconfig.json
+# tsconfig.json - NECESSÁRIO para build-server.mjs resolver aliases
 .prettierrc
 .prettierignore
 

@@ -967,8 +967,17 @@ export const appRouter = router({
         });
       }
 
+      // Validar se N8N_API_URL está configurado
+      const n8nApiUrl = process.env.N8N_API_URL;
+      if (!n8nApiUrl) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'N8N_API_URL não está configurado. Verifique as variáveis de ambiente.',
+        });
+      }
+
       // URL do webhook do N8N para este tenant
-      const webhookUrl = `${process.env.N8N_API_URL}/webhook/tenant_${tenant.id}`;
+      const webhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
       
       try {
         // Enviar POST para o webhook do N8N
