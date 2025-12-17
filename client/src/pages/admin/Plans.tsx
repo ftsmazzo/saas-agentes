@@ -372,10 +372,115 @@ export default function PlansPage() {
               </a>
             </p>
             <p>2. Copie o Price ID de cada plano criado</p>
-            <p>3. Atualize o arquivo <code>server/products.ts</code> com os IDs corretos</p>
-            <p>4. Execute o SQL para inserir os planos no banco de dados (veja CONFIGURACAO.md)</p>
+            <p>3. Use o botão "Novo Plano" acima para criar planos diretamente no sistema</p>
           </CardContent>
         </Card>
+
+        {/* Dialog de Edição */}
+        {editDialogOpen && (
+          <Dialog open={editDialogOpen !== null} onOpenChange={(open) => !open && setEditDialogOpen(null)}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Editar Plano</DialogTitle>
+                <DialogDescription>
+                  Atualize as informações do plano
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Nome do Plano *</Label>
+                  <Input
+                    id="edit-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Plano Básico"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Descrição</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Ideal para pequenas empresas"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-stripePriceId">Stripe Price ID</Label>
+                    <Input
+                      id="edit-stripePriceId"
+                      value={formData.stripePriceId}
+                      onChange={(e) => setFormData({ ...formData, stripePriceId: e.target.value })}
+                      placeholder="price_1234567890"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-priceMonthly">Preço Mensal (R$)</Label>
+                    <Input
+                      id="edit-priceMonthly"
+                      type="number"
+                      step="0.01"
+                      value={formData.priceMonthly}
+                      onChange={(e) => setFormData({ ...formData, priceMonthly: e.target.value })}
+                      placeholder="99.00"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-maxWorkflowExecutions">Execuções/mês</Label>
+                    <Input
+                      id="edit-maxWorkflowExecutions"
+                      type="number"
+                      value={formData.maxWorkflowExecutions}
+                      onChange={(e) => setFormData({ ...formData, maxWorkflowExecutions: e.target.value })}
+                      placeholder="1000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-maxConversations">Conversas/mês</Label>
+                    <Input
+                      id="edit-maxConversations"
+                      type="number"
+                      value={formData.maxConversations}
+                      onChange={(e) => setFormData({ ...formData, maxConversations: e.target.value })}
+                      placeholder="500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-maxStorageGB">Armazenamento (GB)</Label>
+                    <Input
+                      id="edit-maxStorageGB"
+                      type="number"
+                      value={formData.maxStorageGB}
+                      onChange={(e) => setFormData({ ...formData, maxStorageGB: e.target.value })}
+                      placeholder="5"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditDialogOpen(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleUpdate}
+                  disabled={updateMutation.isPending || !formData.name}
+                >
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar Alterações"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </AdminLayout>
   );
