@@ -55,7 +55,7 @@ pnpm-debug.log*
 vitest.config.ts
 
 # Development files
-vite.config.ts
+# vite.config.ts - NECESSÁRIO durante o build, mas não copiado para produção (multi-stage build)
 # tsconfig.json - NECESSÁRIO para build-server.mjs resolver aliases
 .prettierrc
 .prettierignore
