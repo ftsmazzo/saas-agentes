@@ -25,15 +25,38 @@ export default function SetupWizard() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<Step>("n8n");
   
-  // N8N State
+  // Buscar configurações do ambiente (auto-fill)
+  const { data: envConfig } = trpc.config.getEnvConfig.useQuery();
+  
+  // N8N State - preencher automaticamente se disponível
   const [n8nUrl, setN8nUrl] = useState("");
   const [n8nApiKey, setN8nApiKey] = useState("");
   const [n8nWorkflowId, setN8nWorkflowId] = useState("");
   const [n8nTested, setN8nTested] = useState(false);
+  
+  // Preencher automaticamente quando envConfig carregar
+  useEffect(() => {
+    if (envConfig) {
+      if (envConfig.n8nApiUrl && !n8nUrl) setN8nUrl(envConfig.n8nApiUrl);
+      if (envConfig.n8nTemplateWorkflowId && !n8nWorkflowId) setN8nWorkflowId(envConfig.n8nTemplateWorkflowId);
+      // Se já tem tudo configurado no ambiente, marcar como testado
+      if (envConfig.hasN8nEnv && n8nUrl && n8nWorkflowId) {
+        setN8nTested(true);
+      }
+    }
+  }, [envConfig, n8nUrl, n8nWorkflowId]);
 
   // Stripe State
   const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState("");
+  
+  // Preencher Stripe quando envConfig carregar
+  useEffect(() => {
+    if (envConfig?.hasStripeEnv) {
+      // Se já está configurado no ambiente, não precisa preencher (mas pode editar)
+      // O usuário pode deixar vazio e usar do ambiente, ou preencher manualmente
+    }
+  }, [envConfig]);
 
   // Plan State
   const [planName, setPlanName] = useState("");
@@ -58,7 +81,26 @@ export default function SetupWizard() {
 
   const handleTestN8N = async () => {
     try {
-      await testN8NMutation.mutateAsync({ apiUrl: n8nUrl, apiKey: n8nApiKey });
+      // Usar valores do formulário ou do ambiente
+      const apiUrl = n8nUrl || envConfig?.n8nApiUrl || "";
+      const apiKey = n8nApiKey || (envConfig?.hasN8nEnv ? "env" : ""); // Placeholder se usar env
+      
+      if (!apiUrl) {
+        toast.error("URL da API do N8N é obrigatória");
+        return;
+      }
+      
+      // Se está usando do ambiente e não preencheu manualmente, usar endpoint especial
+      if (envConfig?.hasN8nEnv && !n8nApiKey) {
+        // Testar usando variáveis de ambiente do servidor
+        await testN8NMutation.mutateAsync({ 
+          apiUrl: envConfig.n8nApiUrl || "", 
+          apiKey: "env" // Signal para usar do ambiente
+        });
+      } else {
+        await testN8NMutation.mutateAsync({ apiUrl, apiKey });
+      }
+      
       setN8nTested(true);
       toast.success("Conexão com N8N testada com sucesso!");
     } catch (error) {
@@ -67,16 +109,22 @@ export default function SetupWizard() {
   };
 
   const handleSaveN8N = async () => {
-    if (!n8nTested) {
+    // Se está usando do ambiente, não precisa testar (já está funcionando)
+    if (!envConfig?.hasN8nEnv && !n8nTested) {
       toast.error("Por favor, teste a conexão primeiro");
       return;
     }
 
     try {
+      // Usar valores do formulário ou do ambiente
+      const apiUrl = n8nUrl || envConfig?.n8nApiUrl || "";
+      const apiKey = n8nApiKey || (envConfig?.hasN8nEnv ? "env" : "");
+      const templateWorkflowId = n8nWorkflowId || envConfig?.n8nTemplateWorkflowId || "";
+      
       await saveN8NMutation.mutateAsync({
-        apiUrl: n8nUrl,
-        apiKey: n8nApiKey,
-        templateWorkflowId: n8nWorkflowId,
+        apiUrl,
+        apiKey,
+        templateWorkflowId,
       });
       toast.success("Configurações N8N salvas!");
       setCurrentStep("stripe");
@@ -164,6 +212,16 @@ export default function SetupWizard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {envConfig?.hasN8nEnv && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    ✅ Configurações encontradas nas variáveis de ambiente! Os campos foram preenchidos automaticamente.
+                    Você pode editar se necessário ou usar os valores do ambiente.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div>
                 <Label htmlFor="n8n-url">URL da API do N8N *</Label>
                 <Input
@@ -174,7 +232,7 @@ export default function SetupWizard() {
                   onChange={(e) => setN8nUrl(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Variável de ambiente: N8N_API_URL
+                  Variável de ambiente: N8N_API_URL {envConfig?.n8nApiUrl && `(já configurado: ${envConfig.n8nApiUrl})`}
                 </p>
               </div>
 
@@ -183,12 +241,12 @@ export default function SetupWizard() {
                 <Input
                   id="n8n-key"
                   type="password"
-                  placeholder="Sua API Key do N8N"
+                  placeholder={envConfig?.hasN8nEnv ? "Já configurado no ambiente (deixe vazio para usar)" : "Sua API Key do N8N"}
                   value={n8nApiKey}
                   onChange={(e) => setN8nApiKey(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Variável de ambiente: N8N_API_KEY
+                  Variável de ambiente: N8N_API_KEY {envConfig?.hasN8nEnv && "(já configurado no ambiente)"}
                 </p>
               </div>
 
@@ -219,18 +277,18 @@ export default function SetupWizard() {
                 <Button
                   onClick={handleTestN8N}
                   variant="outline"
-                  disabled={!n8nUrl || !n8nApiKey || testN8NMutation.isPending}
+                  disabled={(!n8nUrl && !envConfig?.n8nApiUrl) || (!n8nApiKey && !envConfig?.hasN8nEnv) || testN8NMutation.isPending}
                 >
                   {testN8NMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Testar Conexão
                 </Button>
                 <Button
                   onClick={handleSaveN8N}
-                  disabled={!n8nTested || !n8nWorkflowId || saveN8NMutation.isPending}
+                  disabled={(!n8nTested && !envConfig?.hasN8nEnv) || (!n8nWorkflowId && !envConfig?.n8nTemplateWorkflowId) || saveN8NMutation.isPending}
                   className="flex-1"
                 >
                   {saveN8NMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Salvar e Continuar
+                  {envConfig?.hasN8nEnv && !n8nTested ? "Usar Configuração do Ambiente" : "Salvar e Continuar"}
                 </Button>
               </div>
             </CardContent>

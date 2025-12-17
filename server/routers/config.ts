@@ -30,15 +30,33 @@ export const configRouter = router({
   testN8N: adminProcedure
     .input(
       z.object({
-        apiUrl: z.string().url(),
-        apiKey: z.string().min(1),
+        apiUrl: z.string().url().optional(),
+        apiKey: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
+      // Usar valores do input ou das variáveis de ambiente
+      const apiUrl = input.apiUrl || process.env.N8N_API_URL || "";
+      const apiKey = input.apiKey === "env" ? (process.env.N8N_API_KEY || "") : (input.apiKey || process.env.N8N_API_KEY || "");
+      
+      if (!apiUrl) {
+        return {
+          success: false,
+          message: "URL da API do N8N não configurada",
+        };
+      }
+      
+      if (!apiKey) {
+        return {
+          success: false,
+          message: "API Key do N8N não configurada",
+        };
+      }
+      
       try {
-        const response = await axios.get(`${input.apiUrl}/api/v1/workflows`, {
+        const response = await axios.get(`${apiUrl}/api/v1/workflows`, {
           headers: {
-            "X-N8N-API-KEY": input.apiKey,
+            "X-N8N-API-KEY": apiKey,
           },
           timeout: 10000,
         });
@@ -61,17 +79,26 @@ export const configRouter = router({
   saveN8N: adminProcedure
     .input(
       z.object({
-        apiUrl: z.string().url(),
-        apiKey: z.string().min(1),
-        templateWorkflowId: z.string().min(1),
+        apiUrl: z.string().url().optional(),
+        apiKey: z.string().optional(),
+        templateWorkflowId: z.string().min(1).optional(),
       })
     )
     .mutation(async ({ input }) => {
-      await setConfig(CONFIG_KEYS.N8N_API_URL, input.apiUrl, "N8N API URL");
-      await setConfig(CONFIG_KEYS.N8N_API_KEY, input.apiKey, "N8N API Key", true);
+      // Usar valores do input ou das variáveis de ambiente
+      const apiUrl = input.apiUrl || process.env.N8N_API_URL || "";
+      const apiKey = input.apiKey === "env" ? (process.env.N8N_API_KEY || "") : (input.apiKey || process.env.N8N_API_KEY || "");
+      const templateWorkflowId = input.templateWorkflowId || process.env.N8N_TEMPLATE_WORKFLOW_ID || "";
+      
+      if (!apiUrl || !apiKey || !templateWorkflowId) {
+        throw new Error("Configurações do N8N incompletas. Verifique as variáveis de ambiente ou preencha os campos.");
+      }
+      
+      await setConfig(CONFIG_KEYS.N8N_API_URL, apiUrl, "N8N API URL");
+      await setConfig(CONFIG_KEYS.N8N_API_KEY, apiKey, "N8N API Key", true);
       await setConfig(
         CONFIG_KEYS.N8N_TEMPLATE_WORKFLOW_ID,
-        input.templateWorkflowId,
+        templateWorkflowId,
         "N8N Template Workflow ID"
       );
 
@@ -176,5 +203,21 @@ export const configRouter = router({
   isSetupCompleted: adminProcedure.query(async () => {
     const completed = await getConfig(CONFIG_KEYS.SETUP_COMPLETED);
     return completed === "true";
+  }),
+
+  /**
+   * Get environment variables for auto-fill (read-only, for UI convenience)
+   */
+  getEnvConfig: adminProcedure.query(async () => {
+    return {
+      n8nApiUrl: process.env.N8N_API_URL || "",
+      n8nApiKey: process.env.N8N_API_KEY ? "***" : "", // Mask for security
+      n8nTemplateWorkflowId: process.env.N8N_TEMPLATE_WORKFLOW_ID || "",
+      stripeSecretKey: process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY ? "***" : "",
+      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ? "***" : "",
+      // Check if env vars are set (for auto-complete)
+      hasN8nEnv: !!(process.env.N8N_API_URL && process.env.N8N_API_KEY && process.env.N8N_TEMPLATE_WORKFLOW_ID),
+      hasStripeEnv: !!(process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY) && !!process.env.STRIPE_WEBHOOK_SECRET,
+    };
   }),
 });
