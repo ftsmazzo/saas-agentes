@@ -278,6 +278,7 @@ export default function TenantsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
