@@ -81,16 +81,10 @@ export default function WhatsAppQRCode() {
     disconnectMutation.mutate();
   };
 
-  // Verificar se está conectado - aceitar múltiplos valores que indicam conexão
+  // Verificar se está conectado - simplificado e mais confiável
   const isConnected = status?.status === "open" || 
                       status?.status === "connected" || 
-                      status?.status === "CONNECTED" ||
-                      (status?.status !== "close" && 
-                       status?.status !== "CLOSE" && 
-                       status?.status !== "not_provisioned" && 
-                       status?.status !== "disconnected" &&
-                       status?.status !== undefined &&
-                       !qrData?.qrCode); // Se não há QR Code, provavelmente está conectado
+                      status?.status === "CONNECTED";
   
   const isLoading = qrLoading || statusLoading;
   

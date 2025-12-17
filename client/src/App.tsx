@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
 // Admin pages
+import AdminLogin from "./pages/admin/Login";
 import SetupWizard from "./pages/admin/SetupWizard";
 import WelcomePage from "./pages/admin/Welcome";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -33,6 +34,7 @@ function Router() {
       <Route path={"/activate/:token"} component={ActivateAccount} />
       
       {/* Admin Routes */}
+      <Route path={"/admin/login"} component={AdminLogin} />
       <Route path={"/admin/setup"} component={SetupWizard} />
       <Route path={"/admin"} component={WelcomePage} />
       <Route path={"/admin/dashboard"} component={AdminDashboard} />
