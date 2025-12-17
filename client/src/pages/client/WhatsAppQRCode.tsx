@@ -80,7 +80,17 @@ export default function WhatsAppQRCode() {
     disconnectMutation.mutate();
   };
 
-  const isConnected = status?.status === "open";
+  // Verificar se está conectado - aceitar múltiplos valores que indicam conexão
+  const isConnected = status?.status === "open" || 
+                      status?.status === "connected" || 
+                      status?.status === "CONNECTED" ||
+                      (status?.status !== "close" && 
+                       status?.status !== "CLOSE" && 
+                       status?.status !== "not_provisioned" && 
+                       status?.status !== "disconnected" &&
+                       status?.status !== undefined &&
+                       !qrData?.qrCode); // Se não há QR Code, provavelmente está conectado
+  
   const isLoading = qrLoading || statusLoading;
   
   // Debug: log do status e forçar refetch quando status mudar
@@ -92,16 +102,17 @@ export default function WhatsAppQRCode() {
       isLoading,
       qrLoading,
       statusLoading,
+      hasQRCode: !!qrData?.qrCode,
     });
     
     if (status) {
       console.log("[Client] Status atual:", status);
-      // Se o status mudou para "open", atualizar também o QR Code
-      if (status.status === "open") {
+      // Se o status mudou para "open" ou conectado, atualizar também o QR Code
+      if (status.status === "open" || status.status === "connected" || status.status === "CONNECTED") {
         refetchQR();
       }
     }
-  }, [status, isConnected, isLoading, qrLoading, statusLoading, refetchQR]);
+  }, [status, isConnected, isLoading, qrLoading, statusLoading, qrData, refetchQR]);
 
   return (
     <ClientLayout>
@@ -146,7 +157,7 @@ export default function WhatsAppQRCode() {
           {/* Debug info - remover em produção */}
           {status && (
             <div className="mb-2 p-2 bg-gray-100 rounded text-xs font-mono">
-              Debug: status = "{status?.status}", isConnected = {String(isConnected)}
+              Debug: status = "{status?.status}", isConnected = {String(isConnected)}, hasQRCode = {String(!!qrData?.qrCode)}
             </div>
           )}
           {isLoading ? (
