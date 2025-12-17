@@ -24,7 +24,8 @@ export default function WhatsAppQRCode() {
       refetchInterval: (query) => {
         // Auto-refresh a cada 3 segundos se não estiver conectado
         const currentStatus = query.state.data?.status;
-        if (currentStatus === "open") {
+        // Parar polling quando estiver conectado (aceitar múltiplos valores)
+        if (currentStatus === "open" || currentStatus === "connected" || currentStatus === "CONNECTED") {
           return false; // Parar quando conectado
         }
         return 3000; // Continuar atualizando a cada 3 segundos
@@ -93,26 +94,12 @@ export default function WhatsAppQRCode() {
   
   const isLoading = qrLoading || statusLoading;
   
-  // Debug: log do status e forçar refetch quando status mudar
+  // Atualizar QR Code quando status mudar para conectado
   useEffect(() => {
-    console.log("[Client] Debug - Status completo:", {
-      status,
-      statusValue: status?.status,
-      isConnected,
-      isLoading,
-      qrLoading,
-      statusLoading,
-      hasQRCode: !!qrData?.qrCode,
-    });
-    
-    if (status) {
-      console.log("[Client] Status atual:", status);
-      // Se o status mudou para "open" ou conectado, atualizar também o QR Code
-      if (status.status === "open" || status.status === "connected" || status.status === "CONNECTED") {
-        refetchQR();
-      }
+    if (status?.status === "open" || status?.status === "connected" || status?.status === "CONNECTED") {
+      refetchQR();
     }
-  }, [status, isConnected, isLoading, qrLoading, statusLoading, qrData, refetchQR]);
+  }, [status?.status, refetchQR]);
 
   return (
     <ClientLayout>
@@ -154,12 +141,6 @@ export default function WhatsAppQRCode() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Debug info - remover em produção */}
-          {status && (
-            <div className="mb-2 p-2 bg-gray-100 rounded text-xs font-mono">
-              Debug: status = "{status?.status}", isConnected = {String(isConnected)}, hasQRCode = {String(!!qrData?.qrCode)}
-            </div>
-          )}
           {isLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
