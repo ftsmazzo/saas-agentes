@@ -24,6 +24,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Adicionar hash aos arquivos para cache busting
+    rollupOptions: {
+      output: {
+        // Adicionar timestamp ao nome dos arquivos para evitar cache
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/[name]-[hash].js`,
+        assetFileNames: `assets/[name]-[hash].[ext]`,
+      },
+    },
   },
   server: {
     host: true,

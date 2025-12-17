@@ -48,20 +48,32 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath =
-    process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
+  // Em produção, sempre usar dist/public (onde o build gera os arquivos)
+  const distPath = path.resolve(import.meta.dirname, "../..", "dist", "public");
+  
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
 
-  app.use(express.static(distPath));
+  // Servir arquivos estáticos com headers de cache apropriados
+  app.use(express.static(distPath, {
+    // Cache assets por 1 ano (eles têm hash no nome)
+    maxAge: "1y",
+    // Mas sempre validar index.html (sem cache)
+    etag: true,
+    lastModified: true,
+  }));
 
   // fall through to index.html if the file doesn't exist
+  // IMPORTANTE: Sempre servir index.html sem cache para garantir atualizações
   app.use("*", (_req, res) => {
+    res.set({
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    });
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
