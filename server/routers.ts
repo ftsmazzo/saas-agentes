@@ -897,7 +897,14 @@ export const appRouter = router({
      * Isso cria o webhook no Chatwoot automaticamente
      */
     activateAgent: protectedProcedure.mutation(async ({ ctx }) => {
-      const tenant = ctx.tenant;
+      // Se for cliente, usar tenant direto
+      let tenant = ctx.tenant;
+      
+      // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+      if (!tenant && ctx.user) {
+        tenant = await db.getTenantByUserId(ctx.user.id);
+      }
+      
       if (!tenant) {
         throw new TRPCError({
           code: 'NOT_FOUND',
