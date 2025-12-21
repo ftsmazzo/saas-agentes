@@ -128,6 +128,11 @@ export const agentConfigs = pgTable("agentConfigs", {
   enableAudioTranscription: boolean("enableAudioTranscription").default(true),
   enableImageProcessing: boolean("enableImageProcessing").default(true),
   
+  // Configurações de Tools/Agentes Especialistas (JSON)
+  toolsConfig: text("toolsConfig"), // JSON: { enabledTools: [], toolSettings: {} }
+  schedulingConfig: text("schedulingConfig"), // JSON: { enabled: boolean, settings: {} }
+  ragConfig: text("ragConfig"), // JSON: { enabled: boolean, kbId: string, apiUrl: string }
+  
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -1,0 +1,601 @@
+import { useState, useEffect } from "react";
+import { trpc } from "@/lib/trpc";
+import ClientLayout from "@/components/ClientLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { 
+  Save, 
+  Bot, 
+  Settings, 
+  Calendar, 
+  FileText, 
+  MessageSquare,
+  Database,
+  MapPin,
+  Search,
+  Loader2,
+  CheckCircle2,
+  Clock
+} from "lucide-react";
+
+// Tools disponíveis baseados no workflow N8N
+const AVAILABLE_TOOLS = [
+  {
+    id: "agentSQL",
+    name: "Agente SQL",
+    description: "Consultas a banco de dados para extrair dados quantitativos",
+    icon: Database,
+    enabled: true,
+  },
+  {
+    id: "agentTerritorio",
+    name: "Agente Território",
+    description: "Identificação de CRAS e abrangência territorial",
+    icon: MapPin,
+    enabled: true,
+  },
+  {
+    id: "vectorRAG",
+    name: "Vector (RAG)",
+    description: "Consulta a documentos e base de conhecimento",
+    icon: Search,
+    enabled: false,
+  },
+  {
+    id: "buscaEndereco",
+    name: "Busca Endereço",
+    description: "Consulta ViaCEP para obter dados de endereço",
+    icon: MapPin,
+    enabled: true,
+  },
+  {
+    id: "scheduling",
+    name: "Agendamento",
+    description: "Sistema de agendamentos e calendário",
+    icon: Calendar,
+    enabled: false,
+  },
+];
+
+export default function AgentConfigUnifiedPage() {
+  const { data: config, isLoading } = trpc.agent.getConfig.useQuery();
+  const utils = trpc.useUtils();
+
+  const [formData, setFormData] = useState({
+    systemPrompt: "",
+    welcomeMessage: "",
+    companyInfo: "",
+    enableHumanHandoff: true,
+    enableAudioTranscription: true,
+    enableImageProcessing: true,
+    // Tools config
+    toolsConfig: {
+      enabledTools: [] as string[],
+      toolSettings: {} as Record<string, any>,
+    },
+    // Scheduling config
+    schedulingConfig: {
+      enabled: false,
+      settings: {
+        businessHours: { start: "09:00", end: "18:00" },
+        timezone: "America/Sao_Paulo",
+        availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      },
+    },
+    // RAG config
+    ragConfig: {
+      enabled: false,
+      kbId: "",
+      apiUrl: "",
+    },
+  });
+
+  useEffect(() => {
+    if (config) {
+      setFormData({
+        systemPrompt: config.systemPrompt || "",
+        welcomeMessage: config.welcomeMessage || "",
+        companyInfo: config.companyInfo || "",
+        enableHumanHandoff: config.enableHumanHandoff ?? true,
+        enableAudioTranscription: config.enableAudioTranscription ?? true,
+        enableImageProcessing: config.enableImageProcessing ?? true,
+        toolsConfig: config.toolsConfig 
+          ? JSON.parse(config.toolsConfig) 
+          : { enabledTools: [], toolSettings: {} },
+        schedulingConfig: config.schedulingConfig
+          ? JSON.parse(config.schedulingConfig)
+          : { enabled: false, settings: {} },
+        ragConfig: config.ragConfig
+          ? JSON.parse(config.ragConfig)
+          : { enabled: false, kbId: "", apiUrl: "" },
+      });
+    }
+  }, [config]);
+
+  const updateMutation = trpc.agent.updateConfig.useMutation({
+    onSuccess: () => {
+      toast.success("Configurações salvas com sucesso!");
+      utils.agent.getConfig.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao salvar configurações: ${error.message}`);
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate({
+      systemPrompt: formData.systemPrompt,
+      welcomeMessage: formData.welcomeMessage,
+      companyInfo: formData.companyInfo,
+      enableHumanHandoff: formData.enableHumanHandoff,
+      enableAudioTranscription: formData.enableAudioTranscription,
+      enableImageProcessing: formData.enableImageProcessing,
+      toolsConfig: JSON.stringify(formData.toolsConfig),
+      schedulingConfig: JSON.stringify(formData.schedulingConfig),
+      ragConfig: JSON.stringify(formData.ragConfig),
+    });
+  };
+
+  const toggleTool = (toolId: string) => {
+    const enabledTools = formData.toolsConfig.enabledTools || [];
+    const newEnabledTools = enabledTools.includes(toolId)
+      ? enabledTools.filter(id => id !== toolId)
+      : [...enabledTools, toolId];
+    
+    setFormData({
+      ...formData,
+      toolsConfig: {
+        ...formData.toolsConfig,
+        enabledTools: newEnabledTools,
+      },
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <ClientLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </ClientLayout>
+    );
+  }
+
+  if (!config) {
+    return (
+      <ClientLayout>
+        <Card className="text-center py-12">
+          <CardContent>
+            <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Nenhum agente configurado</h2>
+            <p className="text-muted-foreground mb-4">
+              Crie seu primeiro agente para começar
+            </p>
+            <Button onClick={() => window.location.href = "/client/create-agent"}>
+              Criar Agente
+            </Button>
+          </CardContent>
+        </Card>
+      </ClientLayout>
+    );
+  }
+
+  return (
+    <ClientLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Configuração do Agente</h1>
+          <p className="text-muted-foreground">
+            Personalize o comportamento e configure as ferramentas do seu agente de IA
+          </p>
+        </div>
+
+        <Tabs defaultValue="basic" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="basic">Básico</TabsTrigger>
+            <TabsTrigger value="tools">Tools/Especialistas</TabsTrigger>
+            <TabsTrigger value="scheduling">Agendamento</TabsTrigger>
+            <TabsTrigger value="rag">RAG</TabsTrigger>
+            <TabsTrigger value="features">Funcionalidades</TabsTrigger>
+          </TabsList>
+
+          {/* Aba Básico */}
+          <TabsContent value="basic" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5" />
+                  Prompt do Sistema
+                </CardTitle>
+                <CardDescription>
+                  Define a personalidade e o comportamento base do agente
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="systemPrompt">Instruções para o Agente</Label>
+                  <Textarea
+                    id="systemPrompt"
+                    value={formData.systemPrompt}
+                    onChange={(e) =>
+                      setFormData({ ...formData, systemPrompt: e.target.value })
+                    }
+                    placeholder="Você é um assistente virtual prestativo e profissional..."
+                    rows={10}
+                    className="resize-none font-mono text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="welcomeMessage">Mensagem de Boas-Vindas</Label>
+                  <Textarea
+                    id="welcomeMessage"
+                    value={formData.welcomeMessage}
+                    onChange={(e) =>
+                      setFormData({ ...formData, welcomeMessage: e.target.value })
+                    }
+                    placeholder="Olá! Como posso ajudá-lo hoje?"
+                    rows={3}
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyInfo">Informações da Empresa (JSON)</Label>
+                  <Textarea
+                    id="companyInfo"
+                    value={formData.companyInfo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, companyInfo: e.target.value })
+                    }
+                    placeholder='{"name": "Minha Empresa", "address": "Rua X, 123", "phone": "(11) 99999-9999"}'
+                    rows={6}
+                    className="resize-none font-mono text-sm"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba Tools/Especialistas */}
+          <TabsContent value="tools" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Agentes Especialistas / Tools
+                </CardTitle>
+                <CardDescription>
+                  Ative ou desative as ferramentas que o agente pode usar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {AVAILABLE_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  const isEnabled = formData.toolsConfig.enabledTools?.includes(tool.id) || tool.enabled;
+                  
+                  return (
+                    <div
+                      key={tool.id}
+                      className="flex items-center justify-between p-4 rounded-lg border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Label className="font-semibold">{tool.name}</Label>
+                            {isEnabled && (
+                              <Badge variant="outline" className="text-green-600">
+                                Ativo
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {tool.description}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={isEnabled}
+                        onCheckedChange={() => toggleTool(tool.id)}
+                      />
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba Agendamento */}
+          <TabsContent value="scheduling" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Configuração de Agendamento
+                </CardTitle>
+                <CardDescription>
+                  Configure os dados de agendamento que o agente usará
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Ativar Agendamento</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permite que o agente gerencie agendamentos
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.schedulingConfig.enabled}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        schedulingConfig: {
+                          ...formData.schedulingConfig,
+                          enabled: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {formData.schedulingConfig.enabled && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Horário de Início</Label>
+                        <Input
+                          type="time"
+                          value={formData.schedulingConfig.settings?.businessHours?.start || "09:00"}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              schedulingConfig: {
+                                ...formData.schedulingConfig,
+                                settings: {
+                                  ...formData.schedulingConfig.settings,
+                                  businessHours: {
+                                    ...formData.schedulingConfig.settings?.businessHours,
+                                    start: e.target.value,
+                                  },
+                                },
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Horário de Fim</Label>
+                        <Input
+                          type="time"
+                          value={formData.schedulingConfig.settings?.businessHours?.end || "18:00"}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              schedulingConfig: {
+                                ...formData.schedulingConfig,
+                                settings: {
+                                  ...formData.schedulingConfig.settings,
+                                  businessHours: {
+                                    ...formData.schedulingConfig.settings?.businessHours,
+                                    end: e.target.value,
+                                  },
+                                },
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Fuso Horário</Label>
+                      <Input
+                        value={formData.schedulingConfig.settings?.timezone || "America/Sao_Paulo"}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            schedulingConfig: {
+                              ...formData.schedulingConfig,
+                              settings: {
+                                ...formData.schedulingConfig.settings,
+                                timezone: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        placeholder="America/Sao_Paulo"
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba RAG */}
+          <TabsContent value="rag" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Base de Conhecimento (RAG)
+                </CardTitle>
+                <CardDescription>
+                  Configure e visualize sua base de conhecimento
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Ativar RAG</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permite que o agente consulte documentos e base de conhecimento
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.ragConfig.enabled}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        ragConfig: {
+                          ...formData.ragConfig,
+                          enabled: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {formData.ragConfig.enabled && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label>URL da API RAG</Label>
+                      <Input
+                        value={formData.ragConfig.apiUrl}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            ragConfig: {
+                              ...formData.ragConfig,
+                              apiUrl: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="https://sistemarag.fabricadosdados.online/api/kb"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>ID da Base de Conhecimento</Label>
+                      <Input
+                        value={formData.ragConfig.kbId}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            ragConfig: {
+                              ...formData.ragConfig,
+                              kbId: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="300001"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="font-semibold">Documentos</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Visualização de documentos será implementada em breve
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba Funcionalidades */}
+          <TabsContent value="features" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Funcionalidades do Agente</CardTitle>
+                <CardDescription>
+                  Ative ou desative recursos específicos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableHumanHandoff">
+                      Transferência para Atendimento Humano
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permite que usuários solicitem atendimento humano
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableHumanHandoff"
+                    checked={formData.enableHumanHandoff}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, enableHumanHandoff: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableAudioTranscription">
+                      Transcrição de Áudio
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Converte mensagens de áudio em texto
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableAudioTranscription"
+                    checked={formData.enableAudioTranscription}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, enableAudioTranscription: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableImageProcessing">
+                      Processamento de Imagens
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permite que o agente analise imagens enviadas
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableImageProcessing"
+                    checked={formData.enableImageProcessing}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, enableImageProcessing: checked })
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Botão de Salvar */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            size="lg"
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Salvar Configurações
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </ClientLayout>
+  );
+}
+

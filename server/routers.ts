@@ -806,6 +806,9 @@ export const appRouter = router({
         enableHumanHandoff: z.boolean().optional(),
         enableAudioTranscription: z.boolean().optional(),
         enableImageProcessing: z.boolean().optional(),
+        toolsConfig: z.string().optional(), // JSON string
+        schedulingConfig: z.string().optional(), // JSON string
+        ragConfig: z.string().optional(), // JSON string
       }))
       .mutation(async ({ input, ctx }) => {
         // Se for cliente, usar tenant direto
@@ -1343,6 +1346,146 @@ export const appRouter = router({
     const config = await db.getAgentConfig(tenant.id);
     return config;
     }),
+  }),
+
+  // ========== ROTAS DE INTERAÇÕES E ANÁLISE ==========
+  
+  interactions: router({
+    // Buscar conversas do tenant
+    getConversations: protectedProcedure.query(async ({ ctx }) => {
+      let tenant = ctx.tenant;
+      
+      if (!tenant && ctx.user) {
+        tenant = await db.getTenantByUserId(ctx.user.id);
+      }
+      
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      const conversations = await db.getConversationsByTenantId(tenant.id, 100);
+      return conversations;
+    }),
+
+    // Analisar interações selecionadas e sugerir melhorias no prompt
+    analyzeAndImprovePrompt: protectedProcedure
+      .input(z.object({
+        conversationIds: z.array(z.number()).min(1, "Selecione pelo menos uma conversa"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        let tenant = ctx.tenant;
+        
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        // Buscar configuração atual do agente
+        const currentConfig = await db.getAgentConfig(tenant.id);
+        if (!currentConfig) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Configuração do agente não encontrada',
+          });
+        }
+
+        // Buscar mensagens das conversas selecionadas
+        const messages = await db.getMessagesByConversationIds(input.conversationIds);
+        
+        if (messages.length === 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Nenhuma mensagem encontrada nas conversas selecionadas',
+          });
+        }
+
+        // Preparar contexto para análise com IA
+        const conversationContext = messages
+          .slice(0, 100) // Limitar a 100 mensagens para não exceder tokens
+          .map(msg => `${msg.role === 'user' ? 'Usuário' : 'Assistente'}: ${msg.content}`)
+          .join('\n\n');
+
+        const currentPrompt = currentConfig.systemPrompt || "";
+
+        // Chamar OpenAI para analisar e sugerir melhorias
+        try {
+          const OpenAI = (await import("openai")).default;
+          const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+          });
+
+          const analysisPrompt = `Você é um especialista em otimização de prompts para assistentes de IA.
+
+Analise as seguintes interações entre usuários e um assistente de IA, junto com o prompt atual do sistema, e sugira melhorias específicas e acionáveis.
+
+PROMPT ATUAL DO SISTEMA:
+${currentPrompt}
+
+INTERAÇÕES ANALISADAS:
+${conversationContext}
+
+INSTRUÇÕES:
+1. Identifique padrões nas interações onde o assistente poderia ter respondido melhor
+2. Identifique pontos onde o prompt atual é vago ou poderia ser mais específico
+3. Sugira melhorias concretas e específicas no prompt
+4. Mantenha o tom e personalidade geral, mas torne o prompt mais eficaz
+5. Retorne APENAS o prompt melhorado, sem explicações adicionais
+6. O prompt deve ser direto, claro e acionável
+
+PROMPT MELHORADO:`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "Você é um especialista em otimização de prompts. Analise interações e sugira melhorias específicas e acionáveis no prompt do sistema.",
+              },
+              {
+                role: "user",
+                content: analysisPrompt,
+              },
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+          });
+
+          const suggestedPrompt = completion.choices[0]?.message?.content?.trim() || currentPrompt;
+
+          // Log da análise
+          await db.createPlatformLog({
+            tenantId: tenant.id,
+            eventType: 'config_updated',
+            severity: 'info',
+            message: `Análise de ${input.conversationIds.length} conversas para melhoria do prompt`,
+            metadata: JSON.stringify({
+              conversationIds: input.conversationIds,
+              messagesAnalyzed: messages.length,
+            }),
+          });
+
+          return {
+            suggestedPrompt,
+            conversationsAnalyzed: input.conversationIds.length,
+            messagesAnalyzed: messages.length,
+          };
+        } catch (error: any) {
+          console.error("[Interactions] Erro ao analisar com IA:", error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao analisar interações: ${error.message}`,
+          });
+        }
+      }),
   }),
 });
 

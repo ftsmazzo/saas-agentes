@@ -17,6 +17,8 @@ import SettingsPage from "./pages/admin/Settings";
 
 // Client pages
 import AgentConfigPage from "./pages/client/AgentConfig";
+import AgentConfigUnifiedPage from "./pages/client/AgentConfigUnified";
+import InteractionsPage from "./pages/client/Interactions";
 import MetricsPage from "./pages/client/Metrics";
 import SubscriptionPage from "./pages/client/Subscription";
 import WhatsAppQRCode from "./pages/client/WhatsAppQRCode";
@@ -47,8 +49,9 @@ function Router() {
       <Route path={"/client/create-agent"} component={CreateAgentPage} />
       <Route path={"/client"} component={WhatsAppQRCode} />
       <Route path={"/client/whatsapp"} component={WhatsAppQRCode} />
-      <Route path={"/client/settings"} component={AgentSettings} />
-      <Route path={"/client/agent"} component={AgentConfigPage} />
+      <Route path={"/client/settings"} component={AgentConfigUnifiedPage} />
+      <Route path={"/client/agent"} component={AgentConfigUnifiedPage} />
+      <Route path={"/client/interactions"} component={InteractionsPage} />
       <Route path={"/client/metrics"} component={MetricsPage} />
       <Route path={"/client/subscription"} component={SubscriptionPage} />
       

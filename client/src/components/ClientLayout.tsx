@@ -19,7 +19,8 @@ import {
   CreditCard,
   LogOut,
   Menu,
-  X
+  X,
+  Settings
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
@@ -100,7 +101,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   const navigation = [
     { name: "WhatsApp", href: "/client", icon: Smartphone },
-    { name: "Criar Agente", href: "/client/create-agent", icon: Bot },
+    { name: "Interações", href: "/client/interactions", icon: MessageSquare },
     { name: "Configurações", href: "/client/settings", icon: Settings },
     { name: "Métricas", href: "/client/metrics", icon: BarChart3 },
     { name: "Assinatura", href: "/client/subscription", icon: CreditCard },

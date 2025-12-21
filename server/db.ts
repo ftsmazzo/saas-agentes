@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, ne } from "drizzle-orm";
+import { eq, desc, and, gte, lte, ne, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { 
@@ -19,7 +19,13 @@ import {
   platformLogs,
   PlatformLog,
   InsertPlatformLog,
-  activationTokens
+  activationTokens,
+  conversations,
+  Conversation,
+  chatMessages,
+  ChatMessage,
+  contacts,
+  Contact
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -388,6 +394,67 @@ export async function getAgentConfig(tenantId: number): Promise<AgentConfig | un
 
   const result = await db.select().from(agentConfigs).where(eq(agentConfigs.tenantId, tenantId)).limit(1);
   return result[0];
+}
+
+// ========== CONVERSATIONS AND MESSAGES OPERATIONS ==========
+
+export async function getConversationsByTenantId(
+  tenantId: number,
+  limit: number = 50
+): Promise<(Conversation & { contact: Contact | null; messages: ChatMessage[] })[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const convs = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.tenantId, tenantId))
+    .orderBy(desc(conversations.startedAt))
+    .limit(limit);
+
+  // Buscar contatos e mensagens para cada conversa
+  const result = await Promise.all(
+    convs.map(async (conv) => {
+      const contact = await db
+        .select()
+        .from(contacts)
+        .where(eq(contacts.id, conv.contactId))
+        .limit(1);
+
+      const messages = await db
+        .select()
+        .from(chatMessages)
+        .where(eq(chatMessages.conversationId, conv.id))
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(20); // Últimas 20 mensagens
+
+      return {
+        ...conv,
+        contact: contact[0] || null,
+        messages: messages.reverse(), // Ordem cronológica
+      };
+    })
+  );
+
+  return result;
+}
+
+export async function getMessagesByConversationIds(
+  conversationIds: number[]
+): Promise<ChatMessage[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  if (conversationIds.length === 0) return [];
+
+  // Buscar mensagens de múltiplas conversas
+  const messages = await db
+    .select()
+    .from(chatMessages)
+    .where(inArray(chatMessages.conversationId, conversationIds))
+    .orderBy(desc(chatMessages.createdAt));
+
+  return messages;
 }
 
 /**
