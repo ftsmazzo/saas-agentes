@@ -212,5 +212,6 @@ CREATE INDEX IF NOT EXISTS idx_activation_tokens_tenant ON "activationTokens"("t
 --    são criadas automaticamente pelo workflow N8N quando um agente é criado
 -- 3. No EasyPanel, mude DATABASE_URL de mysql:// para postgresql://
 -- 4. Faça redeploy no EasyPanel
+-- 5. Execute criar-admin-postgresql.sql para criar o usuário admin
 -- ============================================
 
