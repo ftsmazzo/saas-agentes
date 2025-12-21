@@ -1,5 +1,6 @@
-import { eq, desc, and, gte, lte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { eq, desc, and, gte, lte, ne } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { 
   InsertUser, 
   users,
@@ -27,7 +28,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -75,9 +77,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -88,7 +87,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -149,13 +149,10 @@ export async function createTenant(tenant: InsertTenant): Promise<Tenant> {
     }
   }
 
-  const result = await db.insert(tenants).values(cleanTenant);
-  const insertedId = Number(result[0].insertId);
+  const result = await db.insert(tenants).values(cleanTenant).returning();
+  if (!result[0]) throw new Error("Failed to create tenant");
   
-  const created = await db.select().from(tenants).where(eq(tenants.id, insertedId)).limit(1);
-  if (!created[0]) throw new Error("Failed to retrieve created tenant");
-  
-  return created[0];
+  return result[0];
 }
 
 export async function getTenantById(id: number): Promise<Tenant | undefined> {
@@ -218,13 +215,10 @@ export async function createPlan(plan: InsertPlan): Promise<Plan> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(plans).values(plan);
-  const insertedId = Number(result[0].insertId);
+  const result = await db.insert(plans).values(plan).returning();
+  if (!result[0]) throw new Error("Failed to create plan");
   
-  const created = await db.select().from(plans).where(eq(plans.id, insertedId)).limit(1);
-  if (!created[0]) throw new Error("Failed to retrieve created plan");
-  
-  return created[0];
+  return result[0];
 }
 
 export async function getAllPlans(): Promise<Plan[]> {
@@ -248,13 +242,10 @@ export async function createAgentConfig(config: InsertAgentConfig): Promise<Agen
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(agentConfigs).values(config);
-  const insertedId = Number(result[0].insertId);
+  const result = await db.insert(agentConfigs).values(config).returning();
+  if (!result[0]) throw new Error("Failed to create agent config");
   
-  const created = await db.select().from(agentConfigs).where(eq(agentConfigs.id, insertedId)).limit(1);
-  if (!created[0]) throw new Error("Failed to retrieve created config");
-  
-  return created[0];
+  return result[0];
 }
 
 export async function getAgentConfigByTenantId(tenantId: number): Promise<AgentConfig | undefined> {
@@ -278,13 +269,10 @@ export async function createUsageMetric(metric: InsertUsageMetric): Promise<Usag
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(usageMetrics).values(metric);
-  const insertedId = Number(result[0].insertId);
+  const result = await db.insert(usageMetrics).values(metric).returning();
+  if (!result[0]) throw new Error("Failed to create usage metric");
   
-  const created = await db.select().from(usageMetrics).where(eq(usageMetrics.id, insertedId)).limit(1);
-  if (!created[0]) throw new Error("Failed to retrieve created metric");
-  
-  return created[0];
+  return result[0];
 }
 
 export async function getUsageMetricsByTenantId(

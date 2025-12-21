@@ -105,3 +105,7 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
+
+# Chat exports (contém secrets)
+Saas-Chat.md
+*-Chat.md

@@ -3,7 +3,6 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { handleStripeWebhook } from "../webhooks/stripe";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -43,8 +42,6 @@ async function startServer() {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

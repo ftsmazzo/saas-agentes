@@ -62,10 +62,13 @@ export function useAuth(options?: UseAuthOptions) {
       }
     }
     
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(normalizedUser)
-    );
+    // Armazenar informações do usuário no localStorage (compatibilidade)
+    if (normalizedUser) {
+      localStorage.setItem(
+        "user-info",
+        JSON.stringify(normalizedUser)
+      );
+    }
     
     return {
       user: normalizedUser,

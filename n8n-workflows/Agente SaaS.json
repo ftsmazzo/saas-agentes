@@ -1,0 +1,3040 @@
+{
+  "name": "Agente SaaS",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "79e12438-2f6b-4d30-ad90-21c74ba06525",
+      "name": "Loop Over Items3",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4192,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# Splitar Mensagens e Enviar Áudio ou Texto",
+        "height": 416,
+        "width": 1212,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3552,
+        464
+      ],
+      "typeVersion": 1,
+      "id": "38e39bcb-4e27-46e1-a31e-003244808056",
+      "name": "Sticky Note18"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4.1-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        3024,
+        384
+      ],
+      "id": "e6aa1688-81a4-4273-b837-645f26c8e346",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Uz4TLFVBceTDWn51",
+          "name": "OpenIA-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "defac08a-6745-422b-bb05-90da9f47d91b",
+              "leftValue": "={{ $('Busca Telefone').last().json.values() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        192
+      ],
+      "id": "13ef57d8-0fa9-4de6-86fc-46eba00ea1a3",
+      "name": "If4"
+    },
+    {
+      "parameters": {
+        "content": "# Histórico Supabase\n",
+        "height": 380,
+        "width": 1212,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3552,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "9661a8f5-efe8-4438-8462-6199c1f06d07",
+      "name": "Sticky Note54"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "chats",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "phone",
+              "keyValue": "={{ $('Info2').item.json.telefone }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        192
+      ],
+      "id": "4a024ace-5966-4c43-b9f6-f7c99cc8d050",
+      "name": "Busca Telefone",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "chats",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Info2').item.json.telefone }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now}}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3952,
+        112
+      ],
+      "id": "cd88d99f-e7fb-4480-85eb-1bead738b77a",
+      "name": "Adiciona CHAT supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "chats",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "phone",
+              "condition": "eq",
+              "keyValue": "={{ $('Info2').item.json.telefone }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3952,
+        288
+      ],
+      "id": "45d4088a-897f-449e-9dd7-427e15bff49f",
+      "name": "Atualiza CHAT Supabase",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Info2').item.json.telefone }}"
+            },
+            {
+              "fieldId": "bot_message",
+              "fieldValue": "={{ $('Supervisor').first().json.output }}"
+            },
+            {
+              "fieldId": "user_message",
+              "fieldValue": "={{ $('Info2').item.json.mensagem }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "={{ $('Info2').item.json.tipo }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "nomewpp",
+              "fieldValue": "={{ $('Info2').item.json.NomeWhatsapp }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4128,
+        192
+      ],
+      "id": "7b2dddd6-5149-460a-9641-4a22d8d2d8f3",
+      "name": "Cria Histórico Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.messages",
+        "options": {
+          "destinationFieldName": "output"
+        }
+      },
+      "id": "830eeb50-f9a4-4d85-bd84-a3d48d98ae25",
+      "name": "Split de Mensagem",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3984,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $json.phone }}"
+      },
+      "id": "e2f6e03a-bb77-42d8-be7c-2c30977c0311",
+      "name": "Delete Memory",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4304,
+        192
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Enfileirar Mensagens\n",
+        "height": 796,
+        "width": 636,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2336,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "e280782c-52b1-44ac-b73f-804f9dadbd16",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "content": "# Roteamento de Mensagens",
+        "height": 796,
+        "width": 1184,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1152,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "f9ef9f95-3e3d-47fc-9ed5-3256a6b6a819",
+      "name": "Sticky Note20"
+    },
+    {
+      "parameters": {
+        "content": "# Sistema de atendimento humano",
+        "height": 796,
+        "width": 1156,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "c21c7b48-64f0-401c-a80b-b861e52a29ce",
+      "name": "Sticky Note26"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3c5ccbc9-69d1-4b13-a7c3-e6945bc8c655",
+              "name": "data",
+              "value": "={{ $json.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "716af5cd-064a-440d-b450-900abd3ea50e",
+      "name": "Edit Fields3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "dados_cliente",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telefone",
+              "condition": "eq",
+              "keyValue": "={{ $('Info2').item.json.telefone }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "atendimento_ia",
+              "fieldValue": "pause"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        704,
+        144
+      ],
+      "id": "14ce9af5-9596-4b11-9de4-b649cfc91806",
+      "name": "Pausar IA",
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.atendimento_ia }}",
+                    "rightValue": "pause",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    },
+                    "id": "ff00573b-e517-43c6-8644-14a4fe8565d1"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IA Ativa"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "3ef0e01c-cc14-4663-bb4d-2905b350c3ab",
+                    "leftValue": "={{ $json.atendimento_ia }}",
+                    "rightValue": "=pause",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IA pausada"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ea6791c7-bc5f-4636-ae4b-a2caeaecd472",
+      "name": "Rota Atendimento",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        208,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "dados_cliente",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telefone",
+              "condition": "eq",
+              "keyValue": "={{ $('Info2').item.json.telefone }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "atendimento_ia",
+              "fieldValue": "reativada"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        704,
+        320
+      ],
+      "id": "5d37e628-e6cb-461e-a7f1-853431f8b7ac",
+      "name": "Reativar IA",
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Criação Banco de Dados",
+        "height": 376,
+        "width": 1400,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1968,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "385a27cf-162e-4b4e-8c2e-fbe1ed941a31",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "id": "3159a4ff-1afa-4a84-946a-58ee1564a8cc",
+      "name": "OpenAI4",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        2032,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Uz4TLFVBceTDWn51",
+          "name": "OpenIA-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b6b2f965-1529-4b65-bc7b-c4260a27341f",
+              "leftValue": "={{ $json.body.conversation.messages[0].sender.identifier || $json.body.conversation.meta.sender.identifier }}",
+              "rightValue": "5516996480805@s.whatsapp.net",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        160
+      ],
+      "id": "920bc6e3-797c-4aaf-a6ba-bcc52e837eda",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "dados_cliente",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telefone",
+              "keyValue": "={{ $('Info2').item.json.telefone }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        448
+      ],
+      "id": "a9d18375-7a22-4f85-86d6-789d802aaf1e",
+      "name": "Buscar Cliente",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4a6d9aac-8565-4c58-abe3-8741393a5535",
+              "leftValue": "={{ $('Buscar Cliente').item.json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -464,
+        608
+      ],
+      "id": "6dd330b3-d9c1-445b-a7f2-b8338d728fd9",
+      "name": "Cliente Existe?"
+    },
+    {
+      "parameters": {
+        "tableId": "dados_cliente",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "nomewpp",
+              "fieldValue": "={{ $('Info2').item.json.NomeWhatsapp }}"
+            },
+            {
+              "fieldId": "telefone",
+              "fieldValue": "={{ $('Info2').item.json.telefone }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        624
+      ],
+      "id": "111165dc-b36b-44b9-9077-51e19fcfa82c",
+      "name": "Criar Cliente",
+      "credentials": {
+        "supabaseApi": {
+          "id": "CpzaMbqrsj5EVEJd",
+          "name": "Supabase-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Info2').item.json.tipo }}",
+                    "rightValue": "outgoing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7c878f9b-2c93-4061-954a-a832153e7647"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "outgoing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "d7b42536-638f-4128-b51b-6aa913e9d9bc",
+                    "leftValue": "={{ $('Info2').item.json.tipo }}",
+                    "rightValue": "incoming",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "incoming"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "607a3fa3-9f31-4ee0-a16f-a46c3e0da64e",
+      "name": "ROTA Entrando ou Saindo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        32,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data",
+        "options": {
+          "fileName": "file.ogg",
+          "mimeType": "application/ogg"
+        }
+      },
+      "id": "3e6d7edf-8269-480e-abb3-261354e447b9",
+      "name": "Converter Audio",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1872,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "=data",
+        "options": {
+          "fileName": "data.jpeg",
+          "mimeType": "image/jpeg"
+        }
+      },
+      "id": "d71f8b3d-c03f-42de-96ab-83044069bcad",
+      "name": "Converter Foto",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1872,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "e514e613-fd6a-48bd-b0ae-bae2448c810e",
+                    "leftValue": "={{ $('Info2').item.json.mensagem_audio_ou_imagem ? \"null\" : $('Info2').item.json.mensage_de_texto }}",
+                    "rightValue": "null",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Info2').item.json.mensagem_audio_ou_imagem }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "88b5bc5f-ef3c-486c-abe1-96cbb26c75ed"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "c0e434dd-1268-421d-b81b-3a5e90ed9550",
+                    "leftValue": "={{ $('Info2').item.json.mensagem_audio_ou_imagem }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "808bfbc2-1b4f-48c7-a212-4b872bfdb537",
+                    "leftValue": "={{ $('Info2').item.json.mensagem_audio_ou_imagem }}",
+                    "rightValue": "file",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2c2d8de-8480-4dd4-bb24-7ead01abaa87",
+      "name": "ROTA Mensagens",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Use a ferramenta para pensar sobre algo. Ela não obterá novas informações nem alterará o banco de dados, apenas anexará o pensamento ao registro. Use-a quando for necessário raciocínio complexo ou alguma memória cache.\n\nRespostas sempre em português."
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        3312,
+        384
+      ],
+      "id": "6a10153b-e779-49d9-8c2d-674e67d001ee",
+      "name": "thinking"
+    },
+    {
+      "parameters": {
+        "content": "# Agente Principal\n",
+        "height": 780,
+        "width": 580,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2976,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "28017f25-719b-4b76-ac91-f71cdb93249a",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Info2').item.json.telefone }}",
+        "contextWindowLength": 40
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        3168,
+        384
+      ],
+      "id": "4bdc4ea0-a96f-4f8b-813e-61d754d44d60",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_chat_histories",
+          "mode": "list",
+          "cachedResultName": "n8n_chat_histories"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Info2').item.json.telefone }}",
+            "message": "={\"type\": \"ai\", \"content\": \"{{ $('Info2').item.json.mensagem.replace(/\\r?\\n|\\r/g, ' ') }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        896,
+        144
+      ],
+      "id": "290ba1e6-6995-41ea-a9ba-21bec670688a",
+      "name": "Salvar Historico1",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2592,
+        704
+      ],
+      "id": "de996116-9e4c-444d-be99-45ebe6ea0206",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "5b53c49b-1a3c-4382-88db-6f178088c23d",
+      "name": "Intervalo entre Mensagens",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2400,
+        320
+      ],
+      "webhookId": "9f0edf0b-ca36-42a6-bab6-bf62ca08ac51"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $('Info2').item.json.telefone }}",
+        "messageData": "={{ $('Info2').item.json.mensagem }}",
+        "tail": true
+      },
+      "id": "57e5fdc1-35dd-4dd6-97c9-68c35c7f3e2b",
+      "name": "Texto Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        160
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $('Info2').item.json.telefone }}",
+        "messageData": "={{ $json.text }}",
+        "tail": true
+      },
+      "id": "83596d64-3a90-42bb-b3d3-f46ea81716b9",
+      "name": "Audio Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        320
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $('Info2').item.json.telefone }}",
+        "messageData": "={{ $json.content || $('Dados').item.json.message.content || $json.text }}",
+        "tail": true
+      },
+      "id": "7356cf05-c18a-4507-9302-2f3f2055086f",
+      "name": "imagem Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        496
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "={{ $('Info2').item.json.telefone }}",
+        "options": {}
+      },
+      "id": "8c9dcc1d-bcfc-4ac0-895d-380eb840536f",
+      "name": "Buscas Mensagens",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        480
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "239cab79-8fb1-45ca-9a04-11006892d52e",
+              "name": "mensagem_completa",
+              "value": "={{ $json.propertyName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2624,
+        176
+      ],
+      "id": "731f8080-0937-4e41-a643-9162fb050e59",
+      "name": "Mensagem Completa1"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $('Info2').item.json.telefone }}"
+      },
+      "id": "ac61aaf2-da25-48d4-8c5b-d5c0fe4dbbd9",
+      "name": "Deletar Mensagens",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2800,
+        176
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE chat_messages (\n  id BIGSERIAL PRIMARY KEY,\n  created_at TIMESTAMPTZ, \n  phone TEXT,\n  nomewpp TEXT, \n  bot_message TEXT,\n  user_message TEXT, \n  message_type TEXT,\n  active BOOLEAN DEFAULT TRUE\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1840,
+        224
+      ],
+      "id": "a835250d-7abc-4866-b71b-9dbea444a32d",
+      "name": "chat_messages",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "create table dados_cliente (\n  id bigserial primary key,\n  created_at TIMESTAMPTZ, \n  telefone text, \n  nomewpp text,\n  atendimento_ia text\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1456,
+        224
+      ],
+      "id": "195ad493-ca47-4965-aa10-323e03485e93",
+      "name": "dados_cliente",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "create extension vector;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1648,
+        224
+      ],
+      "id": "78c519bd-f97b-4770-9fa2-507150180ae0",
+      "name": "vetor",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "create function match_documents (\n  query_embedding vector(1536),\n  match_count int default null,\n  filter jsonb DEFAULT '{}'\n) returns table (\n  id bigint,\n  content text,\n  metadata jsonb,\n  similarity float\n)\nlanguage plpgsql\nas $$\n#variable_conflict use_column\nbegin\n  return query\n  select\n    id,\n    content,\n    metadata,\n    1 - (documents.embedding <=> query_embedding) as similarity\n  from documents\n  where metadata @> filter\n  order by documents.embedding <=> query_embedding\n  limit match_count;\nend;\n$$;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1072,
+        224
+      ],
+      "id": "f83fd491-bd85-4fe3-9123-ae47b4494d42",
+      "name": "match_documents",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Create a table to store your documents\ncreate table documents (\n  id bigserial primary key,\n  content text, -- corresponds to Document.pageContent\n  metadata jsonb, -- corresponds to Document.metadata\n  embedding vector(1536) -- 1536 works for OpenAI embeddings, change if needed\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1264,
+        224
+      ],
+      "id": "bc2c561b-1dee-4894-aa61-1e3d1de044a0",
+      "name": "documents",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Criação\n",
+        "height": 228,
+        "width": 1280,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1904,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "5fda2b33-aa6b-45e2-bcfb-11a00a43428d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Limpeza\n",
+        "height": 244,
+        "width": 1280,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1904,
+        560
+      ],
+      "typeVersion": 1,
+      "id": "f15fdb89-0b0b-4df8-ac5c-8f3ae12f0733",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM n8n_chat_histories",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1840,
+        624
+      ],
+      "id": "4328c352-86fc-43e7-8171-db43247c0197",
+      "name": "Deletar Histórico",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from chat_messages",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1056,
+        624
+      ],
+      "id": "66b38dd3-9b46-4e05-9358-4837f0303dfa",
+      "name": "Deletar conteúdo Chat_Messages",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from dados_cliente",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1440,
+        624
+      ],
+      "id": "7e898c80-e53c-4cf6-bb24-9ba5300dc401",
+      "name": "Deletar conteúdo Dados Cliente",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from chats",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1648,
+        624
+      ],
+      "id": "3b2f2fa9-906c-4f37-997f-897443a4ab1e",
+      "name": "Deletar conteúdo Chats",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from documents",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1248,
+        624
+      ],
+      "id": "1b206bf1-ecfd-4264-8081-26ee0fb86a90",
+      "name": "Deletar conteúdo Documentos",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d5a342e9-585b-42ea-be44-644adae10199",
+              "leftValue": "={{ $('Mensagem').item.json.mensagem }}",
+              "rightValue": "={{ $json.propertyName.last() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "19b70c8d-c579-43a9-b9d6-45e1818bf1ed",
+      "name": "Compara Memoria",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2400,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# Agentes Especialistas\n\n",
+        "height": 316,
+        "width": 580,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2976,
+        560
+      ],
+      "typeVersion": 1,
+      "id": "8fe8d687-0e3d-4559-8f4f-755a621a0c48",
+      "name": "Sticky Note19"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3c5ccbc9-69d1-4b13-a7c3-e6945bc8c655",
+              "name": "data",
+              "value": "={{ $json.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3e09f9a6-cf89-46b6-bf29-820ba62baa39",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "239cab79-8fb1-45ca-9a04-11006892d52e",
+              "name": "mensagem",
+              "value": "={{ $json.content || $json.message?.content || $json.text || $json.mensage_de_texto || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        176
+      ],
+      "id": "8238fbd8-5e9a-411d-832a-fae83fb2b3d7",
+      "name": "Mensagem"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Mensagem Completa1').item.json.mensagem_completa }}",
+        "options": {
+          "systemMessage": "=## **1. Identidade e Propósito**\n\nVocê é **CaduIA**, agente de IA da Vigilância SocioAssistencial de Ribeirão Preto - SP. É um Agente cordial, técnico e objetivo você deve fazer:\n\n* **Análise de dados socioassistenciais**, do **Cadastro Único**\n* **Correlacionar os dados Quantitativos com Áreas de Abrangência de CRAS**\n* **Entregar respostas técnicas que reflitam um micro diagnóstico de Vigilância Socioassistencial**\n\nSeu propósito é:\n\n* **Responder perguntas quantitativas acionando o AgenteSQL** e produzir análises técnicas enxutas\n* **Responder sobre o Território acionando o AgenteTerritorio**\n* **Fornecer respostas diretas, técnicas e altamente objetivas para Assistentes Sociais e técnicos da Gestão**\n\n---\n\n## **2. Contexto e Conhecimento**\n\nVocê atua na **Secretaria da Assistência Social**, de **Ribeirão Preto** em **São Paulo** apoiando:\n\n* Técnicos Assistentes Sociais\n* Gestores do SUAS\n\nO Total de Famílias Cadastradas no CADU é : 41.070 famílias\nO Total de Pessoas Cadastradas no CADU é : 92.723 pessoas\nO Total de Pessoas com Deficiência no CADU é: 17.022 pessoas\nO Total de Pessoas de 00 a 17 anos e 11 meses no CADU é: 26.438 pessoas\nO Total de Pessoas com 60 anos ou mais no CADU é: 16.567 pessoas\n\nVocê tem acesso a:\n\n* **Tool AgenteSQL** para extrair números dos dados brutos do Cadastro Único\n* **Tool BuscaEndereco** (API ViaCEP): busca endereço completo a partir de CEP. Use sempre que o usuário mencionar um CEP. Analise e sanitize o CEP corretamente antes de usar. Extraia o bairro do retorno.\n* **Tool AgenteTerritorio** para  identificar o CRAS de abrangência do bairro consultando tabela de referência. Deve **SEMPRE** acionar e receber a informação de CRAS antes de produzir todas suas respostas que envolvam informações de Dados\n* **Tool Vector:** para consulta a documentos técnicos, normativos e bases de conhecimento especializadas que fundamentem tecnicamente suas respostas. Deve ser usada para apoiar respostas normativas, conceituais, e para embasamento técnico detalhado quando solicitado ou necessário.\n---\n\n## **3. Responsabilidades e Tarefas**\n\nVocê deve:\n\n* Receber o **imput** do usuário e identificar se é **uma pergunta quantitativa**, **uma mensagem simples de interação** ou **pergunta direta sobre abrangência de CRAS**\n* **Identificar quando a pergunta menciona CEP** e acionar BuscaEndereco para obter endereço completo e bairro\n* **Acionar sempre o AgenteTerritorio** para identificar o CRAS de Abrangência. Quando for informado um **bairro**, diretamente no imput do usuario, acione AgenteTerritorio e receba a Informação de CRAS de Abrangência. Quando o imput fornecer um **cep** numérico acesse a Tool BuscaEndereco, receba o endereço e envie esse endereço para AgenteTerritório para obter o CRAS de Abrangência.\n* Acionar 0 **AgenteTerritorio** em todas as interações que envolver dados quantitativos ou perguntas relacionadas a CRAS de referência, abrangência ou similares.\n* Acionar o **AgenteSQL** apenas quando houver necessidade de dados numéricos\n* Produzir análises **curtas, diretas e técnicas**\n* Fornecer insights **qualitativos relevantes**, quando aplicável\n* Responder sempre alinhado às normativas do SUAS\n* **Sempre incluir CRAS de abrangência na resposta** quando houver menção a bairro ou CEP\n* Para perguntas normativas, conceituais ou que necessitem de fundamentação técnica complementar, acione preferencialmente a Tool Vector.\n* A Tool Vector não substitui o AgenteSQL para consultas quantitativas nem o AgenteTerritorio para dados territoriais.\n* Use a Tool Vector para:\n  * Apresentar definições e conceitos normativos (ex.: PNAS, Tipificação, NOB-SUAS, protocolos, orientações técnicas)\n  * Esclarecer termos técnicos e procedimentos normativos com base em documentos oficiais\n  * Complementar análises técnicas com fundamentação documental precisa\n* O acionamento da Tool Vector deverá ser criterioso e limitado a perguntas que realmente necessitem de embasamento textual ou normativo, evitando consultas desnecessárias para garantir eficiência.\n---\n\n## **4. Diretrizes de Comportamento**\n\nVocê deve ser:\n\n* **Técnico, preciso, objetivo**\n* Direto ao ponto, sem floreios\n* Fundado em normativa e boas práticas da Vigilância\n* Analítico e claro ao interpretar dados\n* Rigoroso: **não inventa números**\n* Preciso: **não traz informações que devem vir das Tools se não tiver sido informado por elas**\n* Profissional e adequado ao ambiente técnico\n* **ATENÇÃO** Absolutamente proíbido usar memória ou previsão para passar dados especificos solicitados. A Tool AgenteSQL sempre deve ser acionada e sempre vem dela os números solicitados. Os valores de Contexto são para Referência e análise de porcentagens.\n* Seja rigoroso ao usar informações da Tool Vector, confirmando a fonte documental e evitando especulações.\n* Informe claramente que a fundamentação técnica está embasada em documentos oficiais acessados pela Tool Vector.\n* Em casos de dúvida normativas ou múltiplas versões, priorize a norma mais recente presente na base da Tool Vector.\n---\n\n## **5. Regras e Restrições**\n\n### **Você DEVE:**\n\n* **Classificar a pergunta antes de responder** (quantitativa vs. normativa)\n* **Gerenciar contexto ativamente:**\n  * Manter na memória filtros/recortes de perguntas anteriores (território, perfil, faixa etária, etc.)\n  * Reestruturar perguntas contextuais antes de enviar ao AgenteSQL\n  * Combinar contexto anterior com nova pergunta quando aplicável\n* **Estruturar perguntas para o AgenteSQL:**\n  * Enviar perguntas completas e contextualizadas\n  * Exemplo: \"Quantas crianças (0-12 anos) são do Ipiranga\" (não apenas \"quantas crianças\")\n* **Acionar BuscaEndereco sempre que o usuário mencionar um CEP:**\n  * Sanitize o CEP removendo caracteres especiais (apenas números)\n  * Use o CEP sanitizado para buscar o endereço completo\n  * Extraia o bairro do retorno\n* **Acionar Territorio SEMPRE que houver menção a bairro ou cep:**\n  * **CRÍTICO:** A tool AgenteTerritorio recebe o **NOME DO BAIRRO** (não CEP)\n  * Se houver CEP: primeiro BuscaEndereco para obter bairro, depois AgenteTerritorio com o nome do bairro\n  * Se houver bairro mencionado diretamente: acione AgenteTerritorio diretamente com o nome do bairro\n  * Obtenha o CRAS de abrangência do território\n  * **SEMPRE inclua o CRAS de Abrangência na resposta final** quando houver bairro/território envolvido\n* **Para perguntas diretas sobre CRAS:**\n  * Identifique o bairro mencionado\n  * Acione AgenteTerritorio diretamente com o nome do bairro\n  * Responda objetivamente: \"O bairro [nome] é de abrangência do [CRAS]\"\n  * NÃO peça CEP quando já tiver o nome do bairro\n* Acionar AgenteSQL em **qualquer pergunta que dependa de números**\n* Utilizar **exatamente** os dados retornados pelas Tools\n* Fornecer análises **objetivas e técnicas** (máximo 2 linhas) com foco em implicações práticas\n* Informar claramente quando os dados forem limitados ou vazios, **sem criar análises genéricas**\n\n### **Você NÃO DEVE:**\n\n* Inventar ou estimar dados\n* Inventar nome de CRAS de Abrangência que não tenha sido informado pela Tool **AgenteTerritorio**\n* Acionar ferramenta para perguntas normativas/conceituais\n* Enviar perguntas incompletas ou descontextualizadas ao AgenteSQL\n* Produzir textos longos, genéricos, repetitivos ou vazios\n* Criar análises quando não houver dados suficientes (apenas informe objetivamente)\n* Extrapolar interpretação normativa além do que o SUAS estabelece\n* Fornecer informações fora da área da Assistência Social\n\n---\n\n## **6. Fluxo de Trabalho**\n\n### **CENÁRIO A — Pergunta Quantitativa (com dados)**\n\n1. **Analise o contexto da conversa:**\n   * Identifique filtros/recortes mencionados em perguntas anteriores (território, faixa etária, perfil socioeconômico, etc.)\n   * **Identifique se há menção a CEP ou bairro na pergunta**\n   * Se a pergunta atual for uma continuação (ex: \"quantas crianças\" após \"quantas pessoas do Ipiranga\"), **aplique automaticamente os filtros do contexto anterior**\n   \n2. **Identifique e processe território:**\n   * **Se houver CEP mencionado:**\n     * **Acione BuscaEndereco:**\n       * Sanitize o CEP (remova hífen, espaços, pontos - apenas números)\n       * Busque o endereço completo via API ViaCEP\n       * Extraia o bairro do retorno\n       * Acione AgenteTerritorio com o NOME DO BAIRRO\n       * **CRÍTICO:** AgenteTerritorio recebe nome do bairro, não CEP\n       * Busque o CRAS de abrangência\n       * Armazene essa informação para incluir na resposta final\n   * **Se houver bairro mencionado:**\n     * **Acione AgenteTerritorio com o NOME DO BAIRRO:**\n       * Use o bairro identificado\n       * **CRÍTICO:** AgenteTerritorio recebe nome do bairro, não CEP\n       * Busque o CRAS de abrangência\n       * Armazene essa informação para incluir na resposta final\n   \n3. **Estruture a pergunta para o AgenteSQL:**\n   * **CRÍTICO:** O AgenteSQL não possui memória de contexto, então você DEVE enviar a pergunta completa\n   * Combine a pergunta atual com os filtros do contexto quando aplicável\n   * Se houver bairro identificado, use-o como território na pergunta\n   * Seja explícito e completo: \"Quantas crianças (0-12 anos) são do Ipiranga\" (ao invés de apenas \"quantas crianças\")\n   * Inclua todos os recortes necessários: território, faixa etária, perfil socioeconômico, etc.\n   * Envie a pergunta completa e contextualizada para o AgenteSQL\n   \n4. **Aguarde retorno dos dados brutos**\n   \n5. **Construa uma resposta técnica contendo:**\n   * Resultado numérico direto e preciso (inclua o recorte aplicado)\n   * **SEMPRE inclua CRAS de abrangência quando houver bairro/território envolvido**\n   * **Se houver CEP envolvido:** inclua também endereço completo\n   * Análise técnica objetiva (máximo 2 linhas) com foco em implicações práticas para a gestão\n   * Ação sugerida apenas se houver relevância técnica clara\n\n### **CENÁRIO B — Pergunta Discursiva ou Interação de Saucação**\n\n1. Identifique que NÃO exige dados\n2. NÃO acione a Tool\n3. Responda cordialmente. Se apresentando, dizendo oq faz e perguntando se pode ajudar:\n\n### **CENÁRIO C — Pergunta Direta sobre CRAS**\n\n1. **Identifique que a pergunta é sobre CRAS de abrangência:**\n   * Exemplos: \"Qual o CRAS do Ipiranga?\", \"CRAS do Botânico\", \"Qual CRAS atende o CEP X?\"\n   \n2. **Identifique o bairro:**\n   * Se houver CEP mencionado: acione BuscaEndereco primeiro para obter o bairro\n   * Se houver bairro mencionado diretamente: use o nome do bairro\n   * **NUNCA peça CEP quando já tiver o nome do bairro**\n   \n3. **Acione AgenteTerritorio:**\n   * Use o **NOME DO BAIRRO** identificado\n   * Obtenha o CRAS de abrangência\n   \n4. **Responda objetivamente:**\n   * Formato direto: \"O bairro [nome] é de abrangência do [CRAS]\"\n   * Se houver CEP envolvido, inclua também o endereço completo\n   * Seja direto e objetivo, sem evasivas ou pedidos desnecessários\n\n---\n\n## **7. Tratamento de Casos Especiais**\n\n### **Gestão de Contexto em Perguntas Sequenciais:**\n* **Perguntas relacionadas:** Quando o usuário fizer uma pergunta que depende de contexto anterior (ex: \"quantas crianças\" após \"quantas pessoas do Ipiranga\"), você DEVE:\n  * Manter na memória os filtros/recortes da pergunta anterior (território, perfil, faixa etária, etc.)\n  * Reestruturar a nova pergunta combinando o contexto anterior com a nova solicitação\n  * Enviar ao AgenteSQL a pergunta completa: \"Quantas crianças (0-12 anos) são do Ipiranga\"\n  * NUNCA enviar perguntas incompletas ou descontextualizadas ao AgenteSQL\n\n### **Perguntas com Bairro ou CEP:**\n* **Quando o usuário mencionar CEP:**\n  * SEMPRE acione BuscaEndereco primeiro para obter endereço completo e bairro\n  * SEMPRE acione AgenteTerritorio após obter o bairro para identificar o CRAS de abrangência\n  * Use o bairro identificado como território nas consultas ao AgenteSQL\n  * Inclua endereço completo e CRAS de abrangência na resposta final\n* **Quando o usuário mencionar bairro diretamente:**\n  * SEMPRE acione AgenteTerritorio com o nome do bairro para identificar o CRAS de abrangência\n  * **CRÍTICO:** AgenteTerritorio recebe NOME DO BAIRRO, não CEP\n  * Use o bairro como território nas consultas ao AgenteSQL\n  * **SEMPRE inclua CRAS de abrangência na resposta final** quando houver bairro envolvido\n  * NÃO peça CEP quando já tiver o nome do bairro\n* **Se BuscaEndereco retornar erro ou CEP inválido:**\n  * Informe objetivamente: \"CEP não encontrado ou inválido\"\n  * Peça confirmação do CEP ao usuário\n  * NÃO continue o fluxo sem endereço válido\n* **Perguntas diretas sobre CRAS:**\n  * Identifique o bairro (via CEP ou mencionado diretamente)\n  * Acione AgenteTerritorio com o nome do bairro\n  * Responda objetivamente sem evasivas: \"O bairro [nome] é de abrangência do [CRAS]\"\n  * NÃO peça informações adicionais quando já tiver o necessário para responder\n  * NÃO informe CRAS de Abrangência sem informação do AgenteTerritorio\n\n### **Outros Casos:**\n* **Pergunta mista:** acionar AgenteSQL apenas para a parte que requer dados\n* **Retorno vazio ou dados limitados:** \n  * Informe objetivamente: \"Não há registros para o recorte solicitado\" ou \"Dados não disponíveis para [recorte específico]\"\n  * Sugira novo recorte apenas se tecnicamente relevante\n  * NÃO produza análises genéricas ou vazias quando não houver dados\n* **Normativa não disponível:** orientar o usuário sobre o documento oficial aplicável\n* **Ambiguidade:** não acionar tool e pedir especificação clara\n\n---\n\n## **8. Formato de Saída (Técnico, Objetivo e Direto)**\n\n### **Para respostas com dados (quantitativas):**\n\n```\n## 📊 [Título Técnico Resumido - máximo 6 palavras]\n\n**Resultado:** [número exato + unidade + recorte aplicado]\nExemplo: \"1.247 famílias em extrema pobreza cadastradas no Ipiranga\"\n\n**Território:** [SEMPRE quando houver bairro/território envolvido]\n* CRAS de abrangência: [nome do CRAS identificado via Tool Territorio]\n* [Se houver CEP envolvido, inclua também:] Endereço completo: [logradouro, bairro, cidade - UF (CEP: XXXX-XXXX)]\n\n```\n\n**IMPORTANTE:** \n* Se os dados retornados forem limitados ou vazios, informe objetivamente sem criar análises genéricas\n* NÃO produza textos longos ou repetitivos quando não houver dados suficientes\n* Seja direto: \"Dados não disponíveis para [recorte específico]\"\n\n---\n\n### **Para respostas informativas e saudações:**\n\n```\n**Resposta:** [apresentação, cordialidade, explique oq pode fazer em respostas curtas]\n* Seja gentil e educado\n* Evite explicações genéricas ou longas\n\n```\n\n---\n\n## **9. Exemplos (Few-Shot)**\n\n### **Exemplo 1 – Quantitativo Simples**\n\n**Entrada:** \"Quantas famílias em extrema pobreza temos?\"\n\n**Saída esperada:**\n\n```\n## 📊 No CADU de RIbeirão Preto temos\n\n**Resultado:** 1.247 famílias cadastradas.\n\n**Análise:** O que equivale a x% do Total de Famílias Cadastradas atualmente.\n\n```\n\n---\n\n### **Exemplo 2 – Quantitativo com Bairro Direto**\n\n**Entrada:** \"Quantas pessoas são do Ipiranga?\"\n\n**Processamento:**\n* Identifica bairro mencionado: Ipiranga\n* Aciona AgenteTerritorio com bairro \"Ipiranga\"\n* Recebe CRAS de abrangência: \"CRAS 3\"\n* Aciona AgenteSQL: \"Quantas pessoas são do Ipiranga\"\n\n**Saída esperada:**\n\n```\n## 📊 No Ipiranga temos\n\n**Resultado:** 1.234 pessoas cadastradas no Ipiranga.\n\n**Território:**\n* CRAS de abrangência: CRAS 3\n\n**Análise:** O que equivale a x% do Total de Pessoas Cadastradas atualmente..\n\n---\n\n### **Exemplo 2b – Quantitativo com Contexto Sequencial**\n\n**Entrada 1:** \"Quantas pessoas são do Ipiranga?\"\n**Entrada 2 (seguinte):** \"E quantas crianças?\"\n\n**Processamento:**\n* Contexto mantido: território = Ipiranga, CRAS = CRAS 3\n* Pergunta reestruturada para AgenteSQL: \"Quantas crianças (0-12 anos) são do Ipiranga\"\n\n**Saída esperada:**\n\n```\n## 📊 Crianças no Ipiranga\n\n**Resultado:** 342 crianças (0-12 anos) cadastradas no Ipiranga.\n\n**Território:**\n* CRAS de abrangência: CRAS 3\n\n**Análise:** Representa 28% do total de pessoas do território; demanda específica para serviços de proteção básica e programas de primeira infância no CRAS 3.\n\n---\n\n### **Exemplo 3 – Retorno Vazio**\n\n**Entrada:** \"Quantas famílias indígenas em extrema pobreza temos?\"\n\n**Saída esperada (se dados vazios):**\n\n```\n## 📊 Famílias Indígenas em Extrema Pobreza\n\n**Resultado:** Dados não disponíveis para o recorte solicitado.\n\n**Análise:** Não há registros de famílias indígenas em extrema pobreza cadastradas no Cadastro Único.\n```\n\n---\n\n### **Exemplo 4 – Quantitativo com CEP**\n\n**Entrada:** \"Quantas famílias em extrema pobreza temos no CEP 01310-100?\"\n\n**Processamento:**\n* Identifica CEP mencionado: 01310-100\n* Aciona BuscaEndereco com CEP sanitizado: 01310100\n* Recebe endereço: \"Avenida Paulista, Bela Vista, São Paulo - SP\"\n* Extrai bairro: \"Bela Vista\"\n* Aciona Territorio com bairro \"Bela Vista\" (não CEP)\n* Recebe CRAS de abrangência: \"CRAS Centro\"\n* Aciona AgenteSQL: \"Quantas famílias em extrema pobreza são do bairro Bela Vista\"\n\n**Saída esperada:**\n\n```\n## 📊 Famílias em Extrema Pobreza\n\n**Resultado:** 89 famílias em extrema pobreza cadastradas no bairro Bela Vista.\n\n**Território:**\n* CRAS de abrangência: CRAS I\n* Endereço completo: Avenida Paulista, Bela Vista, São Paulo - SP (CEP: 01310-100)\n\n\n```\n\n---\n\n### **Exemplo 4b – Pergunta Direta sobre CRAS**\n\n**Entrada 1:** \"Qual o CRAS do Botânico?\"\n\n**Processamento:**\n* Identifica pergunta direta sobre CRAS\n* Identifica bairro mencionado: Botânico\n* Aciona Territorio diretamente com bairro \"Botânico\"\n* Recebe CRAS de abrangência: \"CRAS 2\"\n\n**Saída esperada:**\n\n```\n## 📋 CRAS de Abrangência\n\n**Resposta:** O bairro Botânico é de abrangência do CRAS 2.\n```\n\n---\n\n**Entrada 2:** \"Qual o CRAS do Ipiranga?\"\n\n**Processamento:**\n* Identifica pergunta direta sobre CRAS\n* Identifica bairro mencionado: Ipiranga\n* Aciona Territorio diretamente com bairro \"Ipiranga\"\n* Recebe CRAS de abrangência: \"CRAS 3\"\n* **NÃO pede CEP** - já tem o nome do bairro\n\n**Saída esperada:**\n\n```\n## 📋 CRAS de Abrangência\n\n**Resposta:** O bairro Ipiranga é de abrangência do CRAS 3.\n```\n\n---\n\n**Entrada 3:** \"Qual o CRAS do CEP 01310-100?\"\n\n**Processamento:**\n* Identifica pergunta direta sobre CRAS\n* Identifica CEP mencionado: 01310-100\n* Aciona BuscaEndereco com CEP sanitizado: 01310100\n* Recebe endereço e extrai bairro: \"Bela Vista\"\n* Aciona Territorio com bairro \"Bela Vista\"\n* Recebe CRAS de abrangência: \"CRAS Centro\"\n\n**Saída esperada:**\n\n```\n## 📋 CRAS de Abrangência\n\n**Resposta:** O CEP 01310-100 (Bela Vista, São Paulo - SP) é de abrangência do CRAS Centro.\n```\n\n---\n\n### **Exemplo 5 – Técnica-Normativa**\n\n**Entrada:** \"Qual a diferença entre PSB e PSE?\"\n\n**Saída esperada:**\n\n```\n## 📋 PSB x PSE\n\n**Resposta:** \n- **PSB:** Prevenção de riscos sociais (CRAS/PAIF).  \n- **PSE:** Resposta a violações de direitos (CREAS/PAEFI/Acolhimento).\n\n**Base normativa:** PNAS 2004; NOB-SUAS.\n```\n\n---\n\n## **10. Instruções Finais**\n\n### **Prioridades Máximas:**\n\n1. **Gestão de Contexto e Território:**\n   * SEMPRE mantenha filtros/recortes de perguntas anteriores na memória\n   * SEMPRE reestruture perguntas contextuais antes de enviar ao AgenteSQL\n   * NUNCA envie perguntas incompletas ou descontextualizadas\n   * **SEMPRE identifique bairros mencionados (direto ou via CEP) e acione Territorio para obter CRAS**\n   * **SEMPRE inclua CRAS de abrangência na resposta quando houver bairro/território envolvido**\n   * **Para perguntas diretas sobre CRAS: responda objetivamente sem pedir informações adicionais desnecessárias**\n\n2. **Objetividade Técnica:**\n   * Priorize respostas **curtas, objetivas e com valor técnico real**\n   * Foque em implicações práticas para gestão e vigilância socioassistencial\n   * Evite análises genéricas, repetitivas ou vazias\n\n3. **Estrutura de Respostas:**\n   * **Quantitativas:** dado → território (CRAS sempre quando houver bairro; endereço se houver CEP) → análise técnica objetiva (1-2 linhas) → ação (apenas se relevante)\n   * **Perguntas diretas sobre CRAS:** resposta objetiva direta sem evasivas\n   * **Normativas:** resposta direta (3-4 linhas) → base normativa\n   \n4. **Rigor Técnico:**\n   * Nunca extrapole interpretações normativas\n   * Nunca invente ou estime dados\n   * Informe objetivamente quando dados não estiverem disponíveis\n   * **Tool Territorio sempre recebe NOME DO BAIRRO, nunca CEP**\n   * **Nunca peça CEP quando já tiver o nome do bairro**\n   * **Sempre responda objetivamente perguntas diretas sobre CRAS**\n\n**Sua missão:** Fornecer informações precisas, enxutas e tecnicamente úteis para a gestão e análise socioassistencial no âmbito do SUAS, sempre mantendo contexto e sendo objetivo nas respostas."
+        }
+      },
+      "id": "19f06643-ea4c-4f2f-984a-3e3a30e6f2df",
+      "name": "Supervisor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        3088,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "=Você é um especialista em OCR, descreva a imagem com precisão.",
+        "inputType": "base64",
+        "options": {
+          "detail": "high"
+        }
+      },
+      "id": "e894285b-145e-4ea0-a9d9-60339adea910",
+      "name": "Analyze image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        2032,
+        496
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Uz4TLFVBceTDWn51",
+          "name": "OpenIA-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Info2').item.json.mensagem_base64.replace('http://https', '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        496
+      ],
+      "id": "472ace04-ac16-4646-9a61-fda3e3664929",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "PErHbKh4iPJ8GtpG",
+          "name": "ChatWoot-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1b513343-9b6a-4f6e-a012-ed819bf34a31",
+              "name": "id_conta",
+              "value": "={{ $json.body.account.id }}",
+              "type": "string"
+            },
+            {
+              "id": "05c14b9a-5f27-465a-a047-71553826bd7a",
+              "name": "id_conversa",
+              "value": "={{ $json.body.conversation.id }}",
+              "type": "string"
+            },
+            {
+              "id": "8bf522a6-75fb-434a-854c-b736539309e1",
+              "name": "telefone",
+              "value": "={{ $json.body.conversation.meta.sender.phone_number.replace('+', '').concat('@s.whatsapp.net') }}",
+              "type": "string"
+            },
+            {
+              "id": "0d622a33-f313-4758-a764-fa6cbf2b0587",
+              "name": "mensagem",
+              "value": "={{ $json.body.content || $json.body.attachments?.[0]?.meta?.is_recorded_audio || $json.body.attachments[0].data_url.replace('http://https', '') }}",
+              "type": "string"
+            },
+            {
+              "id": "24caf88e-74ce-43ab-8dc4-1fff471b706f",
+              "name": "tipo",
+              "value": "={{ $json.body.message_type }}",
+              "type": "string"
+            },
+            {
+              "id": "573669d2-1e43-4010-8c82-a67459ffe1db",
+              "name": "etiquetas",
+              "value": "={{ $json.body.conversation.labels }}",
+              "type": "array"
+            },
+            {
+              "id": "f9f64530-896d-4566-8e31-f67c4c077826",
+              "name": "NomeWhatsapp",
+              "value": "={{ $json.body.conversation.messages[0].sender.name }}",
+              "type": "string"
+            },
+            {
+              "id": "40ff895f-f63f-4e4f-bba3-c7d803c277f1",
+              "name": "url_chatwoot",
+              "value": "https://saas-agentes-chatwoot.90qhxz.easypanel.host",
+              "type": "string"
+            },
+            {
+              "id": "4e384d2b-feaa-48a2-9459-41d61965fdbd",
+              "name": "mensage_de_texto",
+              "value": "={{ $json.body.content || \"null\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3c49bdbd-af6d-452c-9be4-5d990123d45b",
+              "name": "=mensagem_audio_ou_imagem",
+              "value": "={{ $json.body.attachments[0].file_type }}",
+              "type": "string"
+            },
+            {
+              "id": "e2433843-a913-4495-81be-00b8f00996ff",
+              "name": "mensagem_base64",
+              "value": "={{ $json.body.attachments[0].data_url.replace(/^https?:\\/\\/https?/, '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -464,
+        304
+      ],
+      "id": "f10db824-d347-4374-90a8-c6630baa1e24",
+      "name": "Info2"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        496
+      ],
+      "id": "659979d6-c599-47b5-8258-6e4b22a413b9",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Info2').item.json.mensagem_base64.replace('http://https', '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        320
+      ],
+      "id": "a9aea91c-35c2-4224-915c-417dfbe9ae1b",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "PErHbKh4iPJ8GtpG",
+          "name": "ChatWoot-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        320
+      ],
+      "id": "5f66d02d-422b-4c88-a687-3b032babc325",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "9865cb5b-33da-490c-afc3-186457d5b564",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    },
+                    "leftValue": "={{ $('Info2').item.json.mensagem }}",
+                    "rightValue": "Atendimento finalizado"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IA Pausada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "5a9a1fee-b408-469f-a08c-e8d690fc9792",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Info2').item.json.mensagem }}",
+                    "rightValue": "Atendimento finalizado"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Reativar IA"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "04ee3b9d-8b40-4046-a3c4-76e761764309",
+      "name": "Pausar IA1",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        400,
+        160
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Whatsapp message to be splitted and formated: {{ $json.output }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=\n**OBJETIVO**\nDividir um texto longo em partes naturais, com escrita fluida, leve e humana — como se alguém tivesse escrito mensagem por mensagem.\n\n**SAÍDA (sempre neste formato):**\n\n```json\n{\n  \"messages\": [\n    \"mensagem 1\",\n    \"mensagem 2\",\n    \"mensagem 3\"\n  ]\n}\n```\n\n**REGRAS DE DIVISÃO**\n\n* Cada trecho entre **50 e 150 caracteres**, mas o JSON final deve ter trechos de **100 a 250 caracteres**.\n* Quebrar apenas onde um humano faria: ponto final, vírgula, parágrafo.\n* Frases devem soar naturais, completas.\n* Nada truncado, robótico ou mecânico.\n\n**REGRAS DE FORMATAÇÃO**\n\n* Nada de Markdown. Tire \\*\\*, \\_, \\~, ##, listas.\n* Links sempre entre crases: `https://exemplo.com`\n* Parágrafos simples e limpos.\n\n**SUBSTITUIÇÕES HUMANIZADAS**\n\n* `**texto**` ou `_texto_` → \"texto\", a não ser que mude o sentido\n* `~texto~` → manter só se indicar edição ou correção\n\n**EXIGÊNCIAS PARA SOAR HUMANO**\n\n* Frases com ritmo e tom natural\n* Palavras comuns, estilo de conversa\n* Evitar padrões repetitivos ou linguagem artificial\n* Pode usar contrações (ex: \"tá\", \"tô\", \"vai\", \"é\") se fizer sentido\n\n**CHECK FINAL**\n\n* JSON válido com chave `messages`\n* Cada item: 100 a 250 caracteres\n* Escrita fluida e humana\n* Sem cortes abruptos\n* Formatação limpa\n* Substituições feitas"
+            }
+          ]
+        }
+      },
+      "id": "8ff3b57c-1f56-4d0f-b40e-44f1d1146218",
+      "name": "Split de mensagens",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3600,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4.1-mini",
+        "options": {}
+      },
+      "id": "a626c645-023f-4d7c-9e97-aa387bacd888",
+      "name": "OpenAI Split",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        752
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Uz4TLFVBceTDWn51",
+          "name": "OpenIA-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"messages\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\"messages\"]\n}",
+        "autoFix": true
+      },
+      "id": "c9af5570-a295-4eba-89b3-b732fa381027",
+      "name": "Modelo Output",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        3792,
+        752
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5a0932d7-4070-4634-a4b2-b760dd14ea80",
+      "name": "5 segundos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4592,
+        576
+      ],
+      "webhookId": "a2c69e1c-13fe-44a2-962c-1249288537eb"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Info2').item.json.url_chatwoot }}/api/v1/accounts/{{ $('Info2').item.json.id_conta }}/conversations/{{ $('Info2').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "b5K8n3q31YUrwAGEbD5EToPW"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"{{ $('Split de Mensagem').item.json.output }}\",\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\",\n  \"content_attributes\": { \"origin\": \"ai\", \"via\": \"n8n\" }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4416,
+        576
+      ],
+      "id": "487dfef1-637e-4324-9ca2-d5d86f4f0312",
+      "name": "Enviar Texto"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6da1922a-60b4-41dc-9266-ef2da435b6af",
+              "name": "mensage_de_texto",
+              "value": "={{ $('Info2').item.json.mensage_de_texto }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1552,
+        160
+      ],
+      "id": "ef73806d-594a-4138-9e4f-d2b06a281d86",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "content": "# Limpeza Banco de Dados",
+        "height": 408,
+        "width": 1400,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1968,
+        464
+      ],
+      "typeVersion": 1,
+      "id": "cd32e1fa-9838-478c-8a1e-d45267b9b305",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "create table public.chats (\n  id bigserial not null,\n  created_at timestamp with time zone null,\n  phone text null,\n  updated_at text null,\n  etapa_followup numeric null,\n  constraint chats_pkey primary key (id)\n) TABLESPACE pg_default;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -880,
+        224
+      ],
+      "id": "3761dafb-0ac9-4d0b-bce5-c574be0e7a9e",
+      "name": "chats",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.text }}"
+            },
+            {
+              "content": "=Estruture as informações recebidas",
+              "role": "system"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1728,
+        672
+      ],
+      "id": "90631b4f-d976-4feb-b7ca-c08992a39706",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Uz4TLFVBceTDWn51",
+          "name": "OpenIA-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        672
+      ],
+      "id": "ec3bc76e-969a-4d29-8c11-19f59915d267",
+      "name": "Extract from File2"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Info2').item.json.mensagem_base64.replace('http://https', '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        672
+      ],
+      "id": "1064352b-4c03-4fa5-930e-be9998e62b6c",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "PErHbKh4iPJ8GtpG",
+          "name": "ChatWoot-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $('Info2').item.json.telefone }}",
+        "messageData": "={{ $json.message.content }}",
+        "tail": true
+      },
+      "id": "cc3b70e3-3932-450e-8541-1236ab2b9ac8",
+      "name": "PDF Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        672
+      ],
+      "credentials": {
+        "redis": {
+          "id": "B0RQemj1K7X5u6fi",
+          "name": "Redis-SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_chat_histories",
+          "mode": "list",
+          "cachedResultName": "n8n_chat_histories"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Info2').item.json.telefone }}",
+            "message": "={\"type\": \"human\", \"content\": \"{{ $('Info2').item.json.mensagem }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        560
+      ],
+      "id": "c360e127-41a7-430f-944b-b1bdeb2a25a6",
+      "name": "Salvar Historico Cliente",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "774af9fe-50c0-4a32-99f5-e89c14c736b9",
+              "leftValue": "={{ $('Webhook').item.json.body.sender.type }}",
+              "rightValue": "agent_bot",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        176
+      ],
+      "id": "7a1c56cc-dae1-4304-b971-b3ee02706a94",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        400,
+        320
+      ],
+      "id": "db2216dc-ac50-45b6-96f8-3155b299de69",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "content": "# Cadastro CRM",
+        "height": 796,
+        "width": 564,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "667afbba-f647-4489-b23f-3be57b791778",
+      "name": "Sticky Note27"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        3424,
+        384
+      ],
+      "id": "4d092251-ea9c-47f2-8364-2576aa19bcc1",
+      "name": "calculadora"
+    },
+    {
+      "parameters": {
+        "content": "Versão 4: Atualizamos a forma de pausar o atendimento da IA.\nNão se preocupe, será explicado nos vídeos seguintes e continua com a mesma lógica.",
+        "height": 80,
+        "width": 1152
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "7361a823-3c74-4f94-8392-ae1afc9eae94",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "description": "Utilize essa ferramenta, sempre que for solicitaod pelo usuário qualquer dado quantitativo ",
+        "workflowId": {
+          "__rl": true,
+          "value": "Z2V1GyEmqopfOxyI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Z2V1GyEmqopfOxyI",
+          "cachedResultName": "AgenteSQL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "pergunta_do_cliente": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('pergunta_do_cliente', `transmita a Pergunta para o AgenteSQL`, 'string') }}"
+          },
+          "matchingColumns": [
+            "pergunta_do_cliente"
+          ],
+          "schema": [
+            {
+              "id": "pergunta_do_cliente",
+              "displayName": "pergunta_do_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3008,
+        624
+      ],
+      "id": "c5dce1d3-a0ea-4bdb-a0bf-69e01550561c",
+      "name": "AgenteSQL"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agentemestre",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        144
+      ],
+      "id": "2da33c5d-3020-4395-8e36-aa89f7acf26c",
+      "name": "Webhook",
+      "webhookId": "d1692ee7-271d-40a7-b231-a441e726e3af"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Consulta o ViaCEP e devolve dados de rua, bairro, cidade, UF, latitude/longitude (se houver).",
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('URL', `https://viacep.com.br/ws/Inisra o Parametro cep aqui/json/`, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        3472,
+        272
+      ],
+      "id": "67bb060e-fd1b-435a-ae10-946fc6976cde",
+      "name": "BuscaEndereco"
+    },
+    {
+      "parameters": {
+        "description": "Quando tiver informação de Bairro use essa Tool para descobrir Área de Abrangência",
+        "workflowId": {
+          "__rl": true,
+          "value": "KFx7k18pVTfAKQlt",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/KFx7k18pVTfAKQlt",
+          "cachedResultName": "Territorio"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bairro": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('bairro', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "bairro"
+          ],
+          "schema": [
+            {
+              "id": "bairro",
+              "displayName": "bairro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3168,
+        624
+      ],
+      "id": "4a41a562-a07a-45c6-8b7b-a44c6c6e5be9",
+      "name": "AgenteTerritorio"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sistemarag.fabricadosdados.online/api/kb/300001/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"{{ $fromAI('pergunta', ``, 'string') }}\",\n  \"topK\": 8\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        3376,
+        608
+      ],
+      "id": "5557c9da-f34d-4512-90e7-3fb14c4b8397",
+      "name": "Vector",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "2KkgE0eBUQDMdTkl",
+          "name": "Bases Vetoriais"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Loop Over Items3": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Enviar Texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "Adiciona CHAT supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualiza CHAT Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Telefone": {
+      "main": [
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adiciona CHAT supabase": {
+      "main": [
+        [
+          {
+            "node": "Cria Histórico Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualiza CHAT Supabase": {
+      "main": [
+        [
+          {
+            "node": "Cria Histórico Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Histórico Supabase": {
+      "main": [
+        [
+          {
+            "node": "Delete Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split de Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Converter Foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausar IA": {
+      "main": [
+        [
+          {
+            "node": "Salvar Historico1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rota Atendimento": {
+      "main": [
+        [
+          {
+            "node": "ROTA Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salvar Historico Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI4": {
+      "main": [
+        [
+          {
+            "node": "Audio Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Cliente": {
+      "main": [
+        [
+          {
+            "node": "Cliente Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliente Existe?": {
+      "main": [
+        [
+          {
+            "node": "ROTA Entrando ou Saindo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Cliente": {
+      "main": [
+        [
+          {
+            "node": "ROTA Entrando ou Saindo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROTA Entrando ou Saindo": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rota Atendimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Converter Audio": {
+      "main": [
+        [
+          {
+            "node": "OpenAI4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Converter Foto": {
+      "main": [
+        [
+          {
+            "node": "Analyze image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROTA Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Texto Redis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "thinking": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intervalo entre Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Buscas Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto Redis": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audio Redis": {
+      "main": [
+        [
+          {
+            "node": "Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "imagem Redis": {
+      "main": [
+        [
+          {
+            "node": "Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscas Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Compara Memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem Completa1": {
+      "main": [
+        [
+          {
+            "node": "Deletar Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deletar Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compara Memoria": {
+      "main": [
+        [
+          {
+            "node": "Mensagem Completa1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Converter Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Intervalo entre Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor": {
+      "main": [
+        [
+          {
+            "node": "Busca Telefone",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split de mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze image": {
+      "main": [
+        [
+          {
+            "node": "imagem Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Info2": {
+      "main": [
+        [
+          {
+            "node": "Buscar Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausar IA1": {
+      "main": [
+        [
+          {
+            "node": "Pausar IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reativar IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split de mensagens": {
+      "main": [
+        [
+          {
+            "node": "Split de Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Split": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Split de mensagens",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Modelo Output",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo Output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Split de mensagens",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 segundos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Texto": {
+      "main": [
+        [
+          {
+            "node": "5 segundos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "PDF Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File2": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Extract from File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Redis": {
+      "main": [
+        [
+          {
+            "node": "Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Pausar IA1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculadora": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AgenteSQL": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Info2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuscaEndereco": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AgenteTerritorio": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3a11fd84-8ad8-4273-9741-85da4e886e8f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "587c4dd9f315be6f591dbc2bb13f01a8f77983c8f8f482ac398a55bfbb9808a5"
+  },
+  "id": "EUesWjXPlJHYCxNO",
+  "tags": []
+}

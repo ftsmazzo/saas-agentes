@@ -375,3 +375,4 @@ Transformar o sistema atual em uma plataforma white label completa que permite:
 **Tempo total estimado:** 8-12 semanas
 **Investimento:** Desenvolvimento incremental, testando cada fase
 
+
