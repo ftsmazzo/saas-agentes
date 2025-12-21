@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, timestamp, varchar, boolean, integer, serial, timestamptz } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, timestamp, varchar, boolean, integer, serial } from "drizzle-orm/pg-core";
 
 /**
  * Enums do PostgreSQL
@@ -41,9 +41,9 @@ export const users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   passwordHash: text("passwordHash"), // Hash da senha para login admin
   role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
-  lastSignedIn: timestamptz("lastSignedIn").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -81,8 +81,8 @@ export const tenants = pgTable("tenants", {
   subscriptionStatus: subscriptionStatusEnum("subscriptionStatus"),
   currentPlanId: integer("currentPlanId"),
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Tenant = typeof tenants.$inferSelect;
@@ -104,8 +104,8 @@ export const plans = pgTable("plans", {
   maxStorageGB: integer("maxStorageGB").default(5),
   
   isActive: boolean("isActive").default(true).notNull(),
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Plan = typeof plans.$inferSelect;
@@ -128,8 +128,8 @@ export const agentConfigs = pgTable("agentConfigs", {
   enableAudioTranscription: boolean("enableAudioTranscription").default(true),
   enableImageProcessing: boolean("enableImageProcessing").default(true),
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AgentConfig = typeof agentConfigs.$inferSelect;
@@ -143,8 +143,8 @@ export const usageMetrics = pgTable("usageMetrics", {
   tenantId: integer("tenantId").notNull(),
   
   // Período da métrica
-  periodStart: timestamptz("periodStart").notNull(),
-  periodEnd: timestamptz("periodEnd").notNull(),
+  periodStart: timestamp("periodStart", { withTimezone: true }).notNull(),
+  periodEnd: timestamp("periodEnd", { withTimezone: true }).notNull(),
   
   // Métricas de uso
   workflowExecutions: integer("workflowExecutions").default(0),
@@ -153,7 +153,7 @@ export const usageMetrics = pgTable("usageMetrics", {
   apiCallsOpenAI: integer("apiCallsOpenAI").default(0),
   storageUsedMB: integer("storageUsedMB").default(0),
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type UsageMetric = typeof usageMetrics.$inferSelect;
@@ -171,7 +171,7 @@ export const platformLogs = pgTable("platformLogs", {
   message: text("message").notNull(),
   metadata: text("metadata"), // JSON com detalhes adicionais
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type PlatformLog = typeof platformLogs.$inferSelect;
@@ -186,7 +186,7 @@ export const systemConfig = pgTable("system_config", {
   configValue: text("configValue"),
   isEncrypted: boolean("isEncrypted").default(false).notNull(),
   description: text("description"),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type SystemConfig = typeof systemConfig.$inferSelect;
@@ -205,13 +205,13 @@ export const contacts = pgTable("contacts", {
   
   // Status do contato
   isActive: boolean("isActive").default(true),
-  lastInteraction: timestamptz("lastInteraction"),
+  lastInteraction: timestamp("lastInteraction", { withTimezone: true }),
   
   // Metadados
   metadata: text("metadata"), // JSON com dados adicionais
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
-  updatedAt: timestamptz("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Contact = typeof contacts.$inferSelect;
@@ -230,9 +230,9 @@ export const conversations = pgTable("conversations", {
   aiPaused: boolean("aiPaused").default(false), // Se IA está pausada (atendimento humano)
   
   // Timestamps
-  startedAt: timestamptz("startedAt").defaultNow().notNull(),
-  lastMessageAt: timestamptz("lastMessageAt"),
-  closedAt: timestamptz("closedAt"),
+  startedAt: timestamp("startedAt", { withTimezone: true }).defaultNow().notNull(),
+  lastMessageAt: timestamp("lastMessageAt", { withTimezone: true }),
+  closedAt: timestamp("closedAt", { withTimezone: true }),
 });
 
 export type Conversation = typeof conversations.$inferSelect;
@@ -258,7 +258,7 @@ export const chatMessages = pgTable("chatMessages", {
   // Metadados
   metadata: text("metadata"), // JSON com dados adicionais (tokens, modelo usado, etc)
   
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
@@ -271,9 +271,9 @@ export const activationTokens = pgTable("activationTokens", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull().unique(),
   token: varchar("token", { length: 255 }).notNull().unique(),
-  expiresAt: timestamptz("expiresAt").notNull(),
-  usedAt: timestamptz("usedAt"),
-  createdAt: timestamptz("createdAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  usedAt: timestamp("usedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ActivationToken = typeof activationTokens.$inferSelect;
