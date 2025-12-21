@@ -44,6 +44,28 @@ CREATE TABLE IF NOT EXISTS n8n_chat_histories (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Adicionar tenant_id em tabelas existentes (se não existir)
+DO $$ 
+BEGIN
+  -- Adicionar tenant_id em chats se não existir
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'chats' AND column_name = 'tenant_id') THEN
+    ALTER TABLE chats ADD COLUMN tenant_id INT;
+  END IF;
+  
+  -- Adicionar tenant_id em chat_messages se não existir
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'chat_messages' AND column_name = 'tenant_id') THEN
+    ALTER TABLE chat_messages ADD COLUMN tenant_id INT;
+  END IF;
+  
+  -- Adicionar tenant_id em dados_cliente se não existir
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'dados_cliente' AND column_name = 'tenant_id') THEN
+    ALTER TABLE dados_cliente ADD COLUMN tenant_id INT;
+  END IF;
+END $$;
+
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_chats_tenant_phone ON chats(tenant_id, phone);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_tenant_phone ON chat_messages(tenant_id, phone);
