@@ -458,12 +458,18 @@ export const appRouter = router({
           });
           console.log('✅ [STEP 6] Configura\u00e7\u00e3o criada!');
           
-          // 7. Notificar o propriet\u00e1rio
-              console.log('📧 [STEP 7] Notificando proprietário...');
-          await notifyOwner({
-            title: 'Novo Cliente Cadastrado',
-            content: `Um novo cliente foi cadastrado: ${input.companyName} (${input.email})`,
-          });
+          // 7. Notificar o proprietário (opcional - não bloqueia criação)
+          console.log('📧 [STEP 7] Notificando proprietário...');
+          try {
+            await notifyOwner({
+              title: 'Novo Cliente Cadastrado',
+              content: `Um novo cliente foi cadastrado: ${input.companyName} (${input.email})`,
+            });
+            console.log('✅ [STEP 7] Notificação enviada!');
+          } catch (error: any) {
+            console.warn('⚠️ [STEP 7] Erro ao notificar (não bloqueia criação):', error.message);
+            // Não lançar erro - notificação é opcional
+          }
 
           console.log('\n🎉 [SUCCESS] Tenant criado com sucesso!');
           console.log('========================================\n\n');

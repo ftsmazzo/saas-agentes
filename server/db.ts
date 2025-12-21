@@ -483,17 +483,26 @@ export async function deleteActivationToken(token: string): Promise<void> {
  */
 export async function activateTenant(tenantId: number, password: string): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    throw new Error("Database not available");
+  }
 
   // Hash da senha usando bcrypt
   const bcrypt = await import('bcryptjs');
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  await db.update(tenants)
+  const result = await db.update(tenants)
     .set({
       status: 'active',
       passwordHash: hashedPassword,
       isActivated: true, // IMPORTANTE: Marcar como ativado
     })
-    .where(eq(tenants.id, tenantId));
+    .where(eq(tenants.id, tenantId))
+    .returning();
+
+  if (!result || result.length === 0) {
+    throw new Error(`Tenant ${tenantId} não encontrado para ativação`);
+  }
+
+  console.log(`[Activate] Tenant ${tenantId} ativado com sucesso. isActivated: ${result[0].isActivated}, status: ${result[0].status}`);
 }
