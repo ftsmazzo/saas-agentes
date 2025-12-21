@@ -1,260 +1,154 @@
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 import AdminLayout from "@/components/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle2, 
-  Circle, 
-  AlertCircle, 
-  BookOpen, 
-  Rocket,
-  Settings,
-  CreditCard,
-  Workflow,
-  Database
-} from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { Users, CreditCard, FileText, Settings, LayoutDashboard, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function WelcomePage() {
-  // REMOVIDO: SetupWizard não é mais necessário
-  // As configurações já estão no EasyPanel (variáveis de ambiente)
-  // Planos podem ser criados diretamente em /admin/plans
-  
-  // Debug: verificar se código atualizado
-  console.log("[WelcomePage] Componente carregado - SetupWizard REMOVIDO");
+  const [, setLocation] = useLocation();
+  const { data: tenants, isLoading: tenantsLoading } = trpc.tenants.list.useQuery();
+  const { data: plans, isLoading: plansLoading } = trpc.plans.list.useQuery();
 
-  // TODO: Implementar verificação real do status de configuração
-  const configStatus = {
-    stripe: true,
-    n8n: true,
-    postgresql: true,
-    plans: true,
+  // Redirecionar para dashboard após um momento (opcional)
+  // Ou manter como página inicial simples
+
+  const quickStats = {
+    totalClients: tenants?.length || 0,
+    totalPlans: plans?.length || 0,
   };
 
-  const allConfigured = Object.values(configStatus).every(Boolean);
-
-  const steps = [
+  const quickActions = [
     {
-      id: "stripe",
-      title: "Configurar Stripe",
-      description: "Configure os produtos e preços no Stripe Dashboard",
+      title: "Dashboard",
+      description: "Visão geral da plataforma",
+      icon: LayoutDashboard,
+      href: "/admin/dashboard",
+      color: "text-blue-600",
+    },
+    {
+      title: "Clientes",
+      description: "Gerenciar clientes e tenants",
+      icon: Users,
+      href: "/admin/tenants",
+      color: "text-green-600",
+    },
+    {
+      title: "Planos",
+      description: "Gerenciar planos de assinatura",
       icon: CreditCard,
-      completed: configStatus.stripe,
-      link: "/admin/settings",
-      guideSection: "#integração-com-stripe",
+      href: "/admin/plans",
+      color: "text-purple-600",
     },
     {
-      id: "n8n",
-      title: "Integrar N8N",
-      description: "Configure a API do N8N e crie o workflow template",
-      icon: Workflow,
-      completed: configStatus.n8n,
-      link: "/admin/settings",
-      guideSection: "#integração-com-n8n",
+      title: "Logs",
+      description: "Ver eventos e logs do sistema",
+      icon: FileText,
+      href: "/admin/logs",
+      color: "text-orange-600",
     },
     {
-      id: "postgresql",
-      title: "Configurar PostgreSQL Master",
-      description: "Configure o servidor PostgreSQL para provisionar bancos dos clientes",
-      icon: Database,
-      completed: configStatus.postgresql,
-      link: "/admin/settings",
-      guideSection: "#configuração-do-postgresql-master",
-    },
-    {
-      id: "plans",
-      title: "Criar Planos",
-      description: "Cadastre os planos de assinatura no banco de dados",
+      title: "Configurações",
+      description: "Configurar integrações",
       icon: Settings,
-      completed: configStatus.plans,
-      link: "/admin/plans",
-      guideSection: "#gerenciamento-de-planos-e-assinaturas",
+      href: "/admin/settings",
+      color: "text-gray-600",
     },
   ];
-
-  const completedSteps = steps.filter(s => s.completed).length;
-  const progress = (completedSteps / steps.length) * 100;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bem-vindo ao SaaS de Agentes! 🎉</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Painel Administrativo</h1>
           <p className="text-muted-foreground mt-2">
-            Siga os passos abaixo para configurar sua plataforma e começar a provisionar clientes
+            Gerencie sua plataforma SaaS de Agentes N8N
           </p>
         </div>
 
-        {!allConfigured && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Configuração Necessária</AlertTitle>
-            <AlertDescription>
-              Você precisa completar a configuração inicial antes de criar clientes. 
-              Siga o checklist abaixo e consulte o guia completo para instruções detalhadas.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {allConfigured && (
-          <Alert className="bg-green-50 border-green-200">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-900">Tudo Pronto!</AlertTitle>
-            <AlertDescription className="text-green-800">
-              Sua plataforma está configurada e pronta para uso. Você já pode criar seu primeiro cliente!
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Progress Bar */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Progresso da Configuração</CardTitle>
-            <CardDescription>
-              {completedSteps} de {steps.length} etapas concluídas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full bg-secondary rounded-full h-3">
-              <div 
-                className="bg-primary h-3 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {progress.toFixed(0)}% completo
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Checklist */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Checklist de Configuração</CardTitle>
-            <CardDescription>
-              Complete estas etapas para começar a usar a plataforma
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const StatusIcon = step.completed ? CheckCircle2 : Circle;
-              
-              return (
-                <div 
-                  key={step.id}
-                  className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                >
-                  <div className="mt-1">
-                    <StatusIcon 
-                      className={`h-6 w-6 ${
-                        step.completed ? "text-green-600" : "text-muted-foreground"
-                      }`} 
-                    />
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="font-semibold">
-                        {index + 1}. {step.title}
-                      </h3>
-                      {step.completed && (
-                        <Badge variant="outline" className="text-green-600 border-green-600">
-                          Concluído
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {step.description}
-                    </p>
-                    <div className="flex gap-2">
-                      <Link href={step.link}>
-                        <Button size="sm" variant="outline">
-                          Ir para Configurações
-                        </Button>
-                      </Link>
-                      <a 
-                        href={`/GUIA_DE_USO.md${step.guideSection}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button size="sm" variant="ghost">
-                          <BookOpen className="h-4 w-4 mr-2" />
-                          Ver Guia
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
+        {/* Quick Stats */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">📚 Guia Completo</CardTitle>
-              <CardDescription>
-                Documentação detalhada com instruções passo a passo
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <a 
-                href="/GUIA_DE_USO.md"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button className="w-full">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Abrir Guia de Uso
-                </Button>
-              </a>
+              <div className="text-2xl font-bold">
+                {tenantsLoading ? "..." : quickStats.totalClients}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Clientes cadastrados na plataforma
+              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">🚀 Criar Primeiro Cliente</CardTitle>
-              <CardDescription>
-                {allConfigured 
-                  ? "Tudo pronto! Crie seu primeiro cliente agora"
-                  : "Complete a configuração antes de criar clientes"
-                }
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Planos Disponíveis</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <Link href="/admin/tenants">
-                <Button 
-                  className="w-full" 
-                  disabled={!allConfigured}
-                >
-                  <Rocket className="h-4 w-4 mr-2" />
-                  {allConfigured ? "Criar Cliente" : "Configuração Pendente"}
-                </Button>
-              </Link>
+              <div className="text-2xl font-bold">
+                {plansLoading ? "..." : quickStats.totalPlans}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Planos de assinatura configurados
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Help Section */}
-        <Card className="bg-muted/50">
+        {/* Quick Actions */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg">💡 Precisa de Ajuda?</CardTitle>
+            <CardTitle>Ações Rápidas</CardTitle>
+            <CardDescription>
+              Acesse rapidamente as principais funcionalidades
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>
-              <strong>1. Consulte o Guia de Uso:</strong> Documento completo com todas as instruções
-            </p>
-            <p>
-              <strong>2. Verifique os Logs:</strong> Acesse <Link href="/admin/logs"><span className="text-primary hover:underline">Logs</span></Link> para ver eventos e erros
-            </p>
-            <p>
-              <strong>3. Teste as Integrações:</strong> Use a página de <Link href="/admin/settings"><span className="text-primary hover:underline">Configurações</span></Link> para validar conexões
-            </p>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link key={action.href} href={action.href}>
+                    <div className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
+                      <div className={`p-2 rounded-lg bg-muted ${action.color}`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-sm">{action.title}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {action.description}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Primary Action */}
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-lg">Começar</CardTitle>
+            <CardDescription>
+              Acesse o dashboard para ver uma visão completa da plataforma
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/dashboard">
+              <Button className="w-full md:w-auto">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Ir para Dashboard
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

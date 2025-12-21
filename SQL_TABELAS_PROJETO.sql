@@ -82,10 +82,10 @@ CREATE TABLE IF NOT EXISTS plans (
   description TEXT,
   "stripePriceId" VARCHAR(100) NOT NULL,
   "priceMonthly" INTEGER NOT NULL,
-  "maxTenants" INTEGER,
-  "maxAgents" INTEGER,
-  "maxMessagesPerMonth" INTEGER,
-  "features" JSONB,
+  "maxWorkflowExecutions" INTEGER DEFAULT 1000,
+  "maxConversations" INTEGER DEFAULT 10000,
+  "maxStorageGB" INTEGER DEFAULT 5,
+  "isActive" BOOLEAN DEFAULT true NOT NULL,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
