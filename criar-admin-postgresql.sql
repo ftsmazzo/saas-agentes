@@ -11,27 +11,39 @@ DECLARE
   -- Hash bcrypt para "Admin123!" (gerado automaticamente)
   password_hash TEXT := '$2b$10$T3puHBhdsxcW.NLrYX4I/Ou2OMe8CuNNg4icoQoLOdVwKvjnn7i.6';
   admin_openid VARCHAR := 'admin_' || EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT;
+  user_exists BOOLEAN;
 BEGIN
-  -- Inserir ou atualizar admin
-  INSERT INTO users ("openId", email, name, "passwordHash", role, "createdAt", "updatedAt", "lastSignedIn")
-  VALUES (
-    admin_openid,
-    admin_email,
-    admin_name,
-    password_hash,
-    'admin',
-    NOW(),
-    NOW(),
-    NOW()
-  )
-  ON CONFLICT (email) DO UPDATE
-  SET 
-    "passwordHash" = password_hash,
-    role = 'admin',
-    name = admin_name,
-    "updatedAt" = NOW();
+  -- Verificar se admin já existe
+  SELECT EXISTS(SELECT 1 FROM users WHERE email = admin_email AND role = 'admin') INTO user_exists;
   
-  RAISE NOTICE 'Admin criado/atualizado com sucesso!';
+  IF user_exists THEN
+    -- Atualizar admin existente
+    UPDATE users 
+    SET 
+      "passwordHash" = password_hash,
+      role = 'admin',
+      name = admin_name,
+      "updatedAt" = NOW()
+    WHERE email = admin_email AND role = 'admin';
+    
+    RAISE NOTICE 'Admin atualizado com sucesso!';
+  ELSE
+    -- Inserir novo admin
+    INSERT INTO users ("openId", email, name, "passwordHash", role, "createdAt", "updatedAt", "lastSignedIn")
+    VALUES (
+      admin_openid,
+      admin_email,
+      admin_name,
+      password_hash,
+      'admin',
+      NOW(),
+      NOW(),
+      NOW()
+    );
+    
+    RAISE NOTICE 'Admin criado com sucesso!';
+  END IF;
+  
   RAISE NOTICE 'Email: %', admin_email;
   RAISE NOTICE 'Senha: Admin123!';
 END $$;
