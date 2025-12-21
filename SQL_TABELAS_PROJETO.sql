@@ -91,43 +91,51 @@ CREATE TABLE IF NOT EXISTS plans (
 );
 
 -- Tabela de configurações de agente
-CREATE TABLE IF NOT EXISTS agent_configs (
+CREATE TABLE IF NOT EXISTS "agentConfigs" (
   id SERIAL PRIMARY KEY,
-  "tenantId" INTEGER NOT NULL,
-  "systemPrompt" TEXT NOT NULL,
-  "companyInfo" JSONB,
+  "tenantId" INTEGER NOT NULL UNIQUE,
+  "systemPrompt" TEXT,
+  "companyInfo" TEXT,
   "welcomeMessage" TEXT,
-  "enableAudioTranscription" BOOLEAN DEFAULT false NOT NULL,
-  "enableAudioResponse" BOOLEAN DEFAULT false NOT NULL,
+  "enableHumanHandoff" BOOLEAN DEFAULT true,
+  "enableAudioTranscription" BOOLEAN DEFAULT true,
+  "enableImageProcessing" BOOLEAN DEFAULT true,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Tabela de métricas de uso
-CREATE TABLE IF NOT EXISTS usage_metrics (
+CREATE TABLE IF NOT EXISTS "usageMetrics" (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER NOT NULL,
-  "metricType" VARCHAR(50) NOT NULL,
-  value INTEGER NOT NULL,
-  "recordedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+  "periodStart" TIMESTAMPTZ NOT NULL,
+  "periodEnd" TIMESTAMPTZ NOT NULL,
+  "workflowExecutions" INTEGER DEFAULT 0,
+  "totalConversations" INTEGER DEFAULT 0,
+  "totalMessages" INTEGER DEFAULT 0,
+  "apiCallsOpenAI" INTEGER DEFAULT 0,
+  "storageUsedMB" INTEGER DEFAULT 0,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Tabela de logs da plataforma
-CREATE TABLE IF NOT EXISTS platform_logs (
+CREATE TABLE IF NOT EXISTS "platformLogs" (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER,
   "eventType" eventType NOT NULL,
-  severity severity NOT NULL,
+  severity severity DEFAULT 'info' NOT NULL,
   message TEXT NOT NULL,
-  metadata JSONB,
+  metadata TEXT,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Tabela de configurações do sistema
-CREATE TABLE IF NOT EXISTS system_config (
+CREATE TABLE IF NOT EXISTS "system_config" (
   id SERIAL PRIMARY KEY,
-  key VARCHAR(100) NOT NULL UNIQUE,
-  value TEXT,
+  "configKey" VARCHAR(100) NOT NULL UNIQUE,
+  "configValue" TEXT,
+  "isEncrypted" BOOLEAN DEFAULT false NOT NULL,
+  description TEXT,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
@@ -135,10 +143,12 @@ CREATE TABLE IF NOT EXISTS system_config (
 CREATE TABLE IF NOT EXISTS contacts (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER NOT NULL,
-  phone VARCHAR(20) NOT NULL,
-  name TEXT,
+  "phoneNumber" VARCHAR(20) NOT NULL,
+  name VARCHAR(255),
   email VARCHAR(320),
-  metadata JSONB,
+  "isActive" BOOLEAN DEFAULT true,
+  "lastInteraction" TIMESTAMPTZ,
+  metadata TEXT,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
@@ -147,31 +157,33 @@ CREATE TABLE IF NOT EXISTS contacts (
 CREATE TABLE IF NOT EXISTS conversations (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER NOT NULL,
-  "contactId" INTEGER,
-  phone VARCHAR(20) NOT NULL,
+  "contactId" INTEGER NOT NULL,
   status conversationStatus DEFAULT 'active' NOT NULL,
+  "aiPaused" BOOLEAN DEFAULT false,
+  "startedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "lastMessageAt" TIMESTAMPTZ,
-  "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+  "closedAt" TIMESTAMPTZ
 );
 
 -- Tabela de mensagens
-CREATE TABLE IF NOT EXISTS chat_messages (
+CREATE TABLE IF NOT EXISTS "chatMessages" (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER NOT NULL,
-  "conversationId" INTEGER,
+  "conversationId" INTEGER NOT NULL,
+  "contactId" INTEGER NOT NULL,
   role messageRole NOT NULL,
   content TEXT NOT NULL,
-  "mediaType" mediaType DEFAULT 'text' NOT NULL,
+  "mediaType" mediaType DEFAULT 'text',
   "mediaUrl" TEXT,
+  metadata TEXT,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Tabela de tokens de ativação
-CREATE TABLE IF NOT EXISTS activation_tokens (
+CREATE TABLE IF NOT EXISTS "activationTokens" (
   id SERIAL PRIMARY KEY,
-  "tenantId" INTEGER NOT NULL,
-  token VARCHAR(64) NOT NULL UNIQUE,
+  "tenantId" INTEGER NOT NULL UNIQUE,
+  token VARCHAR(255) NOT NULL UNIQUE,
   "expiresAt" TIMESTAMPTZ NOT NULL,
   "usedAt" TIMESTAMPTZ,
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL
@@ -183,15 +195,15 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_tenants_owner ON tenants("ownerId");
 CREATE INDEX IF NOT EXISTS idx_tenants_subdomain ON tenants(subdomain);
 CREATE INDEX IF NOT EXISTS idx_tenants_email ON tenants(email);
-CREATE INDEX IF NOT EXISTS idx_agent_configs_tenant ON agent_configs("tenantId");
-CREATE INDEX IF NOT EXISTS idx_usage_metrics_tenant ON usage_metrics("tenantId");
-CREATE INDEX IF NOT EXISTS idx_platform_logs_tenant ON platform_logs("tenantId");
-CREATE INDEX IF NOT EXISTS idx_contacts_tenant_phone ON contacts("tenantId", phone);
+CREATE INDEX IF NOT EXISTS idx_agent_configs_tenant ON "agentConfigs"("tenantId");
+CREATE INDEX IF NOT EXISTS idx_usage_metrics_tenant ON "usageMetrics"("tenantId");
+CREATE INDEX IF NOT EXISTS idx_platform_logs_tenant ON "platformLogs"("tenantId");
+CREATE INDEX IF NOT EXISTS idx_contacts_tenant_phone ON contacts("tenantId", "phoneNumber");
 CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations("tenantId");
-CREATE INDEX IF NOT EXISTS idx_chat_messages_tenant ON chat_messages("tenantId");
-CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages("conversationId");
-CREATE INDEX IF NOT EXISTS idx_activation_tokens_token ON activation_tokens(token);
-CREATE INDEX IF NOT EXISTS idx_activation_tokens_tenant ON activation_tokens("tenantId");
+CREATE INDEX IF NOT EXISTS idx_chat_messages_tenant ON "chatMessages"("tenantId");
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON "chatMessages"("conversationId");
+CREATE INDEX IF NOT EXISTS idx_activation_tokens_token ON "activationTokens"(token);
+CREATE INDEX IF NOT EXISTS idx_activation_tokens_tenant ON "activationTokens"("tenantId");
 
 -- ============================================
 -- IMPORTANTE: 
