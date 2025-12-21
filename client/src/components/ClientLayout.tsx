@@ -63,12 +63,12 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             Você precisa estar logado como cliente para acessar esta área.
           </p>
           <div className="flex gap-2 justify-center">
-            <Button onClick={() => window.location.href = '/client/login'}>
-              Fazer Login
-            </Button>
-            <Button variant="outline" onClick={() => window.location.href = '/'}>
-              Voltar para Home
-            </Button>
+            <Link href="/client/login">
+              <Button>Fazer Login</Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline">Voltar para Home</Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -100,6 +100,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   const navigation = [
     { name: "WhatsApp", href: "/client", icon: Smartphone },
+    { name: "Criar Agente", href: "/client/create-agent", icon: Bot },
     { name: "Configurações", href: "/client/settings", icon: Settings },
     { name: "Métricas", href: "/client/metrics", icon: BarChart3 },
     { name: "Assinatura", href: "/client/subscription", icon: CreditCard },

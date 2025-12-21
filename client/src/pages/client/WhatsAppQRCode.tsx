@@ -1,20 +1,25 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone, Play } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone, Play, Bot, Sparkles } from "lucide-react";
 import ClientLayout from "@/components/ClientLayout";
 
 export default function WhatsAppQRCode() {
+  const [, setLocation] = useLocation();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [forceQRCode, setForceQRCode] = useState(false);
+  
+  // Verificar se o agente existe
+  const { data: agentConfig, isLoading: agentLoading } = trpc.agent.getConfig.useQuery();
   
   // Só buscar QR Code se não estiver conectado ou se forçar
   const { data: qrData, isLoading: qrLoading, refetch: refetchQR } = trpc.clientPanel.getQRCode.useQuery(
     undefined,
     {
-      enabled: !forceQRCode, // Não buscar automaticamente se forçar
+      enabled: !forceQRCode && !!agentConfig, // Só buscar se agente existir
       refetchOnWindowFocus: false,
     }
   );
@@ -86,7 +91,7 @@ export default function WhatsAppQRCode() {
                       status?.status === "connected" || 
                       status?.status === "CONNECTED";
   
-  const isLoading = qrLoading || statusLoading;
+  const isLoading = qrLoading || statusLoading || agentLoading;
   
   // Atualizar QR Code quando status mudar para conectado
   useEffect(() => {
@@ -94,6 +99,38 @@ export default function WhatsAppQRCode() {
       refetchQR();
     }
   }, [status?.status, refetchQR]);
+
+  // Se não tiver agente configurado, mostrar mensagem para criar
+  if (!agentLoading && !agentConfig) {
+    return (
+      <ClientLayout>
+        <div className="max-w-4xl mx-auto">
+          <Card className="text-center py-12">
+            <CardContent className="space-y-6">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-primary/10 p-6">
+                  <Bot className="h-12 w-12 text-primary" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Crie seu primeiro agente</h2>
+                <p className="text-muted-foreground">
+                  Antes de conectar o WhatsApp, você precisa criar e configurar seu agente de IA
+                </p>
+              </div>
+              <Button
+                onClick={() => setLocation("/client/create-agent")}
+                size="lg"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Criar Agente
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </ClientLayout>
+    );
+  }
 
   return (
     <ClientLayout>

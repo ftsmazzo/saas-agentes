@@ -716,6 +716,63 @@ export const appRouter = router({
   // ========== ROTAS DE CONFIGURAÇÃO DO AGENTE (CLIENTE) ==========
   
   agent: router({
+    // Criar novo agente
+    createAgent: protectedProcedure
+      .input(z.object({
+        agentName: z.string().min(1, "Nome do agente é obrigatório"),
+        systemPrompt: z.string().min(50, "Prompt deve ter no mínimo 50 caracteres"),
+        welcomeMessage: z.string().optional(),
+        companyInfo: z.string().optional(),
+        enableHumanHandoff: z.boolean().default(true),
+        enableAudioTranscription: z.boolean().default(true),
+        enableImageProcessing: z.boolean().default(true),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Se for cliente, usar tenant direto
+        let tenant = ctx.tenant;
+        
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        // Verificar se já existe configuração
+        const existingConfig = await db.getAgentConfig(tenant.id);
+        if (existingConfig) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Agente já existe. Use a opção de editar para modificar.',
+          });
+        }
+
+        // Criar configuração do agente
+        await db.createAgentConfig({
+          tenantId: tenant.id,
+          systemPrompt: input.systemPrompt,
+          welcomeMessage: input.welcomeMessage || "Olá! Como posso ajudá-lo hoje?",
+          companyInfo: input.companyInfo || null,
+          enableHumanHandoff: input.enableHumanHandoff,
+          enableAudioTranscription: input.enableAudioTranscription,
+          enableImageProcessing: input.enableImageProcessing,
+        });
+
+        await db.createPlatformLog({
+          tenantId: tenant.id,
+          eventType: 'config_updated',
+          severity: 'info',
+          message: `Agente "${input.agentName}" criado com sucesso`,
+        });
+
+        return { success: true, message: "Agente criado com sucesso!" };
+      }),
+
     // Buscar configuração do agente
     getConfig: protectedProcedure.query(async ({ ctx }) => {
       // Se for cliente, usar tenant direto
