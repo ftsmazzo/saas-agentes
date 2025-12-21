@@ -152,3 +152,128 @@ export async function getWorkflowExecutionStats(workflowId: string): Promise<any
     return [];
   }
 }
+
+/**
+ * Sincroniza configuração do agente para o workflow N8N
+ * Envia atualizações via webhook do workflow
+ */
+export async function syncAgentConfigToN8N(
+  workflowId: string,
+  tenantId: number,
+  config: {
+    systemPrompt?: string;
+    welcomeMessage?: string;
+    companyInfo?: string;
+    toolsConfig?: string; // JSON string
+    schedulingConfig?: string; // JSON string
+    ragConfig?: string; // JSON string
+    enableHumanHandoff?: boolean;
+    enableAudioTranscription?: boolean;
+    enableImageProcessing?: boolean;
+  }
+): Promise<boolean> {
+  if (!process.env.N8N_API_URL) {
+    console.warn("[N8N] N8N_API_URL não configurado. Pulando sincronização.");
+    return false;
+  }
+
+  try {
+    // URL do webhook do workflow para receber atualizações de configuração
+    // O workflow precisa ter um webhook configurado para receber essas atualizações
+    const configWebhookUrl = `${process.env.N8N_API_URL}/webhook/config/tenant_${tenantId}`;
+    
+    const payload = {
+      action: "update_config",
+      tenantId,
+      config: {
+        systemPrompt: config.systemPrompt,
+        welcomeMessage: config.welcomeMessage,
+        companyInfo: config.companyInfo,
+        tools: config.toolsConfig ? JSON.parse(config.toolsConfig) : null,
+        scheduling: config.schedulingConfig ? JSON.parse(config.schedulingConfig) : null,
+        rag: config.ragConfig ? JSON.parse(config.ragConfig) : null,
+        features: {
+          enableHumanHandoff: config.enableHumanHandoff,
+          enableAudioTranscription: config.enableAudioTranscription,
+          enableImageProcessing: config.enableImageProcessing,
+        },
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const response = await axios.post(configWebhookUrl, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    });
+
+    console.log(`[N8N] ✅ Configuração sincronizada para workflow ${workflowId}`);
+    return response.status === 200;
+  } catch (error: any) {
+    console.warn(`[N8N] ⚠️ Erro ao sincronizar configuração (não bloqueia):`, error.message);
+    // Não lançar erro - sincronização é opcional
+    return false;
+  }
+}
+
+/**
+ * Atualiza workflow via API N8N (método alternativo)
+ * Modifica nodes diretamente no workflow
+ */
+export async function updateWorkflowConfig(
+  workflowId: string,
+  config: {
+    systemPrompt?: string;
+    welcomeMessage?: string;
+    toolsConfig?: any;
+  }
+): Promise<boolean> {
+  try {
+    // Buscar workflow atual
+    const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
+    const workflow = workflowResponse.data.data || workflowResponse.data;
+
+    // Modificar nodes com novas configurações
+    const updatedNodes = workflow.nodes.map((node: any) => {
+      // Atualizar prompt do sistema no node Supervisor
+      if (node.name === 'Supervisor' && node.type === '@n8n/n8n-nodes-langchain.agent') {
+        if (config.systemPrompt && node.parameters?.text) {
+          // Substituir apenas a parte do prompt, mantendo estrutura
+          const currentText = node.parameters.text;
+          // Encontrar onde começa o prompt (após "systemMessage": "=)
+          const promptMatch = currentText.match(/systemMessage["\s]*:["\s]*["']?=([^"']+)/);
+          if (promptMatch) {
+            node.parameters.text = currentText.replace(
+              promptMatch[0],
+              `systemMessage": "=${config.systemPrompt}`
+            );
+          } else {
+            // Se não encontrar, adicionar no início
+            node.parameters.text = `systemMessage": "=${config.systemPrompt}\n\n${currentText}`;
+          }
+        }
+      }
+
+      // Atualizar tools baseado em toolsConfig
+      if (config.toolsConfig) {
+        // Lógica para habilitar/desabilitar nodes de tools
+        // Isso depende da estrutura específica do workflow
+      }
+
+      return node;
+    });
+
+    // Atualizar workflow
+    await n8nApi.put(`/workflows/${workflowId}`, {
+      ...workflow,
+      nodes: updatedNodes,
+    });
+
+    console.log(`[N8N] ✅ Workflow ${workflowId} atualizado via API`);
+    return true;
+  } catch (error: any) {
+    console.error("[N8N] Erro ao atualizar workflow:", error.response?.data || error.message);
+    return false;
+  }
+}

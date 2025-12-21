@@ -8,7 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
-import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats } from "./n8n-integration";
+import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
 import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
@@ -817,14 +817,14 @@ export const appRouter = router({
         ragConfig: z.string().optional(), // JSON string
       }))
       .mutation(async ({ input, ctx }) => {
+        let tenantId: number | null = null;
+        
         // Se for cliente, usar tenant direto
         if (ctx.tenant) {
           await db.updateAgentConfig(ctx.tenant.id, input);
-          return { success: true };
-        }
-        
-        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
-        if (ctx.user) {
+          tenantId = ctx.tenant.id;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
           const tenants = await db.getAllTenants();
           const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
           
@@ -833,10 +833,24 @@ export const appRouter = router({
           }
 
           await db.updateAgentConfig(userTenant.id, input);
-          return { success: true };
+          tenantId = userTenant.id;
+        } else {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
         }
 
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
+        // Sincronizar configuração com N8N em background (não bloqueia)
+        if (tenantId) {
+          try {
+            const tenant = await db.getTenantById(tenantId);
+            if (tenant?.n8nWorkflowId) {
+              await syncAgentConfigToN8N(tenant.n8nWorkflowId, tenantId, input);
+            }
+          } catch (error: any) {
+            console.warn(`[AgentConfig] Erro ao sincronizar com N8N (não bloqueia):`, error.message);
+          }
+        }
+
+        return { success: true };
       }),
   }),
 

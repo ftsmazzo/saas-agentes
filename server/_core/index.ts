@@ -34,6 +34,10 @@ async function startServer() {
   app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), handleStripeWebhook);
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
   
+  // N8N webhook - recebe dados do workflow
+  const { handleN8NWebhook } = await import("../webhooks/n8n");
+  app.post("/api/webhooks/n8n/:tenantId", express.json(), handleN8NWebhook);
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
