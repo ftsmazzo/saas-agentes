@@ -58,13 +58,12 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
 
   const generatePromptMutation = trpc.clientPanel.generateSystemPrompt.useMutation({
     onSuccess: (data) => {
-      addMessage('assistant', 'Perfeito! ✅ Seu agente foi configurado com sucesso!');
-      addMessage('assistant', 'Agora você pode revisar as configurações abaixo. O prompt do sistema foi gerado automaticamente e não pode ser editado diretamente.');
+      addMessage('assistant', '✅ Perfeito! Seu agente foi configurado com sucesso!');
       setState((prev) => ({ ...prev, step: 'complete' }));
-      toast.success('Configurações salvas com sucesso!');
+      toast.success('Agente configurado! Agora você pode conectar o WhatsApp e ativar o agente.');
       setTimeout(() => {
         onComplete();
-      }, 3000);
+      }, 2000);
     },
     onError: (error) => {
       toast.error(`Erro: ${error.message}`);

@@ -125,41 +125,28 @@ export default function WhatsAppQRCode() {
     }
   }, [status?.status, refetchQR]);
 
-  // Se não tiver agente configurado, mostrar mensagem para criar
-  if (!agentLoading && !agentConfig) {
-    return (
-      <ClientLayout>
-        <div className="max-w-4xl mx-auto">
-          <Card className="text-center py-12">
-            <CardContent className="space-y-6">
-              <div className="flex justify-center">
-                <div className="rounded-full bg-primary/10 p-6">
-                  <Bot className="h-12 w-12 text-primary" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Crie seu primeiro agente</h2>
-                <p className="text-muted-foreground">
-                  Antes de conectar o WhatsApp, você precisa criar e configurar seu agente de IA
-                </p>
-              </div>
-              <Button
-                onClick={() => setLocation("/client/settings")}
-                size="lg"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Configurar Agente
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </ClientLayout>
-    );
-  }
+  // Se não tiver agente configurado, mostrar aviso mas permitir conectar WhatsApp
+  // O usuário pode conectar WhatsApp primeiro e depois configurar o agente
 
   return (
     <ClientLayout>
-    <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto">
+        {/* Aviso se não houver agente configurado */}
+        {!agentLoading && !agentConfig && (
+          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
+            <Bot className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <strong>Agente não configurado ainda.</strong> Você pode conectar o WhatsApp primeiro e depois configurar o agente. 
+              <Button
+                variant="link"
+                className="p-0 h-auto ml-1 text-yellow-800 underline"
+                onClick={() => setLocation("/client/settings")}
+              >
+                Configurar agora
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Conectar WhatsApp</h1>
         <p className="text-muted-foreground mt-2">

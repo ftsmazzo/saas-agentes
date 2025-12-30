@@ -298,33 +298,39 @@ export default function AgentConfigUnifiedPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="welcomeMessage">Mensagem de Boas-Vindas</Label>
-                  <Textarea
-                    id="welcomeMessage"
-                    value={formData.welcomeMessage}
-                    onChange={(e) =>
-                      setFormData({ ...formData, welcomeMessage: e.target.value })
-                    }
-                    placeholder="Olá! Como posso ajudá-lo hoje?"
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
+                {/* Mensagem de Boas-Vindas e Company Info são preenchidos automaticamente pelo assistente de IA */}
+                {config?.welcomeMessage && (
+                  <div className="space-y-2">
+                    <Label htmlFor="welcomeMessage">Mensagem de Boas-Vindas</Label>
+                    <Textarea
+                      id="welcomeMessage"
+                      value={formData.welcomeMessage}
+                      onChange={(e) =>
+                        setFormData({ ...formData, welcomeMessage: e.target.value })
+                      }
+                      placeholder="Olá! Como posso ajudá-lo hoje?"
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      ℹ️ Esta mensagem foi gerada automaticamente pelo assistente de IA. Você pode editá-la se desejar.
+                    </p>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="companyInfo">Informações da Empresa (JSON)</Label>
-                  <Textarea
-                    id="companyInfo"
-                    value={formData.companyInfo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, companyInfo: e.target.value })
-                    }
-                    placeholder='{"name": "Minha Empresa", "address": "Rua X, 123", "phone": "(11) 99999-9999"}'
-                    rows={6}
-                    className="resize-none font-mono text-sm"
-                  />
-                </div>
+                {config?.companyInfo && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyInfo">Informações da Empresa</Label>
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        As informações da empresa foram preenchidas automaticamente pelo assistente de IA:
+                      </p>
+                      <pre className="text-xs font-mono bg-background p-3 rounded border overflow-auto">
+                        {formData.companyInfo || '{}'}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
