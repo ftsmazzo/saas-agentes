@@ -36,11 +36,12 @@ export async function cloneWorkflowForTenant(
       name: `${tenantName} - Agente`,
       nodes: template.nodes.map((node: any) => {
         if (node.type === 'n8n-nodes-base.webhook') {
+          // N8N adiciona /webhook automaticamente, então usamos apenas o path sem /webhook
           return {
             ...node,
             parameters: {
               ...node.parameters,
-              path: `/webhook/tenant_${tenantId}`
+              path: `tenant_${tenantId}`
             }
           };
         }
@@ -81,8 +82,14 @@ export async function cloneWorkflowForTenant(
     console.log("[N8N] Workflow criado:", JSON.stringify(createResponse.data, null, 2).substring(0, 300));
     const newWorkflowId = createResponse.data.id || createResponse.data.data?.id;
 
-    // Ativar workflow usando POST conforme documentação oficial
-    await n8nApi.post(`/workflows/${newWorkflowId}/activate`);
+    // Publicar workflow (N8N 2.1.4+ usa published ao invés de active)
+    try {
+      await n8nApi.patch(`/workflows/${newWorkflowId}`, { published: true });
+      console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso`);
+    } catch (error: any) {
+      console.warn(`[N8N] ⚠️ Erro ao publicar workflow (pode já estar publicado):`, error.response?.data || error.message);
+      // Não lançar erro - workflow foi criado, apenas não foi publicado
+    }
 
     return {
       workflowId: newWorkflowId,
@@ -111,21 +118,29 @@ function injectTenantIdInQuery(query: string, tenantId: number): string {
   return query;
 }
 
+/**
+ * Publica workflow (N8N 2.1.4+ usa published ao invés de active)
+ */
 export async function activateWorkflow(workflowId: string): Promise<void> {
   try {
-    await n8nApi.patch(`/workflows/${workflowId}`, { active: true });
+    await n8nApi.patch(`/workflows/${workflowId}`, { published: true });
+    console.log(`[N8N] ✅ Workflow ${workflowId} publicado com sucesso`);
   } catch (error: any) {
-    console.error("[N8N] Erro ao ativar workflow:", error.response?.data || error.message);
-    throw new Error(`Falha ao ativar workflow: ${error.response?.data?.message || error.message}`);
+    console.error("[N8N] Erro ao publicar workflow:", error.response?.data || error.message);
+    throw new Error(`Falha ao publicar workflow: ${error.response?.data?.message || error.message}`);
   }
 }
 
+/**
+ * Despublica workflow (N8N 2.1.4+ usa published ao invés de active)
+ */
 export async function deactivateWorkflow(workflowId: string): Promise<void> {
   try {
-    await n8nApi.patch(`/workflows/${workflowId}`, { active: false });
+    await n8nApi.patch(`/workflows/${workflowId}`, { published: false });
+    console.log(`[N8N] ✅ Workflow ${workflowId} despublicado com sucesso`);
   } catch (error: any) {
-    console.error("[N8N] Erro ao desativar workflow:", error.response?.data || error.message);
-    throw new Error(`Falha ao desativar workflow: ${error.response?.data?.message || error.message}`);
+    console.error("[N8N] Erro ao despublicar workflow:", error.response?.data || error.message);
+    throw new Error(`Falha ao despublicar workflow: ${error.response?.data?.message || error.message}`);
   }
 }
 
@@ -135,6 +150,21 @@ export async function deleteWorkflow(workflowId: string): Promise<void> {
   } catch (error: any) {
     console.error("[N8N] Erro ao deletar workflow:", error.response?.data || error.message);
     throw new Error(`Falha ao deletar workflow: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Verifica se o workflow está publicado
+ */
+export async function isWorkflowPublished(workflowId: string): Promise<boolean> {
+  try {
+    const response = await n8nApi.get(`/workflows/${workflowId}`);
+    const workflow = response.data.data || response.data;
+    // N8N 2.1.4+ usa 'published' ao invés de 'active'
+    return workflow.published === true || workflow.active === true; // Compatibilidade com versões antigas
+  } catch (error: any) {
+    console.error("[N8N] Erro ao verificar status do workflow:", error.response?.data || error.message);
+    return false;
   }
 }
 

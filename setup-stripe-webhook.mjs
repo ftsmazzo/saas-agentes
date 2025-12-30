@@ -4,7 +4,10 @@ const stripe = new Stripe(process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.S
   apiVersion: '2025-11-17.clover',
 });
 
-const WEBHOOK_URL = 'https://saasagents-uchdrab2.manus.space/api/webhooks/stripe';
+// Use a variável de ambiente ou configure manualmente
+const WEBHOOK_URL = process.env.STRIPE_WEBHOOK_URL || process.env.VITE_APP_URL 
+  ? `${process.env.VITE_APP_URL}/api/webhooks/stripe`
+  : 'https://seu-dominio.com/api/webhooks/stripe';
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 async function setupWebhook() {

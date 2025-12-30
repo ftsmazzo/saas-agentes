@@ -8,7 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
-import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N } from "./n8n-integration";
+import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
 import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
@@ -1208,6 +1208,21 @@ export const appRouter = router({
           code: 'PRECONDITION_FAILED',
           message: 'Workflow N8N não provisionado',
         });
+      }
+
+      // Verificar se o workflow está publicado (N8N 2.1.4+)
+      const isPublished = await isWorkflowPublished(tenant.n8nWorkflowId);
+      if (!isPublished) {
+        console.log(`[Client] ⚠️ Workflow ${tenant.n8nWorkflowId} não está publicado. Tentando publicar...`);
+        try {
+          await activateWorkflow(tenant.n8nWorkflowId);
+          console.log(`[Client] ✅ Workflow ${tenant.n8nWorkflowId} publicado com sucesso`);
+        } catch (error: any) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Workflow N8N não está publicado e não foi possível publicar: ${error.message}. Por favor, publique manualmente no N8N.`,
+          });
+        }
       }
 
       // Validar variáveis de ambiente necessárias
