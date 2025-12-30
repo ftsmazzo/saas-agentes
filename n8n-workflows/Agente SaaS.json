@@ -545,8 +545,8 @@
           "conditions": [
             {
               "id": "b6b2f965-1529-4b65-bc7b-c4260a27341f",
-              "leftValue": "={{ $json.body.conversation.messages[0].sender.identifier || $json.body.conversation.meta.sender.identifier }}",
-              "rightValue": "5516996480805@s.whatsapp.net",
+              "leftValue": "={{ $('Webhook').item.json.webhookUrl }}",
+              "rightValue": "=https://saas-agentes-n8n.90qhxz.easypanel.host/webhook/{{ $json.evolutionInstanceName }}",
               "operator": {
                 "type": "string",
                 "operation": "equals",
@@ -561,7 +561,7 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        -288,
+        -112,
         160
       ],
       "id": "920bc6e3-797c-4aaf-a6ba-bcc52e837eda",
@@ -1572,43 +1572,43 @@
             {
               "id": "1b513343-9b6a-4f6e-a012-ed819bf34a31",
               "name": "id_conta",
-              "value": "={{ $json.body.account.id }}",
+              "value": "={{ $('Webhook').item.json.body.account.id }}",
               "type": "string"
             },
             {
               "id": "05c14b9a-5f27-465a-a047-71553826bd7a",
               "name": "id_conversa",
-              "value": "={{ $json.body.conversation.id }}",
+              "value": "={{ $('Webhook').item.json.body.conversation.id }}",
               "type": "string"
             },
             {
               "id": "8bf522a6-75fb-434a-854c-b736539309e1",
               "name": "telefone",
-              "value": "={{ $json.body.conversation.meta.sender.phone_number.replace('+', '').concat('@s.whatsapp.net') }}",
+              "value": "={{ $('Webhook').item.json.body.conversation.meta.sender.phone_number.replace('+', '').concat('@s.whatsapp.net') }}",
               "type": "string"
             },
             {
               "id": "0d622a33-f313-4758-a764-fa6cbf2b0587",
               "name": "mensagem",
-              "value": "={{ $json.body.content || $json.body.attachments?.[0]?.meta?.is_recorded_audio || $json.body.attachments[0].data_url.replace('http://https', '') }}",
+              "value": "={{ $('Webhook').item.json.body.content || $json.body.attachments?.[0]?.meta?.is_recorded_audio || $json.body.attachments[0].data_url.replace('http://https', '') }}",
               "type": "string"
             },
             {
               "id": "24caf88e-74ce-43ab-8dc4-1fff471b706f",
               "name": "tipo",
-              "value": "={{ $json.body.message_type }}",
+              "value": "={{ $('Webhook').item.json.body.message_type }}",
               "type": "string"
             },
             {
               "id": "573669d2-1e43-4010-8c82-a67459ffe1db",
               "name": "etiquetas",
-              "value": "={{ $json.body.conversation.labels }}",
+              "value": "={{ $('Webhook').item.json.body.conversation.labels }}",
               "type": "array"
             },
             {
               "id": "f9f64530-896d-4566-8e31-f67c4c077826",
               "name": "NomeWhatsapp",
-              "value": "={{ $json.body.conversation.messages[0].sender.name }}",
+              "value": "={{ $('Webhook').item.json.body.conversation.messages[0].sender.name }}",
               "type": "string"
             },
             {
@@ -1620,19 +1620,25 @@
             {
               "id": "4e384d2b-feaa-48a2-9459-41d61965fdbd",
               "name": "mensage_de_texto",
-              "value": "={{ $json.body.content || \"null\" }}",
+              "value": "={{ $('Webhook').item.json.body.content || \"null\" }}",
               "type": "string"
             },
             {
               "id": "3c49bdbd-af6d-452c-9be4-5d990123d45b",
               "name": "=mensagem_audio_ou_imagem",
-              "value": "={{ $json.body.attachments[0].file_type }}",
+              "value": "={{ $('Webhook').item.json.body.attachments[0].file_type }}",
               "type": "string"
             },
             {
               "id": "e2433843-a913-4495-81be-00b8f00996ff",
               "name": "mensagem_base64",
-              "value": "={{ $json.body.attachments[0].data_url.replace(/^https?:\\/\\/https?/, '') }}",
+              "value": "={{ $('Webhook').item.json.body.attachments[0].data_url.replace(/^https?:\\/\\/https?/, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "f636205c-91ee-4352-9760-76f316884ff9",
+              "name": "chatwootAgentBotToken",
+              "value": "={{ $json.chatwootAgentBotToken }}",
               "type": "string"
             }
           ]
@@ -1841,7 +1847,7 @@
           "parameters": [
             {
               "name": "api_access_token",
-              "value": "b5K8n3q31YUrwAGEbD5EToPW"
+              "value": "={{ $('Info2').item.json.chatwootAgentBotToken }}"
             }
           ]
         },
@@ -2144,8 +2150,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -560,
-        80
+        -432,
+        112
       ],
       "typeVersion": 1,
       "id": "667afbba-f647-4489-b23f-3be57b791778",
@@ -2228,8 +2234,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -464,
-        144
+        -592,
+        160
       ],
       "id": "2da33c5d-3020-4395-8e36-aa89f7acf26c",
       "name": "Webhook",
@@ -2324,9 +2330,243 @@
           "name": "Bases Vetoriais"
         }
       }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86ff3c5d-89ec-44ac-abe6-535c829000ca",
+              "name": "webhookUrl",
+              "value": "={{$json.webhookUrl.split('/').pop().replace(/\\s+/g, '') }}\n",
+              "type": "string"
+            },
+            {
+              "id": "6c2b4625-c998-4862-810f-adea8dc6202b",
+              "name": "tenantId",
+              "value": "={{$json.webhookUrl ? parseInt($json.webhookUrl.split('/').pop().replace(/\\s+/g, '').replace(/^tenant_?/i, '')) || null : null}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        160
+      ],
+      "id": "28ade722-8a1f-45f4-8baf-5df03d5b011c",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tenants",
+          "mode": "list",
+          "cachedResultName": "tenants"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "evolutionInstanceName",
+              "value": "={{ $json.webhookUrl.trim() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -256,
+        160
+      ],
+      "id": "cd97e8de-6fdb-45a2-8fbc-50e901dc135b",
+      "name": "Select rows from a table",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "saas-agentes-n8n.90qhxz.easypanel.host",
+            "user-agent": "rest-client/2.1.0 (linux-musl x86_64) ruby/3.4.4p34",
+            "content-length": "4638",
+            "accept": "application/json",
+            "accept-encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
+            "content-type": "application/json",
+            "x-forwarded-for": "172.18.0.1",
+            "x-forwarded-host": "saas-agentes-n8n.90qhxz.easypanel.host",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "be9d4643f3b2",
+            "x-real-ip": "172.18.0.1"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "account": {
+              "id": 1,
+              "name": "Fabrica IA"
+            },
+            "additional_attributes": {},
+            "content_attributes": {},
+            "content_type": "text",
+            "content": "Bom dia",
+            "conversation": {
+              "additional_attributes": {},
+              "can_reply": true,
+              "channel": "Channel::Api",
+              "contact_inbox": {
+                "id": 66,
+                "contact_id": 3,
+                "inbox_id": 50,
+                "source_id": "efe082b9-d448-4d56-a9ad-f59bac1109e7",
+                "created_at": "2025-12-29T14:06:42.804Z",
+                "updated_at": "2025-12-29T14:06:42.804Z",
+                "hmac_verified": false,
+                "pubsub_token": "arMnZcTJACiawdsxT2XQMMbC"
+              },
+              "id": 59,
+              "inbox_id": 50,
+              "messages": [
+                {
+                  "id": 1669,
+                  "content": "Bom dia",
+                  "account_id": 1,
+                  "inbox_id": 50,
+                  "conversation_id": 59,
+                  "message_type": 0,
+                  "created_at": 1767017202,
+                  "updated_at": "2025-12-29T14:06:42.896Z",
+                  "private": false,
+                  "status": "sent",
+                  "source_id": "WAID:3EB0D31C049060C6B1EC31",
+                  "content_type": "text",
+                  "content_attributes": {},
+                  "sender_type": "Contact",
+                  "sender_id": 3,
+                  "external_source_ids": {},
+                  "additional_attributes": {},
+                  "processed_message_content": "Bom dia",
+                  "sentiment": {},
+                  "conversation": {
+                    "assignee_id": null,
+                    "unread_count": 1,
+                    "last_activity_at": 1767017202,
+                    "contact_inbox": {
+                      "source_id": "efe082b9-d448-4d56-a9ad-f59bac1109e7"
+                    }
+                  },
+                  "sender": {
+                    "additional_attributes": {
+                      "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
+                      "last_avatar_sync_at": "2025-12-29T14:04:36Z"
+                    },
+                    "custom_attributes": {},
+                    "email": null,
+                    "id": 3,
+                    "identifier": "5516996480805@s.whatsapp.net",
+                    "name": "Frederico",
+                    "phone_number": "+5516996480805",
+                    "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
+                    "blocked": false,
+                    "type": "contact"
+                  }
+                }
+              ],
+              "labels": [],
+              "meta": {
+                "sender": {
+                  "additional_attributes": {
+                    "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
+                    "last_avatar_sync_at": "2025-12-29T14:04:36Z"
+                  },
+                  "custom_attributes": {},
+                  "email": null,
+                  "id": 3,
+                  "identifier": "5516996480805@s.whatsapp.net",
+                  "name": "Frederico",
+                  "phone_number": "+5516996480805",
+                  "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
+                  "blocked": false,
+                  "type": "contact"
+                },
+                "assignee": null,
+                "assignee_type": null,
+                "team": null,
+                "hmac_verified": false
+              },
+              "status": "open",
+              "custom_attributes": {},
+              "snoozed_until": null,
+              "unread_count": 1,
+              "first_reply_created_at": null,
+              "priority": null,
+              "waiting_since": 1767017202,
+              "agent_last_seen_at": 0,
+              "contact_last_seen_at": 0,
+              "last_activity_at": 1767017202,
+              "timestamp": 1767017202,
+              "created_at": 1767017202,
+              "updated_at": 1767017202.8988538
+            },
+            "created_at": "2025-12-29T14:06:42.896Z",
+            "id": 1669,
+            "inbox": {
+              "id": 50,
+              "name": "Tenant 8"
+            },
+            "message_type": "incoming",
+            "private": false,
+            "sender": {
+              "account": {
+                "id": 1,
+                "name": "Fabrica IA"
+              },
+              "additional_attributes": {
+                "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
+                "last_avatar_sync_at": "2025-12-29T14:04:36Z"
+              },
+              "avatar": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
+              "custom_attributes": {},
+              "email": null,
+              "id": 3,
+              "identifier": "5516996480805@s.whatsapp.net",
+              "name": "Frederico",
+              "phone_number": "+5516996480805",
+              "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
+              "blocked": false
+            },
+            "source_id": "WAID:3EB0D31C049060C6B1EC31",
+            "event": "message_created"
+          },
+          "webhookUrl": "https://saas-agentes-n8n.90qhxz.easypanel.host/webhook/agentemestre",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
     "Loop Over Items3": {
       "main": [
@@ -2985,7 +3225,7 @@
       "main": [
         [
           {
-            "node": "Info2",
+            "node": "Edit Fields2",
             "type": "main",
             "index": 0
           }
@@ -3024,13 +3264,46 @@
           }
         ]
       ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Info2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "3a11fd84-8ad8-4273-9741-85da4e886e8f",
+  "versionId": "d8c66ddc-8630-47c9-a34f-b18a6a0b6d19",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "587c4dd9f315be6f591dbc2bb13f01a8f77983c8f8f482ac398a55bfbb9808a5"
