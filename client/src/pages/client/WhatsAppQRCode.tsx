@@ -18,11 +18,11 @@ export default function WhatsAppQRCode() {
   // Verificar se o agente está ativado
   const { data: agentStatus, isLoading: agentStatusLoading, refetch: refetchAgentStatus } = trpc.clientPanel.getAgentStatus.useQuery();
   
-  // Só buscar QR Code se não estiver conectado ou se forçar
+  // Buscar QR Code se não estiver conectado ou se forçar
   const { data: qrData, isLoading: qrLoading, refetch: refetchQR } = trpc.clientPanel.getQRCode.useQuery(
     undefined,
     {
-      enabled: !forceQRCode && !!agentConfig, // Só buscar se agente existir
+      enabled: !forceQRCode, // Buscar sempre (não precisa de agente para conectar WhatsApp)
       refetchOnWindowFocus: false,
     }
   );
