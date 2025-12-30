@@ -62,7 +62,7 @@
           "conditions": [
             {
               "id": "defac08a-6745-422b-bb05-90da9f47d91b",
-              "leftValue": "={{ $('Busca Telefone').last().json.values() }}",
+              "leftValue": "={{ $('Busca Telefone1').last().json.values() }}",
               "rightValue": "",
               "operator": {
                 "type": "array",
@@ -102,156 +102,6 @@
     },
     {
       "parameters": {
-        "operation": "get",
-        "tableId": "chats",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "phone",
-              "keyValue": "={{ $('Info2').item.json.telefone }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3632,
-        192
-      ],
-      "id": "4a024ace-5966-4c43-b9f6-f7c99cc8d050",
-      "name": "Busca Telefone",
-      "alwaysOutputData": true,
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "tableId": "chats",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "phone",
-              "fieldValue": "={{ $('Info2').item.json.telefone }}"
-            },
-            {
-              "fieldId": "updated_at",
-              "fieldValue": "={{ $now}}"
-            },
-            {
-              "fieldId": "created_at",
-              "fieldValue": "={{ $now }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3952,
-        112
-      ],
-      "id": "cd88d99f-e7fb-4480-85eb-1bead738b77a",
-      "name": "Adiciona CHAT supabase",
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "tableId": "chats",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "phone",
-              "condition": "eq",
-              "keyValue": "={{ $('Info2').item.json.telefone }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "updated_at",
-              "fieldValue": "={{ $now }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3952,
-        288
-      ],
-      "id": "45d4088a-897f-449e-9dd7-427e15bff49f",
-      "name": "Atualiza CHAT Supabase",
-      "alwaysOutputData": true,
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "tableId": "chat_messages",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "phone",
-              "fieldValue": "={{ $('Info2').item.json.telefone }}"
-            },
-            {
-              "fieldId": "bot_message",
-              "fieldValue": "={{ $('Supervisor').first().json.output }}"
-            },
-            {
-              "fieldId": "user_message",
-              "fieldValue": "={{ $('Info2').item.json.mensagem }}"
-            },
-            {
-              "fieldId": "message_type",
-              "fieldValue": "={{ $('Info2').item.json.tipo }}"
-            },
-            {
-              "fieldId": "created_at",
-              "fieldValue": "={{ $now }}"
-            },
-            {
-              "fieldId": "nomewpp",
-              "fieldValue": "={{ $('Info2').item.json.NomeWhatsapp }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        4128,
-        192
-      ],
-      "id": "7b2dddd6-5149-460a-9641-4a22d8d2d8f3",
-      "name": "Cria Histórico Supabase",
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
-    },
-    {
-      "parameters": {
         "fieldToSplitOut": "output.messages",
         "options": {
           "destinationFieldName": "output"
@@ -276,8 +126,8 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        4304,
-        192
+        4544,
+        208
       ],
       "credentials": {
         "redis": {
@@ -327,8 +177,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        0,
-        80
+        32,
+        96
       ],
       "typeVersion": 1,
       "id": "c21c7b48-64f0-401c-a80b-b861e52a29ce",
@@ -356,43 +206,6 @@
         1712,
         496
       ]
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "tableId": "dados_cliente",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "telefone",
-              "condition": "eq",
-              "keyValue": "={{ $('Info2').item.json.telefone }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "atendimento_ia",
-              "fieldValue": "pause"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        704,
-        144
-      ],
-      "id": "14ce9af5-9596-4b11-9de4-b649cfc91806",
-      "name": "Pausar IA",
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
     },
     {
       "parameters": {
@@ -461,43 +274,6 @@
     },
     {
       "parameters": {
-        "operation": "update",
-        "tableId": "dados_cliente",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "telefone",
-              "condition": "eq",
-              "keyValue": "={{ $('Info2').item.json.telefone }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "atendimento_ia",
-              "fieldValue": "reativada"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        704,
-        320
-      ],
-      "id": "5d37e628-e6cb-461e-a7f1-853431f8b7ac",
-      "name": "Reativar IA",
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
-    },
-    {
-      "parameters": {
         "content": "# Criação Banco de Dados",
         "height": 376,
         "width": 1400,
@@ -505,8 +281,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1968,
-        80
+        -2064,
+        -896
       ],
       "typeVersion": 1,
       "id": "385a27cf-162e-4b4e-8c2e-fbe1ed941a31",
@@ -561,40 +337,11 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        -112,
-        160
+        -288,
+        208
       ],
       "id": "920bc6e3-797c-4aaf-a6ba-bcc52e837eda",
       "name": "Filter"
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "tableId": "dados_cliente",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "telefone",
-              "keyValue": "={{ $('Info2').item.json.telefone }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        -464,
-        448
-      ],
-      "id": "a9d18375-7a22-4f85-86d6-789d802aaf1e",
-      "name": "Buscar Cliente",
-      "alwaysOutputData": true,
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
     },
     {
       "parameters": {
@@ -608,7 +355,7 @@
           "conditions": [
             {
               "id": "4a6d9aac-8565-4c58-abe3-8741393a5535",
-              "leftValue": "={{ $('Buscar Cliente').item.json }}",
+              "leftValue": "={{ $('Busca Cliente').item.json }}",
               "rightValue": "",
               "operator": {
                 "type": "object",
@@ -624,46 +371,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -464,
-        608
+        -624,
+        768
       ],
       "id": "6dd330b3-d9c1-445b-a7f2-b8338d728fd9",
       "name": "Cliente Existe?"
-    },
-    {
-      "parameters": {
-        "tableId": "dados_cliente",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "nomewpp",
-              "fieldValue": "={{ $('Info2').item.json.NomeWhatsapp }}"
-            },
-            {
-              "fieldId": "telefone",
-              "fieldValue": "={{ $('Info2').item.json.telefone }}"
-            },
-            {
-              "fieldId": "created_at",
-              "fieldValue": "={{ $now}}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        -272,
-        624
-      ],
-      "id": "111165dc-b36b-44b9-9077-51e19fcfa82c",
-      "name": "Criar Cliente",
-      "credentials": {
-        "supabaseApi": {
-          "id": "CpzaMbqrsj5EVEJd",
-          "name": "Supabase-SaaS"
-        }
-      }
     },
     {
       "parameters": {
@@ -913,7 +625,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Info2').item.json.telefone }}",
+        "sessionKey": "={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}",
         "contextWindowLength": 40
       },
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
@@ -926,80 +638,29 @@
       "name": "Postgres Chat Memory",
       "credentials": {
         "postgres": {
-          "id": "LibZSFyBCZW5cdAR",
-          "name": "SaaS"
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
         }
       }
     },
     {
       "parameters": {
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "n8n_chat_histories",
-          "mode": "list",
-          "cachedResultName": "n8n_chat_histories"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "session_id": "={{ $('Info2').item.json.telefone }}",
-            "message": "={\"type\": \"ai\", \"content\": \"{{ $('Info2').item.json.mensagem.replace(/\\r?\\n|\\r/g, ' ') }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "session_id",
-              "displayName": "session_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "message",
-              "displayName": "message",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "object",
-              "canBeUsedToMatch": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_chat_histories (session_id, message)\nVALUES (\n  '{{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}',\n  '{\"type\": \"ai\", \"content\": \"{{ $('Info2').item.json.mensagem.replace(/\\r?\\n|\\r/g, ' ') }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}'::jsonb\n)\nON CONFLICT DO NOTHING;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        896,
+        960,
         144
       ],
       "id": "290ba1e6-6995-41ea-a9ba-21bec670688a",
       "name": "Salvar Historico1",
       "credentials": {
         "postgres": {
-          "id": "LibZSFyBCZW5cdAR",
-          "name": "SaaS"
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
         }
       }
     },
@@ -1167,8 +828,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1840,
-        224
+        -1936,
+        -752
       ],
       "id": "a835250d-7abc-4866-b71b-9dbea444a32d",
       "name": "chat_messages",
@@ -1188,8 +849,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1456,
-        224
+        -1552,
+        -752
       ],
       "id": "195ad493-ca47-4965-aa10-323e03485e93",
       "name": "dados_cliente",
@@ -1209,8 +870,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1648,
-        224
+        -1744,
+        -752
       ],
       "id": "78c519bd-f97b-4770-9fa2-507150180ae0",
       "name": "vetor",
@@ -1230,8 +891,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1072,
-        224
+        -1168,
+        -752
       ],
       "id": "f83fd491-bd85-4fe3-9123-ae47b4494d42",
       "name": "match_documents",
@@ -1251,8 +912,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1264,
-        224
+        -1360,
+        -752
       ],
       "id": "bc2c561b-1dee-4894-aa61-1e3d1de044a0",
       "name": "documents",
@@ -1272,8 +933,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1904,
-        176
+        -2000,
+        -800
       ],
       "typeVersion": 1,
       "id": "5fda2b33-aa6b-45e2-bcfb-11a00a43428d",
@@ -1288,8 +949,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1904,
-        560
+        -2000,
+        -416
       ],
       "typeVersion": 1,
       "id": "f15fdb89-0b0b-4df8-ac5c-8f3ae12f0733",
@@ -1304,8 +965,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1840,
-        624
+        -1936,
+        -352
       ],
       "id": "4328c352-86fc-43e7-8171-db43247c0197",
       "name": "Deletar Histórico",
@@ -1325,8 +986,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1056,
-        624
+        -1152,
+        -352
       ],
       "id": "66b38dd3-9b46-4e05-9358-4837f0303dfa",
       "name": "Deletar conteúdo Chat_Messages",
@@ -1346,8 +1007,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1440,
-        624
+        -1536,
+        -352
       ],
       "id": "7e898c80-e53c-4cf6-bb24-9ba5300dc401",
       "name": "Deletar conteúdo Dados Cliente",
@@ -1367,8 +1028,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1648,
-        624
+        -1744,
+        -352
       ],
       "id": "3b2f2fa9-906c-4f37-997f-897443a4ab1e",
       "name": "Deletar conteúdo Chats",
@@ -1388,8 +1049,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -1248,
-        624
+        -1344,
+        -352
       ],
       "id": "1b206bf1-ecfd-4264-8081-26ee0fb86a90",
       "name": "Deletar conteúdo Documentos",
@@ -1648,8 +1309,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -464,
-        304
+        -656,
+        384
       ],
       "id": "f10db824-d347-4374-90a8-c6630baa1e24",
       "name": "Info2"
@@ -1897,8 +1558,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1968,
-        464
+        -2064,
+        -512
       ],
       "typeVersion": 1,
       "id": "cd32e1fa-9838-478c-8a1e-d45267b9b305",
@@ -1913,8 +1574,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -880,
-        224
+        -976,
+        -752
       ],
       "id": "3761dafb-0ac9-4d0b-bce5-c574be0e7a9e",
       "name": "chats",
@@ -2041,7 +1702,7 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "session_id": "={{ $('Info2').item.json.telefone }}",
+            "session_id": "={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}",
             "message": "={\"type\": \"human\", \"content\": \"{{ $('Info2').item.json.mensagem }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}"
           },
           "matchingColumns": [
@@ -2092,8 +1753,8 @@
       "name": "Salvar Historico Cliente",
       "credentials": {
         "postgres": {
-          "id": "LibZSFyBCZW5cdAR",
-          "name": "SaaS"
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
         }
       }
     },
@@ -2144,13 +1805,13 @@
     {
       "parameters": {
         "content": "# Cadastro CRM",
-        "height": 796,
-        "width": 564,
+        "height": 940,
+        "width": 836,
         "color": 6
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -432,
+        -832,
         112
       ],
       "typeVersion": 1,
@@ -2234,8 +1895,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -592,
-        160
+        -768,
+        208
       ],
       "id": "2da33c5d-3020-4395-8e36-aa89f7acf26c",
       "name": "Webhook",
@@ -2354,8 +2015,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -400,
-        160
+        -576,
+        208
       ],
       "id": "28ade722-8a1f-45f4-8baf-5df03d5b011c",
       "name": "Edit Fields2"
@@ -2387,8 +2048,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -256,
-        160
+        -432,
+        208
       ],
       "id": "cd97e8de-6fdb-45a2-8fbc-50e901dc135b",
       "name": "Select rows from a table",
@@ -2399,174 +2060,177 @@
           "name": "Agents-Saas"
         }
       }
-    }
-  ],
-  "pinData": {
-    "Webhook": [
-      {
-        "json": {
-          "headers": {
-            "host": "saas-agentes-n8n.90qhxz.easypanel.host",
-            "user-agent": "rest-client/2.1.0 (linux-musl x86_64) ruby/3.4.4p34",
-            "content-length": "4638",
-            "accept": "application/json",
-            "accept-encoding": "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
-            "content-type": "application/json",
-            "x-forwarded-for": "172.18.0.1",
-            "x-forwarded-host": "saas-agentes-n8n.90qhxz.easypanel.host",
-            "x-forwarded-port": "443",
-            "x-forwarded-proto": "https",
-            "x-forwarded-server": "be9d4643f3b2",
-            "x-real-ip": "172.18.0.1"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "account": {
-              "id": 1,
-              "name": "Fabrica IA"
-            },
-            "additional_attributes": {},
-            "content_attributes": {},
-            "content_type": "text",
-            "content": "Bom dia",
-            "conversation": {
-              "additional_attributes": {},
-              "can_reply": true,
-              "channel": "Channel::Api",
-              "contact_inbox": {
-                "id": 66,
-                "contact_id": 3,
-                "inbox_id": 50,
-                "source_id": "efe082b9-d448-4d56-a9ad-f59bac1109e7",
-                "created_at": "2025-12-29T14:06:42.804Z",
-                "updated_at": "2025-12-29T14:06:42.804Z",
-                "hmac_verified": false,
-                "pubsub_token": "arMnZcTJACiawdsxT2XQMMbC"
-              },
-              "id": 59,
-              "inbox_id": 50,
-              "messages": [
-                {
-                  "id": 1669,
-                  "content": "Bom dia",
-                  "account_id": 1,
-                  "inbox_id": 50,
-                  "conversation_id": 59,
-                  "message_type": 0,
-                  "created_at": 1767017202,
-                  "updated_at": "2025-12-29T14:06:42.896Z",
-                  "private": false,
-                  "status": "sent",
-                  "source_id": "WAID:3EB0D31C049060C6B1EC31",
-                  "content_type": "text",
-                  "content_attributes": {},
-                  "sender_type": "Contact",
-                  "sender_id": 3,
-                  "external_source_ids": {},
-                  "additional_attributes": {},
-                  "processed_message_content": "Bom dia",
-                  "sentiment": {},
-                  "conversation": {
-                    "assignee_id": null,
-                    "unread_count": 1,
-                    "last_activity_at": 1767017202,
-                    "contact_inbox": {
-                      "source_id": "efe082b9-d448-4d56-a9ad-f59bac1109e7"
-                    }
-                  },
-                  "sender": {
-                    "additional_attributes": {
-                      "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
-                      "last_avatar_sync_at": "2025-12-29T14:04:36Z"
-                    },
-                    "custom_attributes": {},
-                    "email": null,
-                    "id": 3,
-                    "identifier": "5516996480805@s.whatsapp.net",
-                    "name": "Frederico",
-                    "phone_number": "+5516996480805",
-                    "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
-                    "blocked": false,
-                    "type": "contact"
-                  }
-                }
-              ],
-              "labels": [],
-              "meta": {
-                "sender": {
-                  "additional_attributes": {
-                    "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
-                    "last_avatar_sync_at": "2025-12-29T14:04:36Z"
-                  },
-                  "custom_attributes": {},
-                  "email": null,
-                  "id": 3,
-                  "identifier": "5516996480805@s.whatsapp.net",
-                  "name": "Frederico",
-                  "phone_number": "+5516996480805",
-                  "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
-                  "blocked": false,
-                  "type": "contact"
-                },
-                "assignee": null,
-                "assignee_type": null,
-                "team": null,
-                "hmac_verified": false
-              },
-              "status": "open",
-              "custom_attributes": {},
-              "snoozed_until": null,
-              "unread_count": 1,
-              "first_reply_created_at": null,
-              "priority": null,
-              "waiting_since": 1767017202,
-              "agent_last_seen_at": 0,
-              "contact_last_seen_at": 0,
-              "last_activity_at": 1767017202,
-              "timestamp": 1767017202,
-              "created_at": 1767017202,
-              "updated_at": 1767017202.8988538
-            },
-            "created_at": "2025-12-29T14:06:42.896Z",
-            "id": 1669,
-            "inbox": {
-              "id": 50,
-              "name": "Tenant 8"
-            },
-            "message_type": "incoming",
-            "private": false,
-            "sender": {
-              "account": {
-                "id": 1,
-                "name": "Fabrica IA"
-              },
-              "additional_attributes": {
-                "avatar_url_hash": "759e622050fd5e947201ffb102732f979bf274742193216ccf42bfd585cebb22",
-                "last_avatar_sync_at": "2025-12-29T14:04:36Z"
-              },
-              "avatar": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
-              "custom_attributes": {},
-              "email": null,
-              "id": 3,
-              "identifier": "5516996480805@s.whatsapp.net",
-              "name": "Frederico",
-              "phone_number": "+5516996480805",
-              "thumbnail": "https://saas-agentes-chatwoot.90qhxz.easypanel.host/rails/active_storage/representations/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBdVFDIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--1155850757538d72e8f6cb641a794280b4ffc2d5/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdCem9MWm05eWJXRjBTU0lJYW5CbkJqb0dSVlE2RTNKbGMybDZaVjkwYjE5bWFXeHNXd2RwQWZvdyIsImV4cCI6bnVsbCwicHVyIjoidmFyaWF0aW9uIn19--5eb0aa02ed73b757e02affbe39e9bea6e714fab3/483730894_689324576767410_6751096692709196592_n.jpg",
-              "blocked": false
-            },
-            "source_id": "WAID:3EB0D31C049060C6B1EC31",
-            "event": "message_created"
-          },
-          "webhookUrl": "https://saas-agentes-n8n.90qhxz.easypanel.host/webhook/agentemestre",
-          "executionMode": "production"
-        },
-        "pairedItem": {
-          "item": 0
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM \"clientData\"\nWHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n  AND phone = '{{ $('Info2').item.json.telefone }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -640,
+        576
+      ],
+      "id": "276c678b-04ed-4937-a659-0ed1913156d5",
+      "name": "Busca Cliente",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
         }
       }
-    ]
-  },
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO \"clientData\" (\"tenantId\", phone, name, \"aiService\", \"createdAt\", \"updatedAt\")\nVALUES (\n  {{ $('Edit Fields2').item.json.tenantId }},\n  '{{ $('Info2').item.json.telefone }}',\n  '{{ $('Info2').item.json.NomeWhatsapp }}',\n  'active',\n  NOW(),\n  NOW()\n)\nON CONFLICT DO NOTHING\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -400,
+        784
+      ],
+      "id": "a373ffcb-2996-4e30-b6c5-56551d9c0877",
+      "name": "Criar Cliente",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM conversations \nWHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n  AND phone = '{{ $('Info2').item.json.telefone }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3584,
+        192
+      ],
+      "id": "1957e893-449c-411b-9692-326cb104de03",
+      "name": "Busca Telefone",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO conversations (\"tenantId\", phone, \"updatedAt\", \"startedAt\")\nVALUES (\n  {{ $('Edit Fields2').item.json.tenantId }},\n  '{{ $('Info2').item.json.telefone }}',\n  NOW(),\n  NOW()\n)\nON CONFLICT DO NOTHING\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4080,
+        112
+      ],
+      "id": "ba14a874-dd96-4f54-9d2d-486035ea64e8",
+      "name": "Adiciona CHAT supabase",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversations \nSET \"lastMessageAt\" = NOW(),\n    \"updatedAt\" = NOW()::text\nWHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n  AND phone = '{{ $('Info2').item.json.telefone }}'\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4080,
+        320
+      ],
+      "id": "c4a3f4e4-6d0b-467c-9cda-5daa5cdc491f",
+      "name": "Atualiza CHAT Supabase",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO \"chatMessages\" (\n  \"tenantId\",\n  \"conversationId\",\n  \"contactId\",\n  phone,\n  nomewpp,\n  \"botMessage\",\n  \"userMessage\",\n  \"messageType\",\n  role,\n  content,\n  active\n)\nVALUES (\n  {{ $('Edit Fields2').item.json.tenantId }},\n  (SELECT id FROM conversations \n   WHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n     AND phone = '{{ $('Info2').item.json.telefone }}'\n   LIMIT 1),\n  (SELECT id FROM contacts \n   WHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n     AND \"phoneNumber\" = '{{ $('Info2').item.json.telefone }}'\n   LIMIT 1),\n  '{{ $('Info2').item.json.telefone }}',\n  '{{ $('Info2').item.json.NomeWhatsapp }}',\n  '{{ $('Supervisor').first().json.output }}',\n  '{{ $('Info2').item.json.mensagem }}',\n  '{{ $('Info2').item.json.tipo }}',\n  'assistant',\n  '{{ $('Supervisor').first().json.output }}',\n  true\n)\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4336,
+        208
+      ],
+      "id": "20bfb790-8e23-4449-84e6-6040c00af362",
+      "name": "Cria Histórico Supabase",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"clientData\"\nSET \"aiService\" = 'active',\n    \"updatedAt\" = NOW()\nWHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n  AND phone = '{{ $('Info2').item.json.telefone }}'\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        736,
+        368
+      ],
+      "id": "d8354f1e-7919-405f-98dc-f716d2f88b96",
+      "name": "Reativar IA",
+      "credentials": {
+        "postgres": {
+          "id": "LibZSFyBCZW5cdAR",
+          "name": "SaaS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE \"clientData\"\nSET \"aiService\" = 'pause',\n    \"updatedAt\" = NOW()\nWHERE \"tenantId\" = {{ $('Edit Fields2').item.json.tenantId }}\n  AND phone = '{{ $('Info2').item.json.telefone }}'\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        720,
+        144
+      ],
+      "id": "46cfe1b3-f20d-47c1-871e-3c2a65743d2b",
+      "name": "Pausar IA",
+      "credentials": {
+        "postgres": {
+          "id": "POHa2nqjWojbkPsX",
+          "name": "Agents-Saas"
+        }
+      }
+    }
+  ],
+  "pinData": {},
   "connections": {
     "Loop Over Items3": {
       "main": [
@@ -2609,50 +2273,6 @@
         ]
       ]
     },
-    "Busca Telefone": {
-      "main": [
-        [
-          {
-            "node": "If4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Adiciona CHAT supabase": {
-      "main": [
-        [
-          {
-            "node": "Cria Histórico Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Atualiza CHAT Supabase": {
-      "main": [
-        [
-          {
-            "node": "Cria Histórico Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Cria Histórico Supabase": {
-      "main": [
-        [
-          {
-            "node": "Delete Memory",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Split de Mensagem": {
       "main": [
         [
@@ -2669,17 +2289,6 @@
         [
           {
             "node": "Converter Foto",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Pausar IA": {
-      "main": [
-        [
-          {
-            "node": "Salvar Historico1",
             "type": "main",
             "index": 0
           }
@@ -2715,17 +2324,6 @@
         ]
       ]
     },
-    "Buscar Cliente": {
-      "main": [
-        [
-          {
-            "node": "Cliente Existe?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Cliente Existe?": {
       "main": [
         [
@@ -2738,17 +2336,6 @@
         [
           {
             "node": "Criar Cliente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Criar Cliente": {
-      "main": [
-        [
-          {
-            "node": "ROTA Entrando ou Saindo",
             "type": "main",
             "index": 0
           }
@@ -2970,12 +2557,12 @@
       "main": [
         [
           {
-            "node": "Busca Telefone",
+            "node": "Split de mensagens",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Split de mensagens",
+            "node": "Busca Telefone",
             "type": "main",
             "index": 0
           }
@@ -3008,7 +2595,7 @@
       "main": [
         [
           {
-            "node": "Buscar Cliente",
+            "node": "Busca Cliente",
             "type": "main",
             "index": 0
           }
@@ -3297,13 +2884,95 @@
           }
         ]
       ]
+    },
+    "Busca Cliente": {
+      "main": [
+        [
+          {
+            "node": "Cliente Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Cliente": {
+      "main": [
+        [
+          {
+            "node": "ROTA Entrando ou Saindo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Telefone": {
+      "main": [
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adiciona CHAT supabase": {
+      "main": [
+        [
+          {
+            "node": "Cria Histórico Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualiza CHAT Supabase": {
+      "main": [
+        [
+          {
+            "node": "Cria Histórico Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Histórico Supabase": {
+      "main": [
+        [
+          {
+            "node": "Delete Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reativar IA": {
+      "main": [
+        []
+      ]
+    },
+    "Pausar IA": {
+      "main": [
+        [
+          {
+            "node": "Salvar Historico1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "d8c66ddc-8630-47c9-a34f-b18a6a0b6d19",
+  "versionId": "c9d8e043-1ab9-4710-8271-e4d8d95d0620",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "587c4dd9f315be6f591dbc2bb13f01a8f77983c8f8f482ac398a55bfbb9808a5"
