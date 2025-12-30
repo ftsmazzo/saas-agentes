@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { createEvolutionInstance } from "../evolution-integration";
 import { cloneWorkflowForTenant } from "../n8n-integration";
 import { sendActivationEmail } from "../email";
+import { findChatwootInboxByName } from "../chatwoot-integration";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || "sk_test_dummy";
 if (stripeApiKey === "sk_test_dummy") {
@@ -121,15 +122,33 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   // 2. Provisionar Evolution API
   let evolutionData;
   try {
-    evolutionData = await createEvolutionInstance(tenant.id);
+    evolutionData = await createEvolutionInstance(tenant.id, companyName);
     console.log(`[Provisioning] Evolution instance created: ${evolutionData.instanceName}`);
+    
+    // Buscar inboxId criado pelo Evolution (pode levar alguns segundos para aparecer)
+    let chatwootInboxId: number | null = null;
+    try {
+      // Aguardar um pouco para o Evolution criar o inbox
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Tentar buscar pelo nome (Evolution usa o nome que passamos)
+      chatwootInboxId = await findChatwootInboxByName(companyName);
+      
+      if (chatwootInboxId) {
+        console.log(`[Provisioning] Chatwoot inbox found: ${chatwootInboxId}`);
+      } else {
+        console.log(`[Provisioning] Chatwoot inbox not found immediately (may be created later)`);
+      }
+    } catch (error: any) {
+      console.warn(`[Provisioning] Error finding inbox (non-critical):`, error.message);
+    }
     
     // Atualizar tenant com dados Evolution
     await db.update(tenants)
       .set({
         evolutionInstanceName: evolutionData.instanceName,
         evolutionApiKey: evolutionData.apiKey,
-        // chatwootInboxId será preenchido quando Evolution retornar
+        chatwootInboxId: chatwootInboxId || undefined,
       })
       .where(eq(tenants.id, tenant.id));
   } catch (error: any) {

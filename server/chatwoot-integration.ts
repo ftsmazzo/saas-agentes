@@ -118,14 +118,136 @@ export async function getInboxStats(inboxId: number): Promise<{
 }
 
 /**
+ * Lista todos os inboxes de uma conta
+ */
+export async function listChatwootInboxes(): Promise<any[]> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const response = await chatwootApi.get(`/accounts/${accountId}/inboxes`);
+    return response.data.payload || response.data || [];
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao listar inboxes:", error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca inbox pelo nome
+ */
+export async function findChatwootInboxByName(inboxName: string): Promise<number | null> {
+  try {
+    const inboxes = await listChatwootInboxes();
+    const inbox = inboxes.find((i: any) => i.name === inboxName || i.name?.includes(inboxName));
+    return inbox ? inbox.id : null;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar inbox por nome:", error.response?.data || error.message);
+    return null;
+  }
+}
+
+/**
  * Deleta inbox Chatwoot
  */
 export async function deleteChatwootInbox(inboxId: number): Promise<void> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     await chatwootApi.delete(`/accounts/${accountId}/inboxes/${inboxId}`);
+    console.log(`[Chatwoot] ✅ Inbox ${inboxId} deletado com sucesso`);
   } catch (error: any) {
+    // Se o inbox já não existe (404), não é erro crítico
+    if (error.response?.status === 404) {
+      console.log(`[Chatwoot] ⚠️ Inbox ${inboxId} já não existe (404)`);
+      return;
+    }
     console.error("[Chatwoot] Erro ao deletar inbox:", error.response?.data || error.message);
     throw new Error(`Falha ao deletar inbox Chatwoot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Deleta inbox Chatwoot pelo nome (fallback quando não temos o ID)
+ */
+export async function deleteChatwootInboxByName(inboxName: string): Promise<boolean> {
+  try {
+    const inboxId = await findChatwootInboxByName(inboxName);
+    if (inboxId) {
+      await deleteChatwootInbox(inboxId);
+      return true;
+    }
+    console.log(`[Chatwoot] ⚠️ Inbox com nome "${inboxName}" não encontrado`);
+    return false;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao deletar inbox por nome:", error.response?.data || error.message);
+    return false;
+  }
+}
+
+/**
+ * Lista todos os webhooks de uma conta Chatwoot
+ */
+export async function listChatwootWebhooks(): Promise<any[]> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const response = await chatwootApi.get(`/accounts/${accountId}/webhooks`);
+    return response.data.payload || response.data || [];
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao listar webhooks:", error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca webhook pela URL (usado para encontrar webhook criado pelo N8N)
+ */
+export async function findChatwootWebhookByUrl(webhookUrl: string): Promise<number | null> {
+  try {
+    const webhooks = await listChatwootWebhooks();
+    const webhook = webhooks.find((w: any) => 
+      w.webhook_url === webhookUrl || 
+      w.url === webhookUrl ||
+      (w.webhook_url && w.webhook_url.includes(webhookUrl)) ||
+      (w.url && w.url.includes(webhookUrl))
+    );
+    return webhook ? webhook.id : null;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar webhook por URL:", error.response?.data || error.message);
+    return null;
+  }
+}
+
+/**
+ * Deleta webhook Chatwoot pelo ID
+ */
+export async function deleteChatwootWebhook(webhookId: number): Promise<void> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    await chatwootApi.delete(`/accounts/${accountId}/webhooks/${webhookId}`);
+    console.log(`[Chatwoot] ✅ Webhook ${webhookId} deletado com sucesso`);
+  } catch (error: any) {
+    // Se o webhook já não existe (404), não é erro crítico
+    if (error.response?.status === 404) {
+      console.log(`[Chatwoot] ⚠️ Webhook ${webhookId} já não existe (404)`);
+      return;
+    }
+    console.error("[Chatwoot] Erro ao deletar webhook:", error.response?.data || error.message);
+    throw new Error(`Falha ao deletar webhook Chatwoot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Deleta webhook Chatwoot pela URL (usado para deletar webhook criado pelo N8N)
+ */
+export async function deleteChatwootWebhookByUrl(webhookUrl: string): Promise<boolean> {
+  try {
+    const webhookId = await findChatwootWebhookByUrl(webhookUrl);
+    if (webhookId) {
+      await deleteChatwootWebhook(webhookId);
+      return true;
+    }
+    console.log(`[Chatwoot] ⚠️ Webhook com URL "${webhookUrl}" não encontrado`);
+    return false;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao deletar webhook por URL:", error.response?.data || error.message);
+    return false;
   }
 }

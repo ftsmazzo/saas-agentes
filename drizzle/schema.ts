@@ -23,7 +23,10 @@ export const eventTypeEnum = pgEnum("eventType", [
   "config_updated",
   "provisioning_failed",
   "n8n_failed",
-  "email_failed"
+  "email_failed",
+  "bulk_delete_all_clients",
+  "bulk_delete_test_clients",
+  "agent_activated"
 ]);
 export const severityEnum = pgEnum("severity", ["info", "warning", "error", "critical"]);
 export const conversationStatusEnum = pgEnum("conversationStatus", ["active", "paused", "closed"]);

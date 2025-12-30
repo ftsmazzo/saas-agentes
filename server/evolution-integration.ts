@@ -19,8 +19,10 @@ export interface EvolutionInstance {
  * Cria uma nova instância Evolution API para um tenant
  * Integra automaticamente com Chatwoot
  */
-export async function createEvolutionInstance(tenantId: number): Promise<EvolutionInstance> {
+export async function createEvolutionInstance(tenantId: number, tenantName?: string): Promise<EvolutionInstance> {
   const instanceName = `tenant_${tenantId}`;
+  // Usar o nome do tenant se fornecido, caso contrário usar "Tenant X"
+  const inboxName = tenantName || `Tenant ${tenantId}`;
   
   if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_API_KEY) {
     throw new Error("EVOLUTION_API_URL e EVOLUTION_API_KEY devem estar configurados no .env");
@@ -39,7 +41,7 @@ export async function createEvolutionInstance(tenantId: number): Promise<Evoluti
       chatwootReopenConversation: true,
       chatwootConversationPending: false,
       chatwootImportContacts: true,
-      chatwootNameInbox: `Tenant ${tenantId}`,
+      chatwootNameInbox: inboxName,
       // Configurações de comportamento
       groupsIgnore: true,
       alwaysOnline: false,
