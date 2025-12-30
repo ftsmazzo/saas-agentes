@@ -3,7 +3,8 @@ import axios from "axios";
 const n8nApi = axios.create({
   baseURL: `${process.env.N8N_API_URL || ""}/api/v1`,
   headers: {
-    "X-N8N-API-KEY": process.env.N8N_API_KEY || ""
+    "X-N8N-API-KEY": process.env.N8N_API_KEY || "",
+    "Content-Type": "application/json"
   },
   timeout: 30000, // 30 segundos
 });
@@ -91,20 +92,36 @@ export async function cloneWorkflowForTenant(
       const workflow = workflowResponse.data.data || workflowResponse.data;
       
       console.log(`[N8N] 📋 Workflow atual - published: ${workflow.published}, active: ${workflow.active}`);
+      console.log(`[N8N] 📋 Campos disponíveis:`, Object.keys(workflow).slice(0, 10));
       
-      // Tentar método 1: PUT com workflow completo
+      // Tentar método 1: PUT apenas com campos permitidos (não espalhar workflow completo)
       try {
-        await n8nApi.put(`/workflows/${newWorkflowId}`, {
-          ...workflow,
-          published: true
-        });
+        // N8N 2.1.4+ pode usar 'published' ou ainda usar 'active'
+        // Enviar apenas os campos que a API aceita
+        const updatePayload: any = {
+          name: workflow.name,
+          nodes: workflow.nodes,
+          connections: workflow.connections,
+          settings: workflow.settings,
+          staticData: workflow.staticData,
+        };
+        
+        // Tentar published primeiro (N8N 2.1.4+)
+        if (workflow.published !== undefined) {
+          updatePayload.published = true;
+        } else {
+          // Se não tem published, usar active (versões antigas ou configuração diferente)
+          updatePayload.active = true;
+        }
+        
+        await n8nApi.put(`/workflows/${newWorkflowId}`, updatePayload);
         console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso (método PUT)`);
       } catch (putError: any) {
         console.warn(`[N8N] ⚠️ PUT falhou, tentando método alternativo:`, putError.response?.data || putError.message);
         
-        // Tentar método 2: Endpoint específico de ativação (se existir)
+        // Tentar método 2: Endpoint específico de ativação
         try {
-          await n8nApi.post(`/workflows/${newWorkflowId}/activate`);
+          await n8nApi.post(`/workflows/${newWorkflowId}/activate`, {});
           console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso (método POST /activate)`);
         } catch (postError: any) {
           console.warn(`[N8N] ⚠️ POST /activate também falhou:`, postError.response?.data || postError.message);
@@ -165,19 +182,32 @@ export async function activateWorkflow(workflowId: string): Promise<void> {
     
     console.log(`[N8N] 📋 Estado atual - published: ${workflow.published}, active: ${workflow.active}`);
     
-    // Tentar método 1: PUT com workflow completo
+    // Tentar método 1: PUT apenas com campos permitidos
     try {
-      await n8nApi.put(`/workflows/${workflowId}`, {
-        ...workflow,
-        published: true
-      });
+      const updatePayload: any = {
+        name: workflow.name,
+        nodes: workflow.nodes,
+        connections: workflow.connections,
+        settings: workflow.settings,
+        staticData: workflow.staticData,
+      };
+      
+      // Tentar published primeiro (N8N 2.1.4+)
+      if (workflow.published !== undefined) {
+        updatePayload.published = true;
+      } else {
+        // Se não tem published, usar active
+        updatePayload.active = true;
+      }
+      
+      await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
       console.log(`[N8N] ✅ Workflow ${workflowId} publicado (método PUT)`);
       
       // Verificar se realmente foi publicado
       const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
       const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
       
-      if (verifiedWorkflow.published === true) {
+      if (verifiedWorkflow.published === true || verifiedWorkflow.active === true) {
         console.log(`[N8N] ✅ Confirmação: Workflow ${workflowId} está publicado`);
         return;
       } else {
@@ -189,7 +219,7 @@ export async function activateWorkflow(workflowId: string): Promise<void> {
       
       // Tentar método 2: Endpoint específico de ativação
       try {
-        await n8nApi.post(`/workflows/${workflowId}/activate`);
+        await n8nApi.post(`/workflows/${workflowId}/activate`, {});
         console.log(`[N8N] ✅ Workflow ${workflowId} publicado (método POST /activate)`);
         
         // Verificar novamente
@@ -218,11 +248,24 @@ export async function deactivateWorkflow(workflowId: string): Promise<void> {
     const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
     const workflow = workflowResponse.data.data || workflowResponse.data;
     
-    // Atualizar workflow completo com published: false usando PUT
-    await n8nApi.put(`/workflows/${workflowId}`, {
-      ...workflow,
-      published: false
-    });
+    // Enviar apenas campos permitidos (não espalhar workflow completo)
+    const updatePayload: any = {
+      name: workflow.name,
+      nodes: workflow.nodes,
+      connections: workflow.connections,
+      settings: workflow.settings,
+      staticData: workflow.staticData,
+    };
+    
+    // Tentar published primeiro (N8N 2.1.4+)
+    if (workflow.published !== undefined) {
+      updatePayload.published = false;
+    } else {
+      // Se não tem published, usar active
+      updatePayload.active = false;
+    }
+    
+    await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
     console.log(`[N8N] ✅ Workflow ${workflowId} despublicado com sucesso`);
   } catch (error: any) {
     console.error("[N8N] Erro ao despublicar workflow:", error.response?.data || error.message);
