@@ -35,14 +35,15 @@ function Router() {
       {/* Public Routes */}
       <Route path={"/activate/:token"} component={ActivateAccount} />
       
-      {/* Admin Routes */}
+      {/* Admin Routes - Login deve vir ANTES de todas as outras rotas /admin */}
       <Route path={"/admin/login"} component={AdminLogin} />
-      <Route path={"/admin"} component={AdminDashboard} />
+      {/* Todas as outras rotas /admin/* devem vir depois para garantir precedência */}
       <Route path={"/admin/dashboard"} component={AdminDashboard} />
       <Route path={"/admin/tenants"} component={TenantsPage} />
       <Route path={"/admin/plans"} component={PlansPage} />
       <Route path={"/admin/logs"} component={LogsPage} />
       <Route path={"/admin/settings"} component={SettingsPage} />
+      <Route path={"/admin"} component={AdminDashboard} />
       
       {/* Client Routes */}
       <Route path={"/client/login"} component={ClientLogin} />

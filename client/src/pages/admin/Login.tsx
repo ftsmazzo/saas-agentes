@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, LogIn, Mail, Lock, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/core/hooks/useAuth";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { user, loading } = useAuth();
   
-  // Debug: verificar se código atualizado
-  console.log("[AdminLogin] Componente carregado - versão atualizada");
+  // Se já estiver logado como admin, redirecionar imediatamente
+  useEffect(() => {
+    if (!loading && user && user.role === 'admin') {
+      window.location.href = "/admin/dashboard";
+    }
+  }, [user, loading]);
+  
+  // Mostrar loading enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Se já estiver logado, não mostrar o formulário (será redirecionado)
+  if (user && user.role === 'admin') {
+    return null;
+  }
 
   const loginMutation = trpc.auth.adminLogin.useMutation({
     onSuccess: (data) => {

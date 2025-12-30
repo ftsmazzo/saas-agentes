@@ -73,7 +73,7 @@ export default function Home() {
               {user.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => window.location.href = import.meta.env.VITE_OAUTH_PORTAL_URL}>
+            <Button variant="outline" onClick={() => setLocation('/client/login')}>
               Fazer Login
             </Button>
           )}
