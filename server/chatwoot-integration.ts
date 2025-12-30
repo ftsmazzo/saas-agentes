@@ -132,12 +132,25 @@ export async function listChatwootInboxes(): Promise<any[]> {
 }
 
 /**
- * Busca inbox pelo nome
+ * Busca inbox pelo nome (tenta múltiplas variações)
  */
 export async function findChatwootInboxByName(inboxName: string): Promise<number | null> {
   try {
     const inboxes = await listChatwootInboxes();
-    const inbox = inboxes.find((i: any) => i.name === inboxName || i.name?.includes(inboxName));
+    
+    // Tentar busca exata primeiro
+    let inbox = inboxes.find((i: any) => i.name === inboxName);
+    
+    // Se não encontrar, tentar busca parcial (case-insensitive)
+    if (!inbox) {
+      const lowerName = inboxName.toLowerCase();
+      inbox = inboxes.find((i: any) => 
+        i.name?.toLowerCase() === lowerName || 
+        i.name?.toLowerCase().includes(lowerName) ||
+        lowerName.includes(i.name?.toLowerCase() || '')
+      );
+    }
+    
     return inbox ? inbox.id : null;
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao buscar inbox por nome:", error.response?.data || error.message);
@@ -189,7 +202,27 @@ export async function listChatwootWebhooks(): Promise<any[]> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     const response = await chatwootApi.get(`/accounts/${accountId}/webhooks`);
-    return response.data.payload || response.data || [];
+    
+    // A API do Chatwoot pode retornar em diferentes formatos
+    let webhooks: any[] = [];
+    
+    if (Array.isArray(response.data)) {
+      webhooks = response.data;
+    } else if (response.data?.payload && Array.isArray(response.data.payload)) {
+      webhooks = response.data.payload;
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      webhooks = response.data.data;
+    } else if (response.data?.webhooks && Array.isArray(response.data.webhooks)) {
+      webhooks = response.data.webhooks;
+    }
+    
+    // Garantir que sempre retornamos um array
+    if (!Array.isArray(webhooks)) {
+      console.warn("[Chatwoot] Resposta de webhooks não é um array:", JSON.stringify(response.data).substring(0, 200));
+      return [];
+    }
+    
+    return webhooks;
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao listar webhooks:", error.response?.data || error.message);
     return [];
@@ -202,12 +235,38 @@ export async function listChatwootWebhooks(): Promise<any[]> {
 export async function findChatwootWebhookByUrl(webhookUrl: string): Promise<number | null> {
   try {
     const webhooks = await listChatwootWebhooks();
-    const webhook = webhooks.find((w: any) => 
-      w.webhook_url === webhookUrl || 
-      w.url === webhookUrl ||
-      (w.webhook_url && w.webhook_url.includes(webhookUrl)) ||
-      (w.url && w.url.includes(webhookUrl))
-    );
+    
+    // Garantir que webhooks é um array
+    if (!Array.isArray(webhooks)) {
+      console.warn("[Chatwoot] listChatwootWebhooks não retornou um array:", typeof webhooks);
+      return null;
+    }
+    
+    // Normalizar a URL para comparação (remover trailing slash, etc)
+    const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
+    const normalizedSearchUrl = normalizeUrl(webhookUrl);
+    
+    // Tentar busca exata primeiro
+    let webhook = webhooks.find((w: any) => {
+      if (!w) return false;
+      const url1 = w.webhook_url ? normalizeUrl(w.webhook_url) : '';
+      const url2 = w.url ? normalizeUrl(w.url) : '';
+      return url1 === normalizedSearchUrl || url2 === normalizedSearchUrl;
+    });
+    
+    // Se não encontrar exato, tentar busca parcial (contém)
+    if (!webhook) {
+      webhook = webhooks.find((w: any) => {
+        if (!w) return false;
+        const url1 = w.webhook_url ? normalizeUrl(w.webhook_url) : '';
+        const url2 = w.url ? normalizeUrl(w.url) : '';
+        return url1.includes(normalizedSearchUrl) || 
+               url2.includes(normalizedSearchUrl) ||
+               normalizedSearchUrl.includes(url1) ||
+               normalizedSearchUrl.includes(url2);
+      });
+    }
+    
     return webhook ? webhook.id : null;
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao buscar webhook por URL:", error.response?.data || error.message);

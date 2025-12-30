@@ -66,19 +66,32 @@ async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boo
     }
   } else {
     // Se não temos o ID salvo, tentar buscar e deletar pelo nome
-    // O nome do inbox geralmente é o mesmo que passamos para o Evolution
-    const inboxName = tenant.companyName || `Tenant ${tenant.id}`;
-    try {
-      const deleted = await deleteChatwootInboxByName(inboxName);
-      if (deleted) {
-        console.log(`[Delete] ✅ Inbox Chatwoot "${inboxName}" deletado (encontrado pelo nome)`);
-      } else {
-        console.log(`[Delete] ⚠️ Inbox Chatwoot "${inboxName}" não encontrado (pode já ter sido deletado)`);
+    // Tentar múltiplas variações do nome (Evolution pode criar com nome diferente)
+    const possibleNames = [
+      tenant.companyName,
+      `Tenant ${tenant.id}`,
+      `${tenant.companyName} - WhatsApp`,
+      `Tenant ${tenant.id} - WhatsApp`,
+    ].filter(Boolean); // Remove valores undefined/null
+    
+    let deleted = false;
+    for (const inboxName of possibleNames) {
+      if (!inboxName) continue;
+      
+      try {
+        deleted = await deleteChatwootInboxByName(inboxName);
+        if (deleted) {
+          console.log(`[Delete] ✅ Inbox Chatwoot "${inboxName}" deletado (encontrado pelo nome)`);
+          break; // Se encontrou e deletou, não precisa tentar outros nomes
+        }
+      } catch (error: any) {
+        console.warn(`[Delete] ⚠️ Erro ao tentar deletar inbox "${inboxName}":`, error.message);
+        // Continuar tentando outros nomes
       }
-    } catch (error: any) {
-      const errorMsg = `Chatwoot (busca por nome): ${error.message}`;
-      console.error(`[Delete] ❌ Erro ao deletar Chatwoot por nome:`, errorMsg);
-      // Não adicionar como erro crítico, apenas logar
+    }
+    
+    if (!deleted) {
+      console.log(`[Delete] ⚠️ Inbox Chatwoot não encontrado com nenhum dos nomes: ${possibleNames.join(', ')} (pode já ter sido deletado)`);
     }
   }
 
