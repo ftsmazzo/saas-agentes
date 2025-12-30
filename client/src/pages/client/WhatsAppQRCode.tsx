@@ -197,55 +197,73 @@ export default function WhatsAppQRCode() {
                   WhatsApp conectado e pronto para uso!
                 </AlertDescription>
               </Alert>
-              {isAgentActivated ? (
-                <>
+              
+              {/* Só mostrar botões de ativar/desativar se houver agente configurado */}
+              {agentConfig ? (
+                isAgentActivated ? (
+                  <>
+                    <Button
+                      disabled
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white cursor-not-allowed"
+                      size="lg"
+                    >
+                      <Bot className="h-4 w-4 mr-2" />
+                      Agente Ativado
+                    </Button>
+                    <Button
+                      onClick={handleDeactivateAgent}
+                      disabled={deactivateAgentMutation.isPending}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      {deactivateAgentMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                          Desligando robô...
+                        </>
+                      ) : (
+                        <>
+                          <PowerOff className="h-3 w-3 mr-2" />
+                          Desligar Robô
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
                   <Button
-                    disabled
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white cursor-not-allowed"
+                    onClick={() => activateAgentMutation.mutate()}
+                    disabled={activateAgentMutation.isPending}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
                     size="lg"
                   >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Agente Ativado
-                  </Button>
-                  <Button
-                    onClick={handleDeactivateAgent}
-                    disabled={deactivateAgentMutation.isPending}
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
-                  >
-                    {deactivateAgentMutation.isPending ? (
+                    {activateAgentMutation.isPending ? (
                       <>
-                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                        Desligando robô...
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Ativando agente...
                       </>
                     ) : (
                       <>
-                        <PowerOff className="h-3 w-3 mr-2" />
-                        Desligar Robô
+                        <Play className="h-4 w-4 mr-2" />
+                        Ativar Agente
                       </>
                     )}
                   </Button>
-                </>
+                )
               ) : (
-                <Button
-                  onClick={() => activateAgentMutation.mutate()}
-                  disabled={activateAgentMutation.isPending}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  size="lg"
-                >
-                  {activateAgentMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Ativando agente...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Ativar Agente
-                    </>
-                  )}
-                </Button>
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Bot className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    Configure o agente primeiro para poder ativá-lo. 
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto ml-1 text-blue-800 underline"
+                      onClick={() => setLocation("/client/settings")}
+                    >
+                      Configurar agora
+                    </Button>
+                  </AlertDescription>
+                </Alert>
               )}
               <Button
                 onClick={handleDisconnect}
