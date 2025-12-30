@@ -78,16 +78,42 @@ LIMIT 1;
 - **Operação:** `Execute Query`
 - **Query:**
 ```sql
-INSERT INTO conversations ("tenantId", phone, "updatedAt", "startedAt")
-VALUES (
+WITH contact AS (
+  -- Buscar ou criar contato
+  INSERT INTO contacts ("tenantId", "phoneNumber", name, "isActive", "createdAt", "updatedAt")
+  VALUES (
+    {{ $('Edit Fields2').item.json.tenantId }},
+    '{{ $('Info2').item.json.telefone }}',
+    '{{ $('Info2').item.json.NomeWhatsapp }}',
+    true,
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT ("tenantId", "phoneNumber") 
+  DO UPDATE SET 
+    name = EXCLUDED.name,
+    "updatedAt" = NOW()
+  RETURNING id
+)
+INSERT INTO conversations (
+  "tenantId",
+  "contactId",
+  phone,
+  "updatedAt",
+  "startedAt"
+)
+SELECT 
   {{ $('Edit Fields2').item.json.tenantId }},
+  contact.id,
   '{{ $('Info2').item.json.telefone }}',
   NOW(),
   NOW()
-)
+FROM contact
 ON CONFLICT DO NOTHING
 RETURNING *;
 ```
+
+**⚠️ IMPORTANTE:** Esta query requer que a tabela `contacts` tenha uma constraint UNIQUE em `("tenantId", "phoneNumber")`. Execute o script `SQL_ADD_UNIQUE_CONTACT_CONSTRAINT.sql` se ainda não tiver essa constraint.
 
 ### 📝 Passos:
 1. Delete o node Supabase "Adiciona CHAT supabase"
