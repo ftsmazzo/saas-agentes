@@ -184,15 +184,15 @@ export default function AgentConfigUnifiedPage() {
           </p>
         </div>
 
-        {/* Se não houver configuração, mostrar assistente diretamente */}
-        {!config && (
+        {/* Se não houver configuração OU não houver systemPrompt, mostrar assistente diretamente */}
+        {(!config || !config.systemPrompt) && !showAssistant && !assistantComplete && (
           <div className="mb-6">
             <AgentConfigAssistant
               onComplete={() => {
                 setShowAssistant(false);
                 setAssistantComplete(true);
                 utils.agent.getConfig.invalidate();
-                toast.success('Configuração concluída! Você pode revisar e ajustar abaixo.');
+                toast.success('Configuração concluída! Agora você pode conectar o WhatsApp e ativar o agente.');
               }}
             />
           </div>

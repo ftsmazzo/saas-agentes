@@ -132,62 +132,78 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
     if (!message.trim()) return;
 
     addMessage('user', message);
+    const trimmedMessage = message.trim();
     setUserInput('');
 
     // Processar resposta baseado no step atual
     switch (state.step) {
       case 'welcome':
-        if (message.toLowerCase().includes('sim') || message.toLowerCase().includes('s') || message.toLowerCase().includes('vamos')) {
+        if (trimmedMessage.toLowerCase().includes('sim') || trimmedMessage.toLowerCase().includes('s') || trimmedMessage.toLowerCase().includes('vamos') || trimmedMessage.toLowerCase() === 'ok') {
           handleNextStep();
         } else {
-          addMessage('assistant', 'Tudo bem! Quando estiver pronto, digite "sim" para começar.');
+          addMessage('assistant', 'Tudo bem! Quando estiver pronto, digite "sim" ou "ok" para começar.');
         }
         break;
 
       case 'business-name':
+        if (trimmedMessage.length < 2) {
+          addMessage('assistant', 'Por favor, informe um nome válido para sua empresa:');
+          return;
+        }
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, businessName: message },
+          answers: { ...prev.answers, businessName: trimmedMessage },
+          step: 'business-type',
         }));
-        handleNextStep();
+        addMessage('assistant', `Entendi! ${trimmedMessage}. Qual o ramo de atividade? (ex: imobiliária, e-commerce, clínica, restaurante)`);
         break;
 
       case 'business-type':
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, businessType: message },
+          answers: { ...prev.answers, businessType: trimmedMessage },
+          step: 'address',
         }));
-        handleNextStep();
+        addMessage('assistant', 'Perfeito! Qual o endereço da sua empresa?');
         break;
 
       case 'address':
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, address: message },
+          answers: { ...prev.answers, address: trimmedMessage },
+          step: 'phone',
         }));
-        handleNextStep();
+        addMessage('assistant', 'E qual o telefone de contato?');
         break;
 
       case 'phone':
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, phone: message },
+          answers: { ...prev.answers, phone: trimmedMessage },
+          step: 'tone',
         }));
-        handleNextStep();
+        addMessage('assistant', 'Ótimo! Agora, como você gostaria que seu agente se comunique?');
+        addMessage('assistant', '1. Profissional e técnico\n2. Amigável e descontraído\n3. Casual e próximo\n4. Formal e respeitoso\n\nDigite o número da opção (1-4):');
         break;
 
       case 'tone':
         const toneMap: Record<string, 'professional' | 'friendly' | 'casual' | 'formal'> = {
           '1': 'professional',
-          '2': 'friendly',
-          '3': 'casual',
-          '4': 'formal',
+          '2': 'professional',
+          '3': 'friendly',
+          '4': 'casual',
+          '5': 'formal',
+          'professional': 'professional',
+          'friendly': 'friendly',
+          'casual': 'casual',
+          'formal': 'formal',
         };
-        const selectedTone = toneMap[message.trim()];
+        const selectedTone = toneMap[trimmedMessage.toLowerCase()] || toneMap[trimmedMessage];
         if (selectedTone) {
           setState((prev) => ({
             ...prev,
             answers: { ...prev.answers, tone: selectedTone },
+            step: 'rules',
           }));
           const toneNames = {
             professional: 'profissional e técnico',
@@ -196,18 +212,22 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
             formal: 'formal e respeitoso',
           };
           addMessage('assistant', `Tom ${toneNames[selectedTone]} selecionado!`);
-          handleNextStep();
+          addMessage('assistant', 'Perfeito! Agora, existem perguntas específicas que você quer que o agente responda de forma particular?');
+          addMessage('assistant', 'Por exemplo: "Se perguntarem sobre horário de funcionamento, responda: Funcionamos de segunda a sexta, das 9h às 18h"');
+          addMessage('assistant', 'Deseja adicionar regras personalizadas? (responda "sim" ou "não")');
         } else {
           addMessage('assistant', 'Por favor, digite um número de 1 a 4:');
         }
         break;
 
       case 'rules':
-        if (message.toLowerCase().includes('sim') || message.toLowerCase().includes('s')) {
+        if (trimmedMessage.toLowerCase().includes('sim') || trimmedMessage.toLowerCase().includes('s')) {
           setShowRuleForm(true);
           addMessage('assistant', 'Perfeito! Qual a pergunta que você quer configurar?');
-        } else {
+        } else if (trimmedMessage.toLowerCase().includes('não') || trimmedMessage.toLowerCase().includes('nao') || trimmedMessage.toLowerCase().includes('n')) {
           handleNextStep();
+        } else {
+          addMessage('assistant', 'Por favor, responda "sim" ou "não":');
         }
         break;
     }

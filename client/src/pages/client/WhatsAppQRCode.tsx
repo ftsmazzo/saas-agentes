@@ -116,7 +116,7 @@ export default function WhatsAppQRCode() {
   const isLoading = qrLoading || statusLoading || agentLoading || agentStatusLoading;
   
   // Verificar se o agente está ativado
-  const isAgentActivated = agentStatus?.isActivated || false;
+  const isAgentActivated = agentStatus?.isAgentActive || false;
   
   // Atualizar QR Code quando status mudar para conectado
   useEffect(() => {
