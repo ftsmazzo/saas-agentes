@@ -82,9 +82,17 @@ export async function cloneWorkflowForTenant(
     console.log("[N8N] Workflow criado:", JSON.stringify(createResponse.data, null, 2).substring(0, 300));
     const newWorkflowId = createResponse.data.id || createResponse.data.data?.id;
 
-    // Publicar workflow (N8N 2.1.4+ usa published ao invés de active)
+    // Publicar workflow (N8N 2.1.4+ - precisa atualizar o workflow completo)
     try {
-      await n8nApi.patch(`/workflows/${newWorkflowId}`, { published: true });
+      // Buscar workflow recém-criado
+      const workflowResponse = await n8nApi.get(`/workflows/${newWorkflowId}`);
+      const workflow = workflowResponse.data.data || workflowResponse.data;
+      
+      // Atualizar com published: true usando PUT
+      await n8nApi.put(`/workflows/${newWorkflowId}`, {
+        ...workflow,
+        published: true
+      });
       console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso`);
     } catch (error: any) {
       console.warn(`[N8N] ⚠️ Erro ao publicar workflow (pode já estar publicado):`, error.response?.data || error.message);
@@ -119,11 +127,19 @@ function injectTenantIdInQuery(query: string, tenantId: number): string {
 }
 
 /**
- * Publica workflow (N8N 2.1.4+ usa published ao invés de active)
+ * Publica workflow (N8N 2.1.4+ - precisa atualizar workflow completo com PUT)
  */
 export async function activateWorkflow(workflowId: string): Promise<void> {
   try {
-    await n8nApi.patch(`/workflows/${workflowId}`, { published: true });
+    // Buscar workflow atual
+    const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
+    const workflow = workflowResponse.data.data || workflowResponse.data;
+    
+    // Atualizar workflow completo com published: true usando PUT
+    await n8nApi.put(`/workflows/${workflowId}`, {
+      ...workflow,
+      published: true
+    });
     console.log(`[N8N] ✅ Workflow ${workflowId} publicado com sucesso`);
   } catch (error: any) {
     console.error("[N8N] Erro ao publicar workflow:", error.response?.data || error.message);
@@ -132,11 +148,19 @@ export async function activateWorkflow(workflowId: string): Promise<void> {
 }
 
 /**
- * Despublica workflow (N8N 2.1.4+ usa published ao invés de active)
+ * Despublica workflow (N8N 2.1.4+ - precisa atualizar workflow completo com PUT)
  */
 export async function deactivateWorkflow(workflowId: string): Promise<void> {
   try {
-    await n8nApi.patch(`/workflows/${workflowId}`, { published: false });
+    // Buscar workflow atual
+    const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
+    const workflow = workflowResponse.data.data || workflowResponse.data;
+    
+    // Atualizar workflow completo com published: false usando PUT
+    await n8nApi.put(`/workflows/${workflowId}`, {
+      ...workflow,
+      published: false
+    });
     console.log(`[N8N] ✅ Workflow ${workflowId} despublicado com sucesso`);
   } catch (error: any) {
     console.error("[N8N] Erro ao despublicar workflow:", error.response?.data || error.message);
