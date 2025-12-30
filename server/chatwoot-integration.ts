@@ -203,6 +203,15 @@ export async function listChatwootWebhooks(): Promise<any[]> {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     const response = await chatwootApi.get(`/accounts/${accountId}/webhooks`);
     
+    // Log da resposta completa para debug (apenas estrutura, não dados sensíveis)
+    console.log("[Chatwoot] Estrutura da resposta de webhooks:", {
+      isArray: Array.isArray(response.data),
+      hasPayload: !!response.data?.payload,
+      hasData: !!response.data?.data,
+      hasWebhooks: !!response.data?.webhooks,
+      keys: response.data ? Object.keys(response.data) : [],
+    });
+    
     // A API do Chatwoot pode retornar em diferentes formatos
     let webhooks: any[] = [];
     
@@ -218,8 +227,20 @@ export async function listChatwootWebhooks(): Promise<any[]> {
     
     // Garantir que sempre retornamos um array
     if (!Array.isArray(webhooks)) {
-      console.warn("[Chatwoot] Resposta de webhooks não é um array:", JSON.stringify(response.data).substring(0, 200));
+      console.warn("[Chatwoot] Resposta de webhooks não é um array. Estrutura completa:", JSON.stringify(response.data).substring(0, 500));
       return [];
+    }
+    
+    console.log(`[Chatwoot] ✅ ${webhooks.length} webhook(s) encontrado(s)`);
+    if (webhooks.length > 0) {
+      // Log do primeiro webhook para ver a estrutura
+      console.log("[Chatwoot] Exemplo de webhook (primeiro):", {
+        id: webhooks[0].id,
+        keys: Object.keys(webhooks[0]),
+        hasWebhookUrl: !!webhooks[0].webhook_url,
+        hasUrl: !!webhooks[0].url,
+        hasEndpoint: !!webhooks[0].endpoint,
+      });
     }
     
     return webhooks;
@@ -242,32 +263,77 @@ export async function findChatwootWebhookByUrl(webhookUrl: string): Promise<numb
       return null;
     }
     
+    if (webhooks.length === 0) {
+      console.log("[Chatwoot] Nenhum webhook encontrado na conta");
+      return null;
+    }
+    
     // Normalizar a URL para comparação (remover trailing slash, etc)
-    const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
+    const normalizeUrl = (url: string) => {
+      if (!url || typeof url !== 'string') return '';
+      return url.replace(/\/$/, '').toLowerCase().trim();
+    };
     const normalizedSearchUrl = normalizeUrl(webhookUrl);
     
-    // Tentar busca exata primeiro
+    console.log(`[Chatwoot] 🔍 Buscando webhook com URL: ${webhookUrl}`);
+    console.log(`[Chatwoot] 🔍 URL normalizada: ${normalizedSearchUrl}`);
+    
+    // Listar todas as URLs encontradas para debug
+    const foundUrls = webhooks.map((w: any) => {
+      const urls = [
+        w.webhook_url,
+        w.url,
+        w.endpoint,
+        w.webhookUrl,
+      ].filter(Boolean);
+      return { id: w.id, urls };
+    });
+    console.log("[Chatwoot] 📋 URLs de webhooks encontrados:", JSON.stringify(foundUrls, null, 2));
+    
+    // Tentar busca exata primeiro - verificar todos os campos possíveis
     let webhook = webhooks.find((w: any) => {
       if (!w) return false;
-      const url1 = w.webhook_url ? normalizeUrl(w.webhook_url) : '';
-      const url2 = w.url ? normalizeUrl(w.url) : '';
-      return url1 === normalizedSearchUrl || url2 === normalizedSearchUrl;
+      
+      // Verificar todos os campos possíveis onde a URL pode estar
+      const possibleUrls = [
+        w.webhook_url,
+        w.url,
+        w.endpoint,
+        w.webhookUrl,
+        w.webhookURL,
+      ].filter(Boolean).map(normalizeUrl);
+      
+      return possibleUrls.some(url => url === normalizedSearchUrl);
     });
     
     // Se não encontrar exato, tentar busca parcial (contém)
     if (!webhook) {
+      console.log("[Chatwoot] ⚠️ Busca exata não encontrou, tentando busca parcial...");
       webhook = webhooks.find((w: any) => {
         if (!w) return false;
-        const url1 = w.webhook_url ? normalizeUrl(w.webhook_url) : '';
-        const url2 = w.url ? normalizeUrl(w.url) : '';
-        return url1.includes(normalizedSearchUrl) || 
-               url2.includes(normalizedSearchUrl) ||
-               normalizedSearchUrl.includes(url1) ||
-               normalizedSearchUrl.includes(url2);
+        
+        const possibleUrls = [
+          w.webhook_url,
+          w.url,
+          w.endpoint,
+          w.webhookUrl,
+          w.webhookURL,
+        ].filter(Boolean).map(normalizeUrl);
+        
+        return possibleUrls.some(url => 
+          url.includes(normalizedSearchUrl) || 
+          normalizedSearchUrl.includes(url)
+        );
       });
     }
     
-    return webhook ? webhook.id : null;
+    if (webhook) {
+      console.log(`[Chatwoot] ✅ Webhook encontrado! ID: ${webhook.id}`);
+      return webhook.id;
+    } else {
+      console.log(`[Chatwoot] ❌ Webhook não encontrado com URL: ${webhookUrl}`);
+      return null;
+    }
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao buscar webhook por URL:", error.response?.data || error.message);
     return null;
