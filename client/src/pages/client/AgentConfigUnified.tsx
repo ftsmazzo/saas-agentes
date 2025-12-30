@@ -174,9 +174,6 @@ export default function AgentConfigUnifiedPage() {
     );
   }
 
-  // Se não houver configuração, mostrar assistente diretamente
-  const shouldShowAssistant = !config || (!config.systemPrompt && !showAssistant && !assistantComplete);
-
   return (
     <ClientLayout>
       <div className="space-y-6">
@@ -187,8 +184,8 @@ export default function AgentConfigUnifiedPage() {
           </p>
         </div>
 
-        {/* Mostrar assistente se não houver configuração ou se o usuário clicou para iniciar */}
-        {shouldShowAssistant && (
+        {/* Se não houver configuração, mostrar assistente diretamente */}
+        {!config && (
           <div className="mb-6">
             <AgentConfigAssistant
               onComplete={() => {
@@ -201,7 +198,7 @@ export default function AgentConfigUnifiedPage() {
           </div>
         )}
 
-        {/* Botão para iniciar assistente (se já houver config mas sem systemPrompt) */}
+        {/* Se houver config mas sem systemPrompt, mostrar botão para iniciar assistente */}
         {config && !config.systemPrompt && !showAssistant && !assistantComplete && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
@@ -233,7 +230,7 @@ export default function AgentConfigUnifiedPage() {
         )}
 
         {/* Assistente de IA (quando usuário clica no botão) */}
-        {showAssistant && !assistantComplete && config && (
+        {showAssistant && !assistantComplete && (
           <div className="mb-6">
             <AgentConfigAssistant
               onComplete={() => {
@@ -256,7 +253,9 @@ export default function AgentConfigUnifiedPage() {
           </Alert>
         )}
 
-        <Tabs defaultValue="basic" className="space-y-6">
+        {/* Só mostrar tabs e formulário se houver configuração ou se o assistente foi completado */}
+        {(config || assistantComplete) && (
+          <Tabs defaultValue="basic" className="space-y-6">
           <TabsList>
             <TabsTrigger value="basic">Básico</TabsTrigger>
             <TabsTrigger value="tools">Tools/Especialistas</TabsTrigger>
