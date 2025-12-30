@@ -189,12 +189,16 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
       case 'tone':
         const toneMap: Record<string, 'professional' | 'friendly' | 'casual' | 'formal'> = {
           '1': 'professional',
-          '2': 'professional',
-          '3': 'friendly',
-          '4': 'casual',
-          '5': 'formal',
+          '2': 'friendly',
+          '3': 'casual',
+          '4': 'formal',
           'professional': 'professional',
           'friendly': 'friendly',
+          'casual': 'casual',
+          'formal': 'formal',
+          'profissional': 'professional',
+          'amigável': 'friendly',
+          'amigavel': 'friendly',
           'casual': 'casual',
           'formal': 'formal',
         };
