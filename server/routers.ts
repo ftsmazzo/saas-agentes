@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -63,6 +63,40 @@ async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boo
       const errorMsg = `Chatwoot: ${error.message}`;
       console.error(`[Delete] ❌ Erro ao deletar Chatwoot:`, errorMsg);
       errors.push(errorMsg);
+    }
+  } else {
+    // Se não temos o ID salvo, tentar buscar e deletar pelo nome
+    // O nome do inbox geralmente é o mesmo que passamos para o Evolution
+    const inboxName = tenant.companyName || `Tenant ${tenant.id}`;
+    try {
+      const deleted = await deleteChatwootInboxByName(inboxName);
+      if (deleted) {
+        console.log(`[Delete] ✅ Inbox Chatwoot "${inboxName}" deletado (encontrado pelo nome)`);
+      } else {
+        console.log(`[Delete] ⚠️ Inbox Chatwoot "${inboxName}" não encontrado (pode já ter sido deletado)`);
+      }
+    } catch (error: any) {
+      const errorMsg = `Chatwoot (busca por nome): ${error.message}`;
+      console.error(`[Delete] ❌ Erro ao deletar Chatwoot por nome:`, errorMsg);
+      // Não adicionar como erro crítico, apenas logar
+    }
+  }
+
+  // 3.5. Deletar webhook do Chatwoot criado pelo N8N
+  const n8nApiUrl = process.env.N8N_API_URL;
+  if (n8nApiUrl) {
+    const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
+    try {
+      const deleted = await deleteChatwootWebhookByUrl(tenantWebhookUrl);
+      if (deleted) {
+        console.log(`[Delete] ✅ Webhook Chatwoot "${tenantWebhookUrl}" deletado`);
+      } else {
+        console.log(`[Delete] ⚠️ Webhook Chatwoot "${tenantWebhookUrl}" não encontrado (pode já ter sido deletado ou não foi criado)`);
+      }
+    } catch (error: any) {
+      const errorMsg = `Chatwoot Webhook: ${error.message}`;
+      console.error(`[Delete] ❌ Erro ao deletar webhook Chatwoot:`, errorMsg);
+      // Não adicionar como erro crítico, apenas logar
     }
   }
 
@@ -387,14 +421,33 @@ export const appRouter = router({
           let evolutionApiKey = '';
           
           try {
-            const evolutionResult = await createEvolutionInstance(tenant.id);
+            const evolutionResult = await createEvolutionInstance(tenant.id, input.companyName);
             console.log('✅ [STEP 4] Evolution criada:', evolutionResult.instanceName);
             evolutionInstanceName = evolutionResult.instanceName;
             evolutionApiKey = evolutionResult.apiKey;
             
+            // Buscar inboxId criado pelo Evolution (pode levar alguns segundos para aparecer)
+            let chatwootInboxId: number | null = null;
+            try {
+              // Aguardar um pouco para o Evolution criar o inbox
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              // Tentar buscar pelo nome (Evolution usa o nome que passamos)
+              chatwootInboxId = await findChatwootInboxByName(input.companyName);
+              
+              if (chatwootInboxId) {
+                console.log(`[Chatwoot] ✅ Inbox encontrado: ${chatwootInboxId}`);
+              } else {
+                console.log(`[Chatwoot] ⚠️ Inbox não encontrado imediatamente (pode ser criado depois)`);
+              }
+            } catch (error: any) {
+              console.warn(`[Chatwoot] ⚠️ Erro ao buscar inbox (não crítico):`, error.message);
+            }
+            
             await db.updateTenant(tenant.id, {
               evolutionInstanceName,
               evolutionApiKey,
+              chatwootInboxId: chatwootInboxId || undefined,
             });
             
             await db.createPlatformLog({
