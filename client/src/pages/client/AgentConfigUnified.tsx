@@ -67,6 +67,9 @@ const AVAILABLE_TOOLS = [
 export default function AgentConfigUnifiedPage() {
   const { data: config, isLoading } = trpc.agent.getConfig.useQuery();
   const utils = trpc.useUtils();
+  
+  const [showAssistant, setShowAssistant] = useState(false);
+  const [assistantComplete, setAssistantComplete] = useState(false);
 
   const [formData, setFormData] = useState({
     systemPrompt: "",
@@ -197,6 +200,61 @@ export default function AgentConfigUnifiedPage() {
           </p>
         </div>
 
+        {/* Botão para iniciar assistente */}
+        {!assistantComplete && !config?.systemPrompt && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">
+                    Configure seu Agente com Assistente de IA
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    Responda algumas perguntas simples e nosso assistente criará um agente personalizado para você
+                  </p>
+                  <Button
+                    onClick={() => setShowAssistant(true)}
+                    size="lg"
+                    className="w-full sm:w-auto"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Começar Configuração Guiada
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Assistente de IA */}
+        {showAssistant && !assistantComplete && (
+          <div className="mb-6">
+            <AgentConfigAssistant
+              onComplete={() => {
+                setShowAssistant(false);
+                setAssistantComplete(true);
+                utils.agent.getConfig.invalidate();
+                toast.success('Configuração concluída! Você pode revisar e ajustar abaixo.');
+              }}
+            />
+          </div>
+        )}
+
+        {/* Mostrar mensagem se já configurado */}
+        {config?.systemPrompt && !showAssistant && (
+          <Alert className="mb-6">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>
+              Seu agente já está configurado. Você pode editar as configurações abaixo ou usar o assistente novamente.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Tabs defaultValue="basic" className="space-y-6">
           <TabsList>
             <TabsTrigger value="basic">Básico</TabsTrigger>
@@ -227,10 +285,16 @@ export default function AgentConfigUnifiedPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, systemPrompt: e.target.value })
                     }
-                    placeholder="Você é um assistente virtual prestativo e profissional..."
+                    placeholder="O prompt do sistema será gerado automaticamente pelo assistente de IA..."
                     rows={10}
                     className="resize-none font-mono text-sm"
+                    readOnly={!!config?.systemPrompt}
                   />
+                  {config?.systemPrompt && (
+                    <p className="text-sm text-muted-foreground">
+                      ℹ️ O prompt do sistema foi gerado automaticamente e não pode ser editado diretamente. Use o assistente de IA para reconfigurar.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
