@@ -17,30 +17,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const { user, loading } = useAuth();
   
-  // Se já estiver logado como admin, redirecionar imediatamente
-  useEffect(() => {
-    if (!loading && user && user.role === 'admin') {
-      window.location.href = "/admin/dashboard";
-    }
-  }, [user, loading]);
-  
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Verificando autenticação...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Se já estiver logado, não mostrar o formulário (será redirecionado)
-  if (user && user.role === 'admin') {
-    return null;
-  }
-
+  // IMPORTANTE: Todos os hooks devem ser chamados ANTES de qualquer retorno condicional
   const loginMutation = trpc.auth.adminLogin.useMutation({
     onSuccess: (data) => {
       toast.success(`Bem-vindo, ${data.user?.name || 'Admin'}!`);
@@ -66,6 +43,30 @@ export default function AdminLogin() {
       toast.error(errorMessage);
     },
   });
+  
+  // Se já estiver logado como admin, redirecionar imediatamente
+  useEffect(() => {
+    if (!loading && user && user.role === 'admin') {
+      window.location.href = "/admin/dashboard";
+    }
+  }, [user, loading]);
+  
+  // Mostrar loading enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Se já estiver logado, não mostrar o formulário (será redirecionado)
+  if (user && user.role === 'admin') {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
