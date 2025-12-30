@@ -1373,16 +1373,24 @@ export const appRouter = router({
         if (tenant.chatwootInboxId) {
           try {
             const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
-            const agentBotId = await createOrUpdateChatwootAgentBot(
+            const agentBot = await createOrUpdateChatwootAgentBot(
               botName,
               tenantWebhookUrl,
               `Agent bot para ${tenant.companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
             );
             
             // Conectar o bot ao inbox
-            await connectAgentBotToInbox(tenant.chatwootInboxId, agentBotId);
+            await connectAgentBotToInbox(tenant.chatwootInboxId, agentBot.id);
+            
+            // Salvar ID e token do Agent Bot no banco de dados
+            await db.updateTenant(tenant.id, {
+              chatwootAgentBotId: agentBot.id,
+              chatwootAgentBotToken: agentBot.token || undefined,
+            });
+            
             agentBotCreated = true;
             console.log(`[Client] ✅ Agent Bot criado e conectado ao inbox ${tenant.chatwootInboxId}`);
+            console.log(`[Client] ✅ Agent Bot ID e Token salvos no banco de dados`);
           } catch (error: any) {
             console.warn(`[Client] ⚠️ Erro ao criar Agent Bot (não crítico):`, error.message);
             // Não falhar a ativação se o Agent Bot não for criado

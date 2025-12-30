@@ -223,7 +223,11 @@ export async function listChatwootWebhooks(): Promise<any[]> {
     // A API do Chatwoot pode retornar em diferentes formatos
     let webhooks: any[] = [];
     
-    if (Array.isArray(response.data)) {
+    // Estrutura real: response.data.payload.webhooks (conforme log)
+    if (response.data?.payload?.webhooks && Array.isArray(response.data.payload.webhooks)) {
+      webhooks = response.data.payload.webhooks;
+      console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.payload.webhooks");
+    } else if (Array.isArray(response.data)) {
       webhooks = response.data;
       console.log("[Chatwoot] ✅ Resposta é um array direto");
     } else if (response.data?.payload && Array.isArray(response.data.payload)) {
@@ -450,14 +454,23 @@ export async function findChatwootAgentBotByName(botName: string): Promise<numbe
 }
 
 /**
+ * Interface para retornar dados do Agent Bot criado
+ */
+export interface ChatwootAgentBot {
+  id: number;
+  token: string;
+}
+
+/**
  * Cria ou atualiza um agent bot no Chatwoot
  * Se o bot já existir (pelo nome), atualiza. Caso contrário, cria novo.
+ * Retorna o ID e o token de acesso do bot.
  */
 export async function createOrUpdateChatwootAgentBot(
   botName: string,
   webhookUrl: string,
   description?: string
-): Promise<number> {
+): Promise<ChatwootAgentBot> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     
@@ -479,14 +492,33 @@ export async function createOrUpdateChatwootAgentBot(
       // Atualizar bot existente
       console.log(`[Chatwoot] 🔄 Atualizando agent bot existente: ${botName} (ID: ${existingBotId})`);
       const response = await chatwootApi.put(`/accounts/${accountId}/agent_bots/${existingBotId}`, botData);
-      console.log(`[Chatwoot] ✅ Agent bot atualizado: ${response.data.id || existingBotId}`);
-      return response.data.id || existingBotId;
+      
+      // Buscar o bot atualizado para pegar o token
+      const botResponse = await chatwootApi.get(`/accounts/${accountId}/agent_bots/${existingBotId}`);
+      const bot = botResponse.data.payload || botResponse.data.data || botResponse.data;
+      
+      const botId = response.data.id || existingBotId;
+      const token = bot.access_token || bot.token || bot.accessToken || '';
+      
+      console.log(`[Chatwoot] ✅ Agent bot atualizado: ${botId}`);
+      console.log(`[Chatwoot] 📋 Token do bot: ${token ? '***' + token.slice(-4) : 'não encontrado'}`);
+      
+      return { id: botId, token };
     } else {
       // Criar novo bot
       console.log(`[Chatwoot] ➕ Criando novo agent bot: ${botName}`);
       const response = await chatwootApi.post(`/accounts/${accountId}/agent_bots`, botData);
-      console.log(`[Chatwoot] ✅ Agent bot criado: ${response.data.id}`);
-      return response.data.id;
+      
+      // A resposta pode conter o token diretamente ou precisamos buscar
+      const botData_response = response.data.payload || response.data.data || response.data;
+      const botId = botData_response.id || response.data.id;
+      const token = botData_response.access_token || botData_response.token || botData_response.accessToken || '';
+      
+      console.log(`[Chatwoot] ✅ Agent bot criado: ${botId}`);
+      console.log(`[Chatwoot] 📋 Token do bot: ${token ? '***' + token.slice(-4) : 'não encontrado'}`);
+      console.log(`[Chatwoot] 📋 Resposta completa:`, JSON.stringify(botData_response).substring(0, 300));
+      
+      return { id: botId, token };
     }
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao criar/atualizar agent bot:", error.response?.data || error.message);

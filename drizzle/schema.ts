@@ -72,6 +72,8 @@ export const tenants = pgTable("tenants", {
   evolutionInstanceName: varchar("evolutionInstanceName", { length: 100 }),
   evolutionApiKey: text("evolutionApiKey"),
   chatwootInboxId: integer("chatwootInboxId"),
+  chatwootAgentBotId: integer("chatwootAgentBotId"), // ID do Agent Bot criado
+  chatwootAgentBotToken: text("chatwootAgentBotToken"), // Token de acesso do Agent Bot
   dbHost: varchar("dbHost", { length: 255 }),
   dbPort: integer("dbPort"),
   dbName: varchar("dbName", { length: 100 }),
