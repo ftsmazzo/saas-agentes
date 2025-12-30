@@ -329,51 +329,35 @@ RETURNING *;
 
 ### ⚠️ ATENÇÃO: Este node JÁ é PostgreSQL!
 
-Este node já usa PostgreSQL, mas precisa ser atualizado para incluir `tenantId`.
+Este node já usa PostgreSQL para inserir em `n8n_chat_histories`, mas precisa incluir `tenantId` no `session_id`.
 
 ### ❌ ANTES (PostgreSQL sem tenantId)
 - **Tipo:** `n8n-nodes-base.postgres`
 - **Operação:** `Insert`
-- **Tabela:** `n8n_chat_histories` (ou similar)
+- **Tabela:** `n8n_chat_histories`
 - **Session ID:** `={{ $('Info2').item.json.telefone }}`
+- **Message:** JSON com mensagem do usuário
 
 ### ✅ DEPOIS (PostgreSQL com tenantId)
 - **Tipo:** `n8n-nodes-base.postgres`
-- **Operação:** `Execute Query`
-- **Query:**
-```sql
--- Se for para n8n_chat_histories (Memory do LangChain)
-INSERT INTO n8n_chat_histories (session_id, message)
-VALUES (
-  '{{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}',
-  '{{ $json.message }}'::jsonb
-)
-ON CONFLICT DO NOTHING;
-
--- OU se for para clientData
-INSERT INTO "clientData" ("tenantId", phone, name, "aiService", "createdAt", "updatedAt")
-VALUES (
-  {{ $('Edit Fields2').item.json.tenantId }},
-  '{{ $('Info2').item.json.telefone }}',
-  '{{ $('Info2').item.json.NomeWhatsapp }}',
-  'active',
-  NOW(),
-  NOW()
-)
-ON CONFLICT (phone, "tenantId") 
-DO UPDATE SET 
-  name = EXCLUDED.name,
-  "aiService" = EXCLUDED."aiService",
-  "updatedAt" = NOW()
-RETURNING *;
-```
+- **Operação:** `Insert` (pode manter ou mudar para Execute Query)
+- **Tabela:** `n8n_chat_histories`
+- **Session ID:** `={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}`
+- **Message:** Mantém o mesmo formato
 
 ### 📝 Passos:
 1. Abra o node "Salvar Historico Cliente"
-2. Verifique qual tabela ele está usando
-3. Se for `n8n_chat_histories`, atualize o `session_id` para incluir tenantId
-4. Se for outra tabela, adicione `tenantId` na query
-5. Mude de **Insert** para **Execute Query** se necessário
+2. Na seção **Columns**, encontre o campo `session_id`
+3. Altere o valor de:
+   ```
+   ={{ $('Info2').item.json.telefone }}
+   ```
+   Para:
+   ```
+   ={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}
+   ```
+4. Isso garante que cada tenant tenha seu próprio histórico isolado
+5. O campo `message` pode permanecer igual
 
 ---
 
