@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { 
   Save, 
@@ -22,8 +23,10 @@ import {
   Search,
   Loader2,
   CheckCircle2,
-  Clock
+  Clock,
+  Sparkles
 } from "lucide-react";
+import AgentConfigAssistant from "@/components/AgentConfigAssistant";
 
 // Tools disponíveis baseados no workflow N8N
 const AVAILABLE_TOOLS = [
@@ -181,8 +184,8 @@ export default function AgentConfigUnifiedPage() {
             <p className="text-muted-foreground mb-4">
               Crie seu primeiro agente para começar
             </p>
-            <Button onClick={() => window.location.href = "/client/create-agent"}>
-              Criar Agente
+            <Button onClick={() => window.location.href = "/client/settings"}>
+              Configurar Agente
             </Button>
           </CardContent>
         </Card>

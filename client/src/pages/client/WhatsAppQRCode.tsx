@@ -144,11 +144,11 @@ export default function WhatsAppQRCode() {
                 </p>
               </div>
               <Button
-                onClick={() => setLocation("/client/create-agent")}
+                onClick={() => setLocation("/client/settings")}
                 size="lg"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                Criar Agente
+                Configurar Agente
               </Button>
             </CardContent>
           </Card>
