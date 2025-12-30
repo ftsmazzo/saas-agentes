@@ -174,24 +174,8 @@ export default function AgentConfigUnifiedPage() {
     );
   }
 
-  if (!config) {
-    return (
-      <ClientLayout>
-        <Card className="text-center py-12">
-          <CardContent>
-            <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Nenhum agente configurado</h2>
-            <p className="text-muted-foreground mb-4">
-              Crie seu primeiro agente para começar
-            </p>
-            <Button onClick={() => window.location.href = "/client/settings"}>
-              Configurar Agente
-            </Button>
-          </CardContent>
-        </Card>
-      </ClientLayout>
-    );
-  }
+  // Se não houver configuração, mostrar assistente diretamente
+  const shouldShowAssistant = !config || (!config.systemPrompt && !showAssistant && !assistantComplete);
 
   return (
     <ClientLayout>
@@ -203,8 +187,22 @@ export default function AgentConfigUnifiedPage() {
           </p>
         </div>
 
-        {/* Botão para iniciar assistente */}
-        {!assistantComplete && !config?.systemPrompt && (
+        {/* Mostrar assistente se não houver configuração ou se o usuário clicou para iniciar */}
+        {shouldShowAssistant && (
+          <div className="mb-6">
+            <AgentConfigAssistant
+              onComplete={() => {
+                setShowAssistant(false);
+                setAssistantComplete(true);
+                utils.agent.getConfig.invalidate();
+                toast.success('Configuração concluída! Você pode revisar e ajustar abaixo.');
+              }}
+            />
+          </div>
+        )}
+
+        {/* Botão para iniciar assistente (se já houver config mas sem systemPrompt) */}
+        {config && !config.systemPrompt && !showAssistant && !assistantComplete && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
@@ -234,8 +232,8 @@ export default function AgentConfigUnifiedPage() {
           </Card>
         )}
 
-        {/* Assistente de IA */}
-        {showAssistant && !assistantComplete && (
+        {/* Assistente de IA (quando usuário clica no botão) */}
+        {showAssistant && !assistantComplete && config && (
           <div className="mb-6">
             <AgentConfigAssistant
               onComplete={() => {
