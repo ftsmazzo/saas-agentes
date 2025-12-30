@@ -19,7 +19,10 @@ Isso retorna algo como: `tenant_10` ou `10`
 
 **Campo 2 (novo - para extrair apenas o ID):**
 - **Name:** `tenantId`
-- **Value:** `{{$json.webhookUrl.split('/').pop().replace(/\s+/g, '').split('_').pop() }}`
+- **Value:** `{{$json.webhookUrl ? (function() { const url = $json.webhookUrl.split('/').pop().replace(/\s+/g, ''); const match = url.match(/(\d+)$/); return match ? parseInt(match[1]) : null; })() : null}}`
+
+**⚠️ Se ainda retornar NaN, use esta versão simplificada:**
+- **Value:** `{{$json.webhookUrl ? parseInt($json.webhookUrl.split('/').pop().replace(/\s+/g, '').replace(/^tenant_?/i, '')) || null : null}}`
 
 ---
 
