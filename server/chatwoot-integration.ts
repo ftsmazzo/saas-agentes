@@ -201,15 +201,23 @@ export async function deleteChatwootInboxByName(inboxName: string): Promise<bool
 export async function listChatwootWebhooks(): Promise<any[]> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
-    const response = await chatwootApi.get(`/accounts/${accountId}/webhooks`);
+    const endpoint = `/accounts/${accountId}/webhooks`;
     
-    // Log da resposta completa para debug (apenas estrutura, não dados sensíveis)
-    console.log("[Chatwoot] Estrutura da resposta de webhooks:", {
+    console.log(`[Chatwoot] 🔍 Buscando webhooks no endpoint: ${endpoint}`);
+    console.log(`[Chatwoot] 🔍 Account ID: ${accountId}`);
+    console.log(`[Chatwoot] 🔍 Base URL: ${process.env.CHATWOOT_URL}`);
+    
+    const response = await chatwootApi.get(endpoint);
+    
+    // Log completo da resposta para debug
+    console.log("[Chatwoot] 📦 Resposta completa da API:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.keys(response.headers),
+      dataType: typeof response.data,
       isArray: Array.isArray(response.data),
-      hasPayload: !!response.data?.payload,
-      hasData: !!response.data?.data,
-      hasWebhooks: !!response.data?.webhooks,
-      keys: response.data ? Object.keys(response.data) : [],
+      dataKeys: response.data ? Object.keys(response.data) : [],
+      dataPreview: JSON.stringify(response.data).substring(0, 1000), // Primeiros 1000 caracteres
     });
     
     // A API do Chatwoot pode retornar em diferentes formatos
@@ -217,35 +225,48 @@ export async function listChatwootWebhooks(): Promise<any[]> {
     
     if (Array.isArray(response.data)) {
       webhooks = response.data;
+      console.log("[Chatwoot] ✅ Resposta é um array direto");
     } else if (response.data?.payload && Array.isArray(response.data.payload)) {
       webhooks = response.data.payload;
+      console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.payload");
     } else if (response.data?.data && Array.isArray(response.data.data)) {
       webhooks = response.data.data;
+      console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.data");
     } else if (response.data?.webhooks && Array.isArray(response.data.webhooks)) {
       webhooks = response.data.webhooks;
+      console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.webhooks");
+    } else {
+      // Tentar outros formatos possíveis
+      if (response.data?.results && Array.isArray(response.data.results)) {
+        webhooks = response.data.results;
+        console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.results");
+      } else if (response.data?.items && Array.isArray(response.data.items)) {
+        webhooks = response.data.items;
+        console.log("[Chatwoot] ✅ Webhooks encontrados em response.data.items");
+      }
     }
     
     // Garantir que sempre retornamos um array
     if (!Array.isArray(webhooks)) {
-      console.warn("[Chatwoot] Resposta de webhooks não é um array. Estrutura completa:", JSON.stringify(response.data).substring(0, 500));
+      console.warn("[Chatwoot] ⚠️ Resposta de webhooks não é um array. Estrutura completa:", JSON.stringify(response.data).substring(0, 1000));
       return [];
     }
     
     console.log(`[Chatwoot] ✅ ${webhooks.length} webhook(s) encontrado(s)`);
     if (webhooks.length > 0) {
       // Log do primeiro webhook para ver a estrutura
-      console.log("[Chatwoot] Exemplo de webhook (primeiro):", {
-        id: webhooks[0].id,
-        keys: Object.keys(webhooks[0]),
-        hasWebhookUrl: !!webhooks[0].webhook_url,
-        hasUrl: !!webhooks[0].url,
-        hasEndpoint: !!webhooks[0].endpoint,
-      });
+      console.log("[Chatwoot] 📋 Exemplo de webhook (primeiro):", JSON.stringify(webhooks[0], null, 2));
+    } else {
+      console.warn("[Chatwoot] ⚠️ Nenhum webhook encontrado na resposta. Verifique se há webhooks criados no Chatwoot.");
     }
     
     return webhooks;
   } catch (error: any) {
-    console.error("[Chatwoot] Erro ao listar webhooks:", error.response?.data || error.message);
+    console.error("[Chatwoot] ❌ Erro ao listar webhooks:");
+    console.error("[Chatwoot] Status:", error.response?.status);
+    console.error("[Chatwoot] Status Text:", error.response?.statusText);
+    console.error("[Chatwoot] Response Data:", JSON.stringify(error.response?.data || error.message).substring(0, 500));
+    console.error("[Chatwoot] URL chamada:", error.config?.url);
     return [];
   }
 }
@@ -371,6 +392,176 @@ export async function deleteChatwootWebhookByUrl(webhookUrl: string): Promise<bo
     return false;
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao deletar webhook por URL:", error.response?.data || error.message);
+    return false;
+  }
+}
+
+// ========== AGENT BOTS (ROBÔS) ==========
+
+/**
+ * Lista todos os agent bots de uma conta Chatwoot
+ */
+export async function listChatwootAgentBots(): Promise<any[]> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const response = await chatwootApi.get(`/accounts/${accountId}/agent_bots`);
+    
+    // A API pode retornar em diferentes formatos
+    let bots: any[] = [];
+    
+    if (Array.isArray(response.data)) {
+      bots = response.data;
+    } else if (response.data?.payload && Array.isArray(response.data.payload)) {
+      bots = response.data.payload;
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      bots = response.data.data;
+    } else if (response.data?.agent_bots && Array.isArray(response.data.agent_bots)) {
+      bots = response.data.agent_bots;
+    }
+    
+    if (!Array.isArray(bots)) {
+      console.warn("[Chatwoot] Resposta de agent bots não é um array:", JSON.stringify(response.data).substring(0, 200));
+      return [];
+    }
+    
+    return bots;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao listar agent bots:", error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca agent bot pelo nome
+ */
+export async function findChatwootAgentBotByName(botName: string): Promise<number | null> {
+  try {
+    const bots = await listChatwootAgentBots();
+    const bot = bots.find((b: any) => 
+      b.name === botName || 
+      b.name?.toLowerCase().includes(botName.toLowerCase()) ||
+      botName.toLowerCase().includes(b.name?.toLowerCase() || '')
+    );
+    return bot ? bot.id : null;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar agent bot por nome:", error.response?.data || error.message);
+    return null;
+  }
+}
+
+/**
+ * Cria ou atualiza um agent bot no Chatwoot
+ * Se o bot já existir (pelo nome), atualiza. Caso contrário, cria novo.
+ */
+export async function createOrUpdateChatwootAgentBot(
+  botName: string,
+  webhookUrl: string,
+  description?: string
+): Promise<number> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    // Verificar se já existe um bot com esse nome
+    const existingBotId = await findChatwootAgentBotByName(botName);
+    
+    const botData: any = {
+      name: botName,
+      description: description || `Agent bot para ${botName}`,
+    };
+    
+    // Tentar diferentes campos possíveis para a URL do webhook
+    // A API pode usar: outgoing_url, webhook_url, url, etc.
+    botData.outgoing_url = webhookUrl;
+    botData.webhook_url = webhookUrl;
+    botData.url = webhookUrl;
+    
+    if (existingBotId) {
+      // Atualizar bot existente
+      console.log(`[Chatwoot] 🔄 Atualizando agent bot existente: ${botName} (ID: ${existingBotId})`);
+      const response = await chatwootApi.put(`/accounts/${accountId}/agent_bots/${existingBotId}`, botData);
+      console.log(`[Chatwoot] ✅ Agent bot atualizado: ${response.data.id || existingBotId}`);
+      return response.data.id || existingBotId;
+    } else {
+      // Criar novo bot
+      console.log(`[Chatwoot] ➕ Criando novo agent bot: ${botName}`);
+      const response = await chatwootApi.post(`/accounts/${accountId}/agent_bots`, botData);
+      console.log(`[Chatwoot] ✅ Agent bot criado: ${response.data.id}`);
+      return response.data.id;
+    }
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao criar/atualizar agent bot:", error.response?.data || error.message);
+    console.error("[Chatwoot] Dados enviados:", JSON.stringify({ name: botName, webhookUrl }).substring(0, 200));
+    throw new Error(`Falha ao criar/atualizar agent bot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Conecta um agent bot a um inbox
+ */
+export async function connectAgentBotToInbox(inboxId: number, agentBotId: number): Promise<void> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    await chatwootApi.post(`/accounts/${accountId}/inboxes/${inboxId}/agent_bot`, {
+      agent_bot_id: agentBotId,
+    });
+    console.log(`[Chatwoot] ✅ Agent bot ${agentBotId} conectado ao inbox ${inboxId}`);
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao conectar agent bot ao inbox:", error.response?.data || error.message);
+    throw new Error(`Falha ao conectar agent bot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Desconecta agent bot de um inbox
+ */
+export async function disconnectAgentBotFromInbox(inboxId: number): Promise<void> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    await chatwootApi.delete(`/accounts/${accountId}/inboxes/${inboxId}/agent_bot`);
+    console.log(`[Chatwoot] ✅ Agent bot desconectado do inbox ${inboxId}`);
+  } catch (error: any) {
+    // Se não houver bot conectado, não é erro crítico
+    if (error.response?.status === 404) {
+      console.log(`[Chatwoot] ⚠️ Nenhum agent bot conectado ao inbox ${inboxId}`);
+      return;
+    }
+    console.error("[Chatwoot] Erro ao desconectar agent bot:", error.response?.data || error.message);
+    throw new Error(`Falha ao desconectar agent bot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Deleta agent bot do Chatwoot
+ */
+export async function deleteChatwootAgentBot(agentBotId: number): Promise<void> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    await chatwootApi.delete(`/accounts/${accountId}/agent_bots/${agentBotId}`);
+    console.log(`[Chatwoot] ✅ Agent bot ${agentBotId} deletado`);
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      console.log(`[Chatwoot] ⚠️ Agent bot ${agentBotId} já não existe (404)`);
+      return;
+    }
+    console.error("[Chatwoot] Erro ao deletar agent bot:", error.response?.data || error.message);
+    throw new Error(`Falha ao deletar agent bot: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Deleta agent bot pelo nome (usado para deletar bot criado para um tenant)
+ */
+export async function deleteChatwootAgentBotByName(botName: string): Promise<boolean> {
+  try {
+    const botId = await findChatwootAgentBotByName(botName);
+    if (botId) {
+      await deleteChatwootAgentBot(botId);
+      return true;
+    }
+    console.log(`[Chatwoot] ⚠️ Agent bot com nome "${botName}" não encontrado`);
+    return false;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao deletar agent bot por nome:", error.response?.data || error.message);
     return false;
   }
 }

@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -95,7 +95,30 @@ async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boo
     }
   }
 
-  // 3.5. Deletar webhook do Chatwoot criado pelo N8N
+  // 3.5. Desconectar Agent Bot do inbox (se houver)
+  if (tenant.chatwootInboxId) {
+    try {
+      await disconnectAgentBotFromInbox(tenant.chatwootInboxId);
+      console.log(`[Delete] ✅ Agent Bot desconectado do inbox ${tenant.chatwootInboxId}`);
+    } catch (error: any) {
+      console.warn(`[Delete] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
+    }
+  }
+
+  // 3.6. Deletar Agent Bot do Chatwoot
+  const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
+  try {
+    const deleted = await deleteChatwootAgentBotByName(botName);
+    if (deleted) {
+      console.log(`[Delete] ✅ Agent Bot "${botName}" deletado`);
+    } else {
+      console.log(`[Delete] ⚠️ Agent Bot "${botName}" não encontrado (pode já ter sido deletado)`);
+    }
+  } catch (error: any) {
+    console.warn(`[Delete] ⚠️ Erro ao deletar Agent Bot (não crítico):`, error.message);
+  }
+
+  // 3.7. Deletar webhook do Chatwoot criado pelo N8N
   const n8nApiUrl = process.env.N8N_API_URL;
   if (n8nApiUrl) {
     const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
@@ -1345,21 +1368,45 @@ export const appRouter = router({
         console.log(`[Client] ✅ Agente ativado para tenant ${tenant.id}`);
         console.log(`[Client] Resposta do workflow N8N:`, response.status, response.data);
 
+        // Criar/atualizar Agent Bot no Chatwoot e conectar ao inbox
+        let agentBotCreated = false;
+        if (tenant.chatwootInboxId) {
+          try {
+            const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
+            const agentBotId = await createOrUpdateChatwootAgentBot(
+              botName,
+              tenantWebhookUrl,
+              `Agent bot para ${tenant.companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
+            );
+            
+            // Conectar o bot ao inbox
+            await connectAgentBotToInbox(tenant.chatwootInboxId, agentBotId);
+            agentBotCreated = true;
+            console.log(`[Client] ✅ Agent Bot criado e conectado ao inbox ${tenant.chatwootInboxId}`);
+          } catch (error: any) {
+            console.warn(`[Client] ⚠️ Erro ao criar Agent Bot (não crítico):`, error.message);
+            // Não falhar a ativação se o Agent Bot não for criado
+          }
+        } else {
+          console.warn(`[Client] ⚠️ Inbox ID não encontrado, pulando criação do Agent Bot`);
+        }
+
         await db.createPlatformLog({
           tenantId: tenant.id,
           eventType: 'agent_activated',
           severity: 'info',
-          message: `Agente de IA ativado via workflow N8N. Webhook criado no Chatwoot: ${tenantWebhookUrl}`,
+          message: `Agente de IA ativado via workflow N8N. Webhook criado no Chatwoot: ${tenantWebhookUrl}${agentBotCreated ? '. Agent Bot criado e conectado.' : ''}`,
           metadata: JSON.stringify({
             workflowUrl: createWebhookWorkflowUrl,
             tenantWebhookUrl,
             responseStatus: response.status,
+            agentBotCreated,
           }),
         });
 
         return {
           success: true,
-          message: 'Agente ativado com sucesso! O webhook foi criado no Chatwoot.',
+          message: 'Agente ativado com sucesso! O webhook foi criado no Chatwoot.' + (agentBotCreated ? ' Agent Bot configurado automaticamente.' : ''),
         };
       } catch (error: any) {
         console.error(`[Client] ❌ Erro ao ativar agente para tenant ${tenant.id}:`);
