@@ -51,7 +51,8 @@ function Router() {
       
       {/* Client Routes */}
       <Route path={"/client/login"} component={ClientLogin} />
-      <Route path={"/client/create-agent"} component={CreateAgentPage} />
+      {/* Redirecionar /client/create-agent para a página unificada com assistente */}
+      <Route path={"/client/create-agent"} component={AgentConfigUnifiedPage} />
       <Route path={"/client"} component={WhatsAppQRCode} />
       <Route path={"/client/whatsapp"} component={WhatsAppQRCode} />
       <Route path={"/client/settings"} component={AgentConfigUnifiedPage} />
