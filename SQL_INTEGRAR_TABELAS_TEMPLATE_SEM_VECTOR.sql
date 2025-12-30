@@ -1,22 +1,14 @@
 -- ============================================
 -- INTEGRAÇÃO DE TABELAS DO TEMPLATE
 -- Multi-Tenant com Isolamento por tenantId
+-- VERSÃO SEM PGVECTOR (para PostgreSQL sem extensão vector)
 -- ============================================
 
--- 1. Criar extensão pgvector (necessária para embeddings)
--- ⚠️ Se der erro "extension vector is not available", use SQL_INTEGRAR_TABELAS_TEMPLATE_SEM_VECTOR.sql
--- Ou instale pgvector seguindo INSTALAR_PGVECTOR_EASYPANEL.md
-DO $$
-BEGIN
-  CREATE EXTENSION IF NOT EXISTS vector;
-  RAISE NOTICE '✅ Extensão pgvector criada com sucesso!';
-EXCEPTION
-  WHEN OTHERS THEN
-    RAISE EXCEPTION '❌ Erro ao criar extensão vector. Use SQL_INTEGRAR_TABELAS_TEMPLATE_SEM_VECTOR.sql ou instale pgvector. Erro: %', SQLERRM;
-END $$;
+-- NOTA: Esta versão usa TEXT para armazenar embeddings
+-- Para usar busca vetorial completa, instale pgvector e use SQL_INTEGRAR_TABELAS_TEMPLATE.sql
 
 -- ============================================
--- 2. TABELA: clientData (substitui dados_cliente)
+-- 1. TABELA: clientData (substitui dados_cliente)
 -- ============================================
 CREATE TABLE IF NOT EXISTS "clientData" (
   id SERIAL PRIMARY KEY,
@@ -35,14 +27,15 @@ CREATE INDEX IF NOT EXISTS "clientData_tenantId_idx" ON "clientData"("tenantId")
 CREATE INDEX IF NOT EXISTS "clientData_phone_idx" ON "clientData"(phone);
 
 -- ============================================
--- 3. TABELA: documents (RAG - Vector Embeddings)
+-- 2. TABELA: documents (RAG - Embeddings em TEXT)
 -- ============================================
 CREATE TABLE IF NOT EXISTS documents (
   id SERIAL PRIMARY KEY,
   "tenantId" INTEGER NOT NULL,
   content TEXT NOT NULL,
   metadata JSONB,
-  embedding vector(1536), -- 1536 dimensões para OpenAI embeddings
+  embedding TEXT, -- Armazenado como TEXT (array JSON) ao invés de vector
+  -- Formato: '[0.1, 0.2, ...]' (array JSON de 1536 números)
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   
@@ -51,15 +44,13 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 
 CREATE INDEX IF NOT EXISTS "documents_tenantId_idx" ON documents("tenantId");
--- Índice HNSW para busca vetorial (mais eficiente que IVFFlat)
-CREATE INDEX IF NOT EXISTS "documents_embedding_idx" ON documents 
-USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS "documents_metadata_idx" ON documents USING GIN (metadata);
 
 -- ============================================
--- 4. FUNÇÃO: match_documents (Busca Vetorial)
+-- 3. FUNÇÃO: match_documents (Busca por Similaridade de Cosseno)
+-- Versão simplificada sem pgvector (usa cálculo de similaridade em aplicação)
 -- ============================================
-CREATE OR REPLACE FUNCTION match_documents (
-  query_embedding vector(1536),
+CREATE OR REPLACE FUNCTION match_documents_simple (
   match_count int DEFAULT NULL,
   filter jsonb DEFAULT '{}',
   tenant_id_filter int DEFAULT NULL
@@ -67,29 +58,32 @@ CREATE OR REPLACE FUNCTION match_documents (
   id bigint,
   content text,
   metadata jsonb,
-  similarity float
+  "tenantId" int
 )
 LANGUAGE plpgsql
 AS $$
-#variable_conflict use_column
 BEGIN
   RETURN QUERY
   SELECT
     documents.id,
     documents.content,
     documents.metadata,
-    1 - (documents.embedding <=> query_embedding) as similarity
+    documents."tenantId"
   FROM documents
   WHERE 
     documents.metadata @> filter
     AND (tenant_id_filter IS NULL OR documents."tenantId" = tenant_id_filter)
-  ORDER BY documents.embedding <=> query_embedding
   LIMIT match_count;
 END;
 $$;
 
+-- NOTA: Para busca vetorial completa, você precisará:
+-- 1. Instalar pgvector no PostgreSQL
+-- 2. Usar SQL_INTEGRAR_TABELAS_TEMPLATE.sql
+-- 3. Ou calcular similaridade na aplicação (Node.js/Python)
+
 -- ============================================
--- 5. ADICIONAR CAMPOS À TABELA conversations
+-- 4. ADICIONAR CAMPOS À TABELA conversations
 -- (Compatibilidade com template 'chats')
 -- ============================================
 DO $$
@@ -120,7 +114,7 @@ BEGIN
 END $$;
 
 -- ============================================
--- 6. ADICIONAR CAMPOS À TABELA chatMessages
+-- 5. ADICIONAR CAMPOS À TABELA chatMessages
 -- (Compatibilidade com template 'chat_messages')
 -- ============================================
 DO $$
@@ -175,27 +169,31 @@ BEGIN
 END $$;
 
 -- ============================================
--- 7. COMENTÁRIOS E DOCUMENTAÇÃO
+-- 6. COMENTÁRIOS E DOCUMENTAÇÃO
 -- ============================================
 COMMENT ON TABLE "clientData" IS 'Dados específicos de atendimento por cliente (substitui dados_cliente do template)';
-COMMENT ON TABLE documents IS 'Documentos para RAG com embeddings vetoriais (1536 dimensões para OpenAI)';
-COMMENT ON FUNCTION match_documents IS 'Busca documentos similares usando embeddings vetoriais. Filtra por tenantId para isolamento multi-tenant';
+COMMENT ON TABLE documents IS 'Documentos para RAG com embeddings armazenados como TEXT (sem pgvector)';
+COMMENT ON FUNCTION match_documents_simple IS 'Busca documentos filtrados por metadata. Similaridade vetorial deve ser calculada na aplicação.';
 
 -- ============================================
--- 8. VERIFICAÇÃO FINAL
+-- 7. VERIFICAÇÃO FINAL
 -- ============================================
 DO $$
 BEGIN
-  RAISE NOTICE '✅ Tabelas do template integradas com sucesso!';
+  RAISE NOTICE '✅ Tabelas do template integradas com sucesso (versão sem pgvector)!';
   RAISE NOTICE '📋 Tabelas criadas:';
   RAISE NOTICE '   - clientData (substitui dados_cliente)';
-  RAISE NOTICE '   - documents (RAG com vector embeddings)';
+  RAISE NOTICE '   - documents (RAG com embeddings em TEXT)';
   RAISE NOTICE '📋 Campos adicionados:';
   RAISE NOTICE '   - conversations: phone, etapaFollowup, updatedAt';
   RAISE NOTICE '   - chatMessages: phone, nomewpp, botMessage, userMessage, messageType, active';
-  RAISE NOTICE '🔍 Função criada: match_documents() para busca vetorial';
   RAISE NOTICE '';
-  RAISE NOTICE '⚠️ IMPORTANTE: Todas as queries devem filtrar por tenantId!';
+  RAISE NOTICE '⚠️ IMPORTANTE:';
+  RAISE NOTICE '   - Embeddings são armazenados como TEXT (array JSON)';
+  RAISE NOTICE '   - Busca vetorial deve ser feita na aplicação (Node.js/Python)';
+  RAISE NOTICE '   - Para busca vetorial nativa, instale pgvector e use SQL_INTEGRAR_TABELAS_TEMPLATE.sql';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️ Todas as queries devem filtrar por tenantId!';
   RAISE NOTICE '   Exemplo: SELECT * FROM documents WHERE "tenantId" = 10;';
 END $$;
 
