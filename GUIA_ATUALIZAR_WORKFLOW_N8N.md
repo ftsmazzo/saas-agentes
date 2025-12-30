@@ -24,9 +24,27 @@ Atualizar o workflow do N8N para:
 
 ## 🔧 Passo 1: Extrair tenantId do Webhook
 
-### Opção A: Extrair da URL do Webhook (Recomendado)
+### Opção A: Usar Nó Set (Recomendado - Mais Simples)
 
-No primeiro nó do workflow (geralmente o Webhook), adicione um nó **Code** ou **Set**:
+Se você já tem um campo que extrai o webhook URL, adicione um segundo campo:
+
+**Campo 1 (já existe):**
+- **Name:** `webhookPath` (ou o nome que você já usa)
+- **Value:** `{{$json.webhookUrl.split('/').pop().replace(/\s+/g, '') }}`
+
+**Campo 2 (novo - para extrair apenas o ID):**
+- **Name:** `tenantId`
+- **Value:** `{{parseInt($json.webhookUrl.split('/').pop().replace(/\s+/g, '').split('_').pop())}}`
+- **Type:** Number
+
+**Explicação:**
+- Pega a última parte da URL (ex: `tenant_10`)
+- Divide por `_` e pega a última parte (ex: `10`)
+- Converte para número
+
+### Opção B: Extrair da URL do Webhook (Alternativa)
+
+No primeiro nó do workflow (geralmente o Webhook), adicione um nó **Code**:
 
 ```javascript
 // No nó Code (JavaScript)
@@ -42,11 +60,11 @@ return {
 };
 ```
 
-### Opção B: Usar Expressão do N8N
+### Opção C: Usar Expressão do N8N (Se tiver path direto)
 
 No nó **Set**, adicione um campo:
 - **Name:** `tenantId`
-- **Value:** `{{ $json.path.split('_')[1] }}`
+- **Value:** `{{ parseInt($json.path.split('_')[1]) }}`
 
 ---
 
