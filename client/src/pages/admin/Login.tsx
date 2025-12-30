@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, LogIn, Mail, Lock, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/core/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
