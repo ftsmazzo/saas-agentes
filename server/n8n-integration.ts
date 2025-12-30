@@ -82,21 +82,46 @@ export async function cloneWorkflowForTenant(
     console.log("[N8N] Workflow criado:", JSON.stringify(createResponse.data, null, 2).substring(0, 300));
     const newWorkflowId = createResponse.data.id || createResponse.data.data?.id;
 
-    // Publicar workflow (N8N 2.1.4+ - precisa atualizar o workflow completo)
+    // Publicar workflow (N8N 2.1.4+)
     try {
+      console.log(`[N8N] 🔄 Tentando publicar workflow ${newWorkflowId}...`);
+      
       // Buscar workflow recém-criado
       const workflowResponse = await n8nApi.get(`/workflows/${newWorkflowId}`);
       const workflow = workflowResponse.data.data || workflowResponse.data;
       
-      // Atualizar com published: true usando PUT
-      await n8nApi.put(`/workflows/${newWorkflowId}`, {
-        ...workflow,
-        published: true
-      });
-      console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso`);
+      console.log(`[N8N] 📋 Workflow atual - published: ${workflow.published}, active: ${workflow.active}`);
+      
+      // Tentar método 1: PUT com workflow completo
+      try {
+        await n8nApi.put(`/workflows/${newWorkflowId}`, {
+          ...workflow,
+          published: true
+        });
+        console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso (método PUT)`);
+      } catch (putError: any) {
+        console.warn(`[N8N] ⚠️ PUT falhou, tentando método alternativo:`, putError.response?.data || putError.message);
+        
+        // Tentar método 2: Endpoint específico de ativação (se existir)
+        try {
+          await n8nApi.post(`/workflows/${newWorkflowId}/activate`);
+          console.log(`[N8N] ✅ Workflow ${newWorkflowId} publicado com sucesso (método POST /activate)`);
+        } catch (postError: any) {
+          console.warn(`[N8N] ⚠️ POST /activate também falhou:`, postError.response?.data || postError.message);
+          throw putError; // Lançar o erro original do PUT
+        }
+      }
+      
+      // Verificar se realmente foi publicado
+      const verifyResponse = await n8nApi.get(`/workflows/${newWorkflowId}`);
+      const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
+      console.log(`[N8N] ✅ Verificação - published: ${verifiedWorkflow.published}, active: ${verifiedWorkflow.active}`);
+      
     } catch (error: any) {
-      console.warn(`[N8N] ⚠️ Erro ao publicar workflow (pode já estar publicado):`, error.response?.data || error.message);
+      console.error(`[N8N] ❌ ERRO ao publicar workflow ${newWorkflowId}:`, error.response?.data || error.message);
+      console.error(`[N8N] ⚠️ Workflow criado mas NÃO publicado. Será necessário publicar manualmente no N8N.`);
       // Não lançar erro - workflow foi criado, apenas não foi publicado
+      // A verificação na ativação do agente vai tentar publicar novamente
     }
 
     return {
@@ -127,22 +152,59 @@ function injectTenantIdInQuery(query: string, tenantId: number): string {
 }
 
 /**
- * Publica workflow (N8N 2.1.4+ - precisa atualizar workflow completo com PUT)
+ * Publica workflow (N8N 2.1.4+)
+ * Tenta múltiplos métodos para garantir que funcione
  */
 export async function activateWorkflow(workflowId: string): Promise<void> {
   try {
+    console.log(`[N8N] 🔄 Publicando workflow ${workflowId}...`);
+    
     // Buscar workflow atual
     const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
     const workflow = workflowResponse.data.data || workflowResponse.data;
     
-    // Atualizar workflow completo com published: true usando PUT
-    await n8nApi.put(`/workflows/${workflowId}`, {
-      ...workflow,
-      published: true
-    });
-    console.log(`[N8N] ✅ Workflow ${workflowId} publicado com sucesso`);
+    console.log(`[N8N] 📋 Estado atual - published: ${workflow.published}, active: ${workflow.active}`);
+    
+    // Tentar método 1: PUT com workflow completo
+    try {
+      await n8nApi.put(`/workflows/${workflowId}`, {
+        ...workflow,
+        published: true
+      });
+      console.log(`[N8N] ✅ Workflow ${workflowId} publicado (método PUT)`);
+      
+      // Verificar se realmente foi publicado
+      const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
+      const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
+      
+      if (verifiedWorkflow.published === true) {
+        console.log(`[N8N] ✅ Confirmação: Workflow ${workflowId} está publicado`);
+        return;
+      } else {
+        console.warn(`[N8N] ⚠️ PUT executado mas workflow ainda não está publicado. Tentando método alternativo...`);
+        throw new Error("PUT não publicou o workflow");
+      }
+    } catch (putError: any) {
+      console.warn(`[N8N] ⚠️ PUT falhou, tentando POST /activate:`, putError.response?.data || putError.message);
+      
+      // Tentar método 2: Endpoint específico de ativação
+      try {
+        await n8nApi.post(`/workflows/${workflowId}/activate`);
+        console.log(`[N8N] ✅ Workflow ${workflowId} publicado (método POST /activate)`);
+        
+        // Verificar novamente
+        const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
+        const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
+        console.log(`[N8N] 📋 Após POST /activate - published: ${verifiedWorkflow.published}, active: ${verifiedWorkflow.active}`);
+        
+        return;
+      } catch (postError: any) {
+        console.error(`[N8N] ❌ POST /activate também falhou:`, postError.response?.data || postError.message);
+        throw putError; // Lançar o erro original
+      }
+    }
   } catch (error: any) {
-    console.error("[N8N] Erro ao publicar workflow:", error.response?.data || error.message);
+    console.error("[N8N] ❌ Erro ao publicar workflow:", error.response?.data || error.message);
     throw new Error(`Falha ao publicar workflow: ${error.response?.data?.message || error.message}`);
   }
 }
