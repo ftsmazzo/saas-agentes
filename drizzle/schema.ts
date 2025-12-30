@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, timestamp, varchar, boolean, integer, serial } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, timestamp, varchar, boolean, integer, serial, numeric, jsonb, customType } from "drizzle-orm/pg-core";
 
 /**
  * Enums do PostgreSQL
@@ -230,6 +230,7 @@ export type InsertContact = typeof contacts.$inferInsert;
 
 /**
  * Conversas (compartilhado entre todos os tenants, isolado por tenantId)
+ * Compatível com tabela 'chats' do template
  */
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
@@ -240,10 +241,15 @@ export const conversations = pgTable("conversations", {
   status: conversationStatusEnum("status").default("active").notNull(),
   aiPaused: boolean("aiPaused").default(false), // Se IA está pausada (atendimento humano)
   
+  // Campos adicionais do template 'chats'
+  phone: text("phone"), // Telefone (compatibilidade com template)
+  etapaFollowup: numeric("etapaFollowup"), // Etapa do follow-up (etapa_followup)
+  
   // Timestamps
   startedAt: timestamp("startedAt", { withTimezone: true }).defaultNow().notNull(),
   lastMessageAt: timestamp("lastMessageAt", { withTimezone: true }),
   closedAt: timestamp("closedAt", { withTimezone: true }),
+  updatedAt: text("updatedAt"), // Campo texto para compatibilidade com template
 });
 
 export type Conversation = typeof conversations.$inferSelect;
@@ -251,6 +257,7 @@ export type InsertConversation = typeof conversations.$inferInsert;
 
 /**
  * Mensagens de chat (compartilhado entre todos os tenants, isolado por tenantId)
+ * Compatível com tabela 'chat_messages' do template
  */
 export const chatMessages = pgTable("chatMessages", {
   id: serial("id").primaryKey(),
@@ -265,6 +272,14 @@ export const chatMessages = pgTable("chatMessages", {
   // Tipo de mídia
   mediaType: mediaTypeEnum("mediaType").default("text"),
   mediaUrl: text("mediaUrl"),
+  
+  // Campos adicionais do template 'chat_messages'
+  phone: text("phone"), // Telefone (compatibilidade)
+  nomewpp: text("nomewpp"), // Nome do WhatsApp
+  botMessage: text("botMessage"), // Mensagem do bot
+  userMessage: text("userMessage"), // Mensagem do usuário
+  messageType: text("messageType"), // Tipo de mensagem
+  active: boolean("active").default(true), // Se a mensagem está ativa
   
   // Metadados
   metadata: text("metadata"), // JSON com dados adicionais (tokens, modelo usado, etc)
@@ -289,3 +304,52 @@ export const activationTokens = pgTable("activationTokens", {
 
 export type ActivationToken = typeof activationTokens.$inferSelect;
 export type InsertActivationToken = typeof activationTokens.$inferInsert;
+
+/**
+ * Tipo customizado para vector (pgvector)
+ * Nota: Drizzle não tem suporte nativo, então usamos text no schema
+ * e criamos o tipo vector diretamente no SQL
+ */
+const vector = customType<{ data: string; driverData: string }>({
+  dataType: () => 'vector(1536)',
+});
+
+/**
+ * Dados do cliente (substitui dados_cliente do template)
+ * Armazena informações específicas de atendimento por cliente
+ */
+export const clientData = pgTable("clientData", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(), // Isolamento multi-tenant
+  
+  phone: text("phone").notNull(), // Telefone do cliente
+  name: text("name"), // Nome do WhatsApp (nomewpp)
+  aiService: text("aiService"), // Tipo de atendimento da IA (atendimento_ia)
+  
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ClientData = typeof clientData.$inferSelect;
+export type InsertClientData = typeof clientData.$inferInsert;
+
+/**
+ * Documentos para RAG (Retrieval Augmented Generation)
+ * Armazena documentos com embeddings vetoriais para busca semântica
+ */
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(), // Isolamento multi-tenant
+  
+  content: text("content").notNull(), // Conteúdo do documento
+  metadata: jsonb("metadata"), // Metadados em JSON (corresponde a Document.metadata)
+  embedding: text("embedding"), // Vector embedding (1536 dimensões para OpenAI)
+  // Nota: No SQL criamos como vector(1536), mas no Drizzle usamos text
+  // O tipo real será criado via SQL direto
+  
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Document = typeof documents.$inferSelect;
+export type InsertDocument = typeof documents.$inferInsert;
