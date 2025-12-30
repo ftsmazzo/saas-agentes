@@ -280,30 +280,33 @@ export async function findChatwootWebhookByUrl(webhookUrl: string): Promise<numb
     
     // Listar todas as URLs encontradas para debug
     const foundUrls = webhooks.map((w: any) => {
+      // O webhook é criado com campo "url" no body JSON
       const urls = [
-        w.webhook_url,
-        w.url,
-        w.endpoint,
-        w.webhookUrl,
+        w.url,           // Campo principal usado na criação
+        w.webhook_url,   // Possível campo alternativo
+        w.endpoint,      // Possível campo alternativo
+        w.webhookUrl,    // Possível campo alternativo
       ].filter(Boolean);
-      return { id: w.id, urls };
+      return { 
+        id: w.id, 
+        name: w.name,
+        url: w.url,
+        urls: urls,
+        allKeys: Object.keys(w) // Para debug - ver todos os campos disponíveis
+      };
     });
     console.log("[Chatwoot] 📋 URLs de webhooks encontrados:", JSON.stringify(foundUrls, null, 2));
     
-    // Tentar busca exata primeiro - verificar todos os campos possíveis
+    // Tentar busca exata primeiro - o campo principal é "url" (conforme criação via N8N)
     let webhook = webhooks.find((w: any) => {
       if (!w) return false;
       
-      // Verificar todos os campos possíveis onde a URL pode estar
-      const possibleUrls = [
-        w.webhook_url,
-        w.url,
-        w.endpoint,
-        w.webhookUrl,
-        w.webhookURL,
-      ].filter(Boolean).map(normalizeUrl);
+      // Priorizar o campo "url" que é usado na criação
+      const webhookUrl = w.url || w.webhook_url || w.endpoint || w.webhookUrl || w.webhookURL;
+      if (!webhookUrl) return false;
       
-      return possibleUrls.some(url => url === normalizedSearchUrl);
+      const normalizedWebhookUrl = normalizeUrl(webhookUrl);
+      return normalizedWebhookUrl === normalizedSearchUrl;
     });
     
     // Se não encontrar exato, tentar busca parcial (contém)
@@ -312,18 +315,13 @@ export async function findChatwootWebhookByUrl(webhookUrl: string): Promise<numb
       webhook = webhooks.find((w: any) => {
         if (!w) return false;
         
-        const possibleUrls = [
-          w.webhook_url,
-          w.url,
-          w.endpoint,
-          w.webhookUrl,
-          w.webhookURL,
-        ].filter(Boolean).map(normalizeUrl);
+        // Priorizar o campo "url" que é usado na criação
+        const webhookUrl = w.url || w.webhook_url || w.endpoint || w.webhookUrl || w.webhookURL;
+        if (!webhookUrl) return false;
         
-        return possibleUrls.some(url => 
-          url.includes(normalizedSearchUrl) || 
-          normalizedSearchUrl.includes(url)
-        );
+        const normalizedWebhookUrl = normalizeUrl(webhookUrl);
+        return normalizedWebhookUrl.includes(normalizedSearchUrl) || 
+               normalizedSearchUrl.includes(normalizedWebhookUrl);
       });
     }
     
