@@ -531,10 +531,12 @@ export async function createOrUpdateChatwootAgentBot(
       const response = await chatwootApi.post(`/accounts/${accountId}/agent_bots`, botData);
       
       // A resposta pode conter o token diretamente ou precisamos buscar
+      // Verificar primeiro response.data diretamente (pode vir no nível raiz)
       const botData_response = response.data.payload || response.data.data || response.data;
       const botId = botData_response.id || response.data.id;
       
       console.log(`[Chatwoot] 📋 Resposta completa da criação:`, JSON.stringify(botData_response, null, 2));
+      console.log(`[Chatwoot] 📋 Response.data completo:`, JSON.stringify(response.data, null, 2));
       
       // Buscar o token do bot recém-criado
       // O token pode não vir na resposta de criação, então vamos buscar de várias formas
@@ -542,6 +544,7 @@ export async function createOrUpdateChatwootAgentBot(
       if (botId) {
         try {
           // 1. Tentar pegar da resposta original (pode vir em diferentes formatos)
+          // Verificar primeiro em response.data diretamente (nível raiz)
           const possibleTokenFields = [
             'access_token',
             'token',
@@ -555,11 +558,23 @@ export async function createOrUpdateChatwootAgentBot(
             'botToken'
           ];
           
+          // Primeiro tentar em response.data (nível raiz)
           for (const field of possibleTokenFields) {
-            if (botData_response[field]) {
-              token = botData_response[field];
-              console.log(`[Chatwoot] ✅ Token encontrado na resposta de criação no campo: ${field}`);
+            if (response.data[field]) {
+              token = response.data[field];
+              console.log(`[Chatwoot] ✅ Token encontrado em response.data no campo: ${field}`);
               break;
+            }
+          }
+          
+          // Se não encontrou, tentar em botData_response
+          if (!token) {
+            for (const field of possibleTokenFields) {
+              if (botData_response[field]) {
+                token = botData_response[field];
+                console.log(`[Chatwoot] ✅ Token encontrado na resposta de criação no campo: ${field}`);
+                break;
+              }
             }
           }
           

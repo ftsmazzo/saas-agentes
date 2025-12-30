@@ -1379,10 +1379,8 @@ export const appRouter = router({
               `Agent bot para ${tenant.companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
             );
             
-            // Conectar o bot ao inbox
-            await connectAgentBotToInbox(tenant.chatwootInboxId, agentBot.id);
-            
-            // Salvar ID e token do Agent Bot no banco de dados
+            // IMPORTANTE: Salvar ID e token PRIMEIRO, antes de tentar conectar
+            // Assim, mesmo se a conexão falhar, o token já estará salvo
             console.log(`[Client] 💾 Salvando Agent Bot no banco: ID=${agentBot.id}, Token=${agentBot.token ? '***' + agentBot.token.slice(-4) : 'NÃO ENCONTRADO'}`);
             
             const updateData: any = {
@@ -1399,9 +1397,18 @@ export const appRouter = router({
             const updatedTenant = await db.getTenantById(tenant.id);
             console.log(`[Client] ✅ Verificação pós-salvamento: chatwootAgentBotId=${updatedTenant?.chatwootAgentBotId}, chatwootAgentBotToken=${updatedTenant?.chatwootAgentBotToken ? '***' + updatedTenant.chatwootAgentBotToken.slice(-4) : 'NULL'}`);
             
-            agentBotCreated = true;
-            console.log(`[Client] ✅ Agent Bot criado e conectado ao inbox ${tenant.chatwootInboxId}`);
-            console.log(`[Client] ✅ Agent Bot ID e Token salvos no banco de dados`);
+            // Agora tentar conectar o bot ao inbox (não crítico se falhar)
+            try {
+              await connectAgentBotToInbox(tenant.chatwootInboxId, agentBot.id);
+              console.log(`[Client] ✅ Agent Bot conectado ao inbox ${tenant.chatwootInboxId}`);
+              agentBotCreated = true;
+            } catch (connectError: any) {
+              console.warn(`[Client] ⚠️ Erro ao conectar Agent Bot ao inbox (não crítico):`, connectError.message);
+              // O bot foi criado e o token foi salvo, apenas a conexão falhou
+              agentBotCreated = true; // Consideramos criado mesmo sem conexão
+            }
+            
+            console.log(`[Client] ✅ Agent Bot criado e token salvo no banco de dados`);
           } catch (error: any) {
             console.warn(`[Client] ⚠️ Erro ao criar Agent Bot (não crítico):`, error.message);
             // Não falhar a ativação se o Agent Bot não for criado
