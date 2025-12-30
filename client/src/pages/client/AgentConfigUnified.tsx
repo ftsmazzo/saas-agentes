@@ -255,6 +255,7 @@ export default function AgentConfigUnifiedPage() {
 
         {/* Só mostrar tabs e formulário se houver configuração ou se o assistente foi completado */}
         {(config || assistantComplete) && (
+          <>
           <Tabs defaultValue="basic" className="space-y-6">
           <TabsList>
             <TabsTrigger value="basic">Básico</TabsTrigger>
@@ -658,6 +659,7 @@ export default function AgentConfigUnifiedPage() {
             )}
           </Button>
         </div>
+        </>
         )}
       </div>
     </ClientLayout>
