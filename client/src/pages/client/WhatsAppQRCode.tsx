@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone, Play, Bot, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Smartphone, Play, Bot, Sparkles, PowerOff } from "lucide-react";
 import ClientLayout from "@/components/ClientLayout";
 
 export default function WhatsAppQRCode() {
@@ -14,6 +14,9 @@ export default function WhatsAppQRCode() {
   
   // Verificar se o agente existe
   const { data: agentConfig, isLoading: agentLoading } = trpc.agent.getConfig.useQuery();
+  
+  // Verificar se o agente está ativado
+  const { data: agentStatus, isLoading: agentStatusLoading, refetch: refetchAgentStatus } = trpc.clientPanel.getAgentStatus.useQuery();
   
   // Só buscar QR Code se não estiver conectado ou se forçar
   const { data: qrData, isLoading: qrLoading, refetch: refetchQR } = trpc.clientPanel.getQRCode.useQuery(
@@ -46,12 +49,24 @@ export default function WhatsAppQRCode() {
   };
 
   const activateAgentMutation = trpc.clientPanel.activateAgent.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       alert("Agente ativado com sucesso! 🚀");
+      await refetchAgentStatus(); // Atualizar status do agente
     },
     onError: (error) => {
       console.error("Erro ao ativar agente:", error);
       alert(`Erro ao ativar agente: ${error.message}`);
+    },
+  });
+
+  const deactivateAgentMutation = trpc.clientPanel.deactivateAgent.useMutation({
+    onSuccess: async () => {
+      alert("Agente desativado com sucesso! O robô foi desligado.");
+      await refetchAgentStatus(); // Atualizar status do agente
+    },
+    onError: (error) => {
+      console.error("Erro ao desativar agente:", error);
+      alert(`Erro ao desativar agente: ${error.message}`);
     },
   });
 
@@ -86,12 +101,22 @@ export default function WhatsAppQRCode() {
     disconnectMutation.mutate();
   };
 
+  const handleDeactivateAgent = async () => {
+    if (!confirm("Tem certeza que deseja desligar o robô? O webhook e o Agent Bot serão removidos do Chatwoot.")) {
+      return;
+    }
+    deactivateAgentMutation.mutate();
+  };
+
   // Verificar se está conectado - simplificado e mais confiável
   const isConnected = status?.status === "open" || 
                       status?.status === "connected" || 
                       status?.status === "CONNECTED";
   
-  const isLoading = qrLoading || statusLoading || agentLoading;
+  const isLoading = qrLoading || statusLoading || agentLoading || agentStatusLoading;
+  
+  // Verificar se o agente está ativado
+  const isAgentActivated = agentStatus?.isActivated || false;
   
   // Atualizar QR Code quando status mudar para conectado
   useEffect(() => {
@@ -185,24 +210,56 @@ export default function WhatsAppQRCode() {
                   WhatsApp conectado e pronto para uso!
                 </AlertDescription>
               </Alert>
-              <Button
-                onClick={() => activateAgentMutation.mutate()}
-                disabled={activateAgentMutation.isPending}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-                size="lg"
-              >
-                {activateAgentMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Ativando agente...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Ativar Agente
-                  </>
-                )}
-              </Button>
+              {isAgentActivated ? (
+                <>
+                  <Button
+                    disabled
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white cursor-not-allowed"
+                    size="lg"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Agente Ativado
+                  </Button>
+                  <Button
+                    onClick={handleDeactivateAgent}
+                    disabled={deactivateAgentMutation.isPending}
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    {deactivateAgentMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                        Desligando robô...
+                      </>
+                    ) : (
+                      <>
+                        <PowerOff className="h-3 w-3 mr-2" />
+                        Desligar Robô
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => activateAgentMutation.mutate()}
+                  disabled={activateAgentMutation.isPending}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  size="lg"
+                >
+                  {activateAgentMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Ativando agente...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Ativar Agente
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 onClick={handleDisconnect}
                 disabled={isRefreshing || disconnectMutation.isPending}

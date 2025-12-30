@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
@@ -1574,6 +1574,132 @@ export const appRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: `Erro ao ativar agente: ${error.response?.data?.message || error.message}`,
+        });
+      }
+    }),
+
+    /**
+     * Verifica se o agente está ativado
+     */
+    getAgentStatus: protectedProcedure.query(async ({ ctx }) => {
+      // Se for cliente, usar tenant direto
+      let tenant = ctx.tenant;
+      
+      // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+      if (!tenant && ctx.user) {
+        tenant = await db.getTenantByUserId(ctx.user.id);
+      }
+      
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      // Agente está ativado se tiver Agent Bot ID
+      const isActivated = !!tenant.chatwootAgentBotId;
+      
+      return {
+        isActivated,
+        agentBotId: tenant.chatwootAgentBotId || null,
+        inboxId: tenant.chatwootInboxId || null,
+      };
+    }),
+
+    /**
+     * Desativa o agente (exclui webhook e Agent Bot do Chatwoot)
+     */
+    deactivateAgent: protectedProcedure.mutation(async ({ ctx }) => {
+      // Se for cliente, usar tenant direto
+      let tenant = ctx.tenant;
+      
+      // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+      if (!tenant && ctx.user) {
+        tenant = await db.getTenantByUserId(ctx.user.id);
+      }
+      
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      if (!tenant.chatwootAgentBotId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Agente não está ativado',
+        });
+      }
+
+      const n8nApiUrl = process.env.N8N_API_URL;
+      if (!n8nApiUrl) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'N8N_API_URL não está configurado',
+        });
+      }
+
+      const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
+
+      try {
+        // 1. Desconectar Agent Bot do inbox (se houver inbox)
+        if (tenant.chatwootInboxId) {
+          try {
+            await disconnectAgentBotFromInbox(tenant.chatwootInboxId);
+            console.log(`[Client] ✅ Agent Bot desconectado do inbox ${tenant.chatwootInboxId}`);
+          } catch (error: any) {
+            console.warn(`[Client] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
+          }
+        }
+
+        // 2. Excluir Agent Bot
+        try {
+          await deleteChatwootAgentBot(tenant.chatwootAgentBotId);
+          console.log(`[Client] ✅ Agent Bot ${tenant.chatwootAgentBotId} excluído`);
+        } catch (error: any) {
+          console.warn(`[Client] ⚠️ Erro ao excluir Agent Bot (não crítico):`, error.message);
+        }
+
+        // 3. Excluir webhook do Chatwoot (criado pelo N8N)
+        try {
+          const webhookDeleted = await deleteChatwootWebhookByUrl(tenantWebhookUrl);
+          if (webhookDeleted) {
+            console.log(`[Client] ✅ Webhook ${tenantWebhookUrl} excluído do Chatwoot`);
+          } else {
+            console.log(`[Client] ⚠️ Webhook ${tenantWebhookUrl} não encontrado (pode já ter sido excluído)`);
+          }
+        } catch (error: any) {
+          console.warn(`[Client] ⚠️ Erro ao excluir webhook (não crítico):`, error.message);
+        }
+
+        // 4. Limpar campos no banco de dados
+        await db.updateTenant(tenant.id, {
+          chatwootAgentBotId: null,
+          chatwootAgentBotToken: null,
+        });
+
+        await db.createPlatformLog({
+          tenantId: tenant.id,
+          eventType: 'agent_deactivated',
+          severity: 'info',
+          message: `Agente de IA desativado. Webhook e Agent Bot removidos do Chatwoot.`,
+          metadata: JSON.stringify({
+            tenantWebhookUrl,
+            agentBotId: tenant.chatwootAgentBotId,
+          }),
+        });
+
+        return {
+          success: true,
+          message: 'Agente desativado com sucesso! Webhook e Agent Bot foram removidos.',
+        };
+      } catch (error: any) {
+        console.error(`[Client] ❌ Erro ao desativar agente para tenant ${tenant.id}:`, error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Erro ao desativar agente: ${error.message}`,
         });
       }
     }),
