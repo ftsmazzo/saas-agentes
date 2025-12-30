@@ -327,17 +327,30 @@ RETURNING *;
 
 ## 🔧 NODE 9: Salvar Historico Cliente
 
-### ❌ ANTES (Supabase)
-- **Tipo:** `n8n-nodes-base.supabase`
-- **Operação:** `insert` ou `update`
-- **Tabela:** `dados_cliente`
-- **Campos:** Vários campos do cliente
+### ⚠️ ATENÇÃO: Este node JÁ é PostgreSQL!
 
-### ✅ DEPOIS (PostgreSQL)
+Este node já usa PostgreSQL, mas precisa ser atualizado para incluir `tenantId`.
+
+### ❌ ANTES (PostgreSQL sem tenantId)
+- **Tipo:** `n8n-nodes-base.postgres`
+- **Operação:** `Insert`
+- **Tabela:** `n8n_chat_histories` (ou similar)
+- **Session ID:** `={{ $('Info2').item.json.telefone }}`
+
+### ✅ DEPOIS (PostgreSQL com tenantId)
 - **Tipo:** `n8n-nodes-base.postgres`
 - **Operação:** `Execute Query`
 - **Query:**
 ```sql
+-- Se for para n8n_chat_histories (Memory do LangChain)
+INSERT INTO n8n_chat_histories (session_id, message)
+VALUES (
+  '{{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}',
+  '{{ $json.message }}'::jsonb
+)
+ON CONFLICT DO NOTHING;
+
+-- OU se for para clientData
 INSERT INTO "clientData" ("tenantId", phone, name, "aiService", "createdAt", "updatedAt")
 VALUES (
   {{ $('Edit Fields2').item.json.tenantId }},
@@ -356,13 +369,11 @@ RETURNING *;
 ```
 
 ### 📝 Passos:
-1. Delete o node Supabase "Salvar Historico Cliente"
-2. Adicione um novo node **PostgreSQL**
-3. Configure:
-   - **Operation:** `Execute Query`
-   - **Query:** Cole a query acima
-   - **Credentials:** Use a mesma credencial PostgreSQL
-4. Renomeie para: `Salvar Historico Cliente`
+1. Abra o node "Salvar Historico Cliente"
+2. Verifique qual tabela ele está usando
+3. Se for `n8n_chat_histories`, atualize o `session_id` para incluir tenantId
+4. Se for outra tabela, adicione `tenantId` na query
+5. Mude de **Insert** para **Execute Query** se necessário
 
 ---
 
