@@ -1383,10 +1383,21 @@ export const appRouter = router({
             await connectAgentBotToInbox(tenant.chatwootInboxId, agentBot.id);
             
             // Salvar ID e token do Agent Bot no banco de dados
-            await db.updateTenant(tenant.id, {
+            console.log(`[Client] 💾 Salvando Agent Bot no banco: ID=${agentBot.id}, Token=${agentBot.token ? '***' + agentBot.token.slice(-4) : 'NÃO ENCONTRADO'}`);
+            
+            const updateData: any = {
               chatwootAgentBotId: agentBot.id,
-              chatwootAgentBotToken: agentBot.token || undefined,
-            });
+            };
+            
+            if (agentBot.token) {
+              updateData.chatwootAgentBotToken = agentBot.token;
+            }
+            
+            await db.updateTenant(tenant.id, updateData);
+            
+            // Verificar se foi salvo corretamente
+            const updatedTenant = await db.getTenantById(tenant.id);
+            console.log(`[Client] ✅ Verificação pós-salvamento: chatwootAgentBotId=${updatedTenant?.chatwootAgentBotId}, chatwootAgentBotToken=${updatedTenant?.chatwootAgentBotToken ? '***' + updatedTenant.chatwootAgentBotToken.slice(-4) : 'NULL'}`);
             
             agentBotCreated = true;
             console.log(`[Client] ✅ Agent Bot criado e conectado ao inbox ${tenant.chatwootInboxId}`);

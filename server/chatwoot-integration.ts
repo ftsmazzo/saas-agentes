@@ -512,11 +512,53 @@ export async function createOrUpdateChatwootAgentBot(
       // A resposta pode conter o token diretamente ou precisamos buscar
       const botData_response = response.data.payload || response.data.data || response.data;
       const botId = botData_response.id || response.data.id;
-      const token = botData_response.access_token || botData_response.token || botData_response.accessToken || '';
+      
+      console.log(`[Chatwoot] 📋 Resposta da criação:`, JSON.stringify(botData_response).substring(0, 500));
+      
+      // Buscar o bot recém-criado para pegar o token (pode não vir na resposta de criação)
+      let token = '';
+      if (botId) {
+        try {
+          // Primeiro, tentar pegar da resposta original
+          token = botData_response.access_token || 
+                  botData_response.token || 
+                  botData_response.accessToken || 
+                  botData_response.access_token_key ||
+                  botData_response.api_access_token ||
+                  '';
+          
+          // Se não encontrou na resposta original, buscar detalhes do bot
+          if (!token) {
+            console.log(`[Chatwoot] 🔍 Token não encontrado na resposta de criação. Buscando detalhes do bot ${botId}...`);
+            
+            // Aguardar um pouco para garantir que o bot foi totalmente criado
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const botResponse = await chatwootApi.get(`/accounts/${accountId}/agent_bots/${botId}`);
+            const botDetails = botResponse.data.payload || botResponse.data.data || botResponse.data;
+            
+            console.log(`[Chatwoot] 📋 Detalhes do bot (GET):`, JSON.stringify(botDetails).substring(0, 500));
+            
+            // Tentar diferentes campos possíveis para o token
+            token = botDetails.access_token || 
+                    botDetails.token || 
+                    botDetails.accessToken || 
+                    botDetails.access_token_key ||
+                    botDetails.api_access_token ||
+                    botDetails.outgoing_url_token ||
+                    '';
+          }
+        } catch (getError: any) {
+          console.warn(`[Chatwoot] ⚠️ Erro ao buscar detalhes do bot:`, getError.response?.data || getError.message);
+        }
+      }
       
       console.log(`[Chatwoot] ✅ Agent bot criado: ${botId}`);
-      console.log(`[Chatwoot] 📋 Token do bot: ${token ? '***' + token.slice(-4) : 'não encontrado'}`);
-      console.log(`[Chatwoot] 📋 Resposta completa:`, JSON.stringify(botData_response).substring(0, 300));
+      console.log(`[Chatwoot] 📋 Token do bot: ${token ? '***' + token.slice(-4) : 'NÃO ENCONTRADO'}`);
+      
+      if (!token) {
+        console.warn(`[Chatwoot] ⚠️ ATENÇÃO: Token do Agent Bot não foi encontrado. O bot pode precisar ser configurado manualmente.`);
+      }
       
       return { id: botId, token };
     }
