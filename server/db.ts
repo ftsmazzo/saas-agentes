@@ -136,6 +136,49 @@ export async function getUserByEmail(email: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Lista todos os usuários
+ */
+export async function getAllUsers(): Promise<User[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.select().from(users).orderBy(desc(users.createdAt));
+}
+
+/**
+ * Cria um novo usuário
+ */
+export async function createUser(userData: InsertUser): Promise<User> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(users).values(userData).returning();
+  if (!result[0]) throw new Error("Failed to create user");
+  
+  return result[0];
+}
+
+/**
+ * Atualiza um usuário
+ */
+export async function updateUser(id: number, updates: Partial<InsertUser>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users).set(updates).where(eq(users.id, id));
+}
+
+/**
+ * Deleta um usuário
+ */
+export async function deleteUser(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(users).where(eq(users.id, id));
+}
+
 // ========== TENANT OPERATIONS ==========
 
 export async function createTenant(tenant: InsertTenant): Promise<Tenant> {
@@ -198,7 +241,16 @@ export async function updateTenant(id: number, updates: Partial<InsertTenant>): 
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Log para debug
+  console.log(`[DB] 💾 Atualizando tenant ${id} com:`, JSON.stringify(updates));
+  
   await db.update(tenants).set(updates).where(eq(tenants.id, id));
+  
+  // Verificar se foi atualizado
+  const updated = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
+  if (updated[0]) {
+    console.log(`[DB] ✅ Tenant ${id} atualizado. chatwootAgentBotId=${updated[0].chatwootAgentBotId}, chatwootAgentBotToken=${updated[0].chatwootAgentBotToken ? '***' + updated[0].chatwootAgentBotToken.slice(-4) : 'NULL'}`);
+  }
 }
 
 export async function deleteTenant(id: number): Promise<void> {

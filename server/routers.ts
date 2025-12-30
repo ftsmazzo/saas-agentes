@@ -326,6 +326,76 @@ export const appRouter = router({
         
         return { success: true };
       }),
+    
+    // Atualizar perfil do admin
+    updateProfile: adminProcedure
+      .input(z.object({
+        name: z.string().min(1, { message: "Nome é obrigatório" }),
+        email: z.string().email({ message: "Email inválido" }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
+        }
+        
+        // Verificar se email já está em uso por outro usuário
+        const existingUser = await db.getUserByEmail(input.email.trim().toLowerCase());
+        if (existingUser && existingUser.id !== ctx.user.id) {
+          throw new TRPCError({ 
+            code: 'BAD_REQUEST', 
+            message: 'Este email já está em uso por outro usuário' 
+          });
+        }
+        
+        await db.updateUser(ctx.user.id, {
+          name: input.name.trim(),
+          email: input.email.trim().toLowerCase(),
+        });
+        
+        return { success: true };
+      }),
+    
+    // Alterar senha do admin
+    changePassword: adminProcedure
+      .input(z.object({
+        currentPassword: z.string().min(1, { message: "Senha atual é obrigatória" }),
+        newPassword: z.string().min(8, { message: "Nova senha deve ter pelo menos 8 caracteres" }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
+        }
+        
+        // Buscar usuário atual
+        const user = await db.getUserById(ctx.user.id);
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({ 
+            code: 'BAD_REQUEST', 
+            message: 'Usuário não encontrado ou senha não definida' 
+          });
+        }
+        
+        // Verificar senha atual
+        const bcrypt = await import('bcryptjs');
+        const isValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+        
+        if (!isValid) {
+          throw new TRPCError({ 
+            code: 'BAD_REQUEST', 
+            message: 'Senha atual incorreta' 
+          });
+        }
+        
+        // Gerar hash da nova senha
+        const newPasswordHash = await bcrypt.hash(input.newPassword, 10);
+        
+        // Atualizar senha
+        await db.updateUser(ctx.user.id, {
+          passwordHash: newPasswordHash,
+        });
+        
+        return { success: true };
+      }),
   }),
 
   // ========== SISTEMA DE TESTE SIMULADO ==========
@@ -411,22 +481,20 @@ export const appRouter = router({
           });
 
           console.log('📝 [STEP 2] Criando tenant no banco...');
+          // IMPORTANTE: Criar como não ativado (isActivated: false)
+          // O status pode ser 'active' mas isActivated deve ser false até o cliente ativar
           const tenant = await db.createTenant({
             ownerId: ctx.user.id,
             companyName: input.companyName,
             email: input.email,
             subdomain: input.subdomain || undefined,
             status: 'active' as const,
+            isActivated: false, // Cliente ainda não ativou a conta
             currentPlanId: input.planId,
           });
 
           console.log('✅ [STEP 2] Tenant criado com ID:', tenant.id);
-          
-          // IMPORTANTE: Criar como não ativado (isActivated: false)
-          // O status pode ser 'active' mas isActivated deve ser false até o cliente ativar
-          await db.updateTenant(tenant.id, {
-            isActivated: false,
-          });
+          console.log('✅ [STEP 2] Tenant criado como não ativado (isActivated: false)');
           
           // 2. Provisionar recursos do tenant (modelo multi-tenant compartilhado)
           console.log('🔧 [STEP 3] Provisionando recursos do tenant...');
@@ -1709,6 +1777,126 @@ PROMPT MELHORADO:`;
           });
         }
       }),
+  }),
+
+  // ========== ADMIN USER MANAGEMENT ==========
+  admin: router({
+    users: router({
+      // Listar todos os usuários admin
+      list: adminProcedure.query(async () => {
+        const allUsers = await db.getAllUsers();
+        // Filtrar apenas admins (ou todos se quiser ver todos)
+        return allUsers.filter(u => u.role === 'admin');
+      }),
+
+      // Criar novo usuário admin
+      create: adminProcedure
+        .input(z.object({
+          name: z.string().min(1, { message: "Nome é obrigatório" }),
+          email: z.string().email({ message: "Email inválido" }),
+          password: z.string().min(8, { message: "Senha deve ter pelo menos 8 caracteres" }),
+        }))
+        .mutation(async ({ input }) => {
+          // Verificar se email já existe
+          const existingUser = await db.getUserByEmail(input.email.trim().toLowerCase());
+          if (existingUser) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Este email já está em uso',
+            });
+          }
+
+          // Gerar hash da senha
+          const bcrypt = await import('bcryptjs');
+          const passwordHash = await bcrypt.hash(input.password, 10);
+
+          // Gerar openId único
+          const crypto = await import('crypto');
+          const openId = `admin_${crypto.randomBytes(16).toString('hex')}`;
+
+          // Criar usuário
+          const user = await db.createUser({
+            openId,
+            name: input.name.trim(),
+            email: input.email.trim().toLowerCase(),
+            passwordHash,
+            role: 'admin',
+          });
+
+          return user;
+        }),
+
+      // Atualizar usuário admin
+      update: adminProcedure
+        .input(z.object({
+          id: z.number(),
+          name: z.string().min(1, { message: "Nome é obrigatório" }),
+          email: z.string().email({ message: "Email inválido" }),
+          password: z.string().min(8, { message: "Senha deve ter pelo menos 8 caracteres" }).optional(),
+        }))
+        .mutation(async ({ input }) => {
+          const { id, password, ...updates } = input;
+
+          // Verificar se usuário existe
+          const user = await db.getUserById(id);
+          if (!user) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Usuário não encontrado',
+            });
+          }
+
+          // Verificar se email já está em uso por outro usuário
+          if (updates.email) {
+            const existingUser = await db.getUserByEmail(updates.email.trim().toLowerCase());
+            if (existingUser && existingUser.id !== id) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Este email já está em uso por outro usuário',
+              });
+            }
+          }
+
+          // Preparar atualizações
+          const updateData: any = {
+            name: updates.name.trim(),
+            email: updates.email.trim().toLowerCase(),
+          };
+
+          // Se senha foi fornecida, gerar hash
+          if (password) {
+            const bcrypt = await import('bcryptjs');
+            updateData.passwordHash = await bcrypt.hash(password, 10);
+          }
+
+          await db.updateUser(id, updateData);
+          return { success: true };
+        }),
+
+      // Deletar usuário admin
+      delete: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input, ctx }) => {
+          // Não permitir deletar a si mesmo
+          if (input.id === ctx.user.id) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Você não pode deletar seu próprio usuário',
+            });
+          }
+
+          const user = await db.getUserById(input.id);
+          if (!user) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Usuário não encontrado',
+            });
+          }
+
+          await db.deleteUser(input.id);
+          return { success: true };
+        }),
+    }),
   }),
 });
 

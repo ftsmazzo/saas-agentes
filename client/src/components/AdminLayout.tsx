@@ -71,8 +71,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Início", href: "/admin", icon: LayoutDashboard },
     { name: "Clientes", href: "/admin/tenants", icon: Users },
     { name: "Planos", href: "/admin/plans", icon: CreditCard },
+    { name: "Usuários Admin", href: "/admin/users", icon: Users },
     { name: "Logs", href: "/admin/logs", icon: FileText },
-    { name: "Configurações", href: "/admin/settings", icon: Settings },
+    { name: "Meu Perfil", href: "/admin/profile", icon: Settings },
   ];
 
   const isActive = (href: string) => {

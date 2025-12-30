@@ -14,6 +14,8 @@ import TenantsPage from "./pages/admin/Tenants";
 import PlansPage from "./pages/admin/Plans";
 import LogsPage from "./pages/admin/Logs";
 import SettingsPage from "./pages/admin/Settings";
+import ProfilePage from "./pages/admin/Profile";
+import UsersPage from "./pages/admin/Users";
 
 // Client pages
 import AgentConfigPage from "./pages/client/AgentConfig";
@@ -43,6 +45,8 @@ function Router() {
       <Route path={"/admin/plans"} component={PlansPage} />
       <Route path={"/admin/logs"} component={LogsPage} />
       <Route path={"/admin/settings"} component={SettingsPage} />
+      <Route path={"/admin/profile"} component={ProfilePage} />
+      <Route path={"/admin/users"} component={UsersPage} />
       <Route path={"/admin"} component={AdminDashboard} />
       
       {/* Client Routes */}
