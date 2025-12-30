@@ -241,6 +241,7 @@ export async function activateWorkflow(workflowId: string): Promise<void> {
 
 /**
  * Despublica workflow (N8N 2.1.4+ - precisa atualizar workflow completo com PUT)
+ * IMPORTANTE: Não incluir 'active' no payload pois é read-only no N8N 2.1.4+
  */
 export async function deactivateWorkflow(workflowId: string): Promise<void> {
   try {
@@ -248,7 +249,10 @@ export async function deactivateWorkflow(workflowId: string): Promise<void> {
     const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
     const workflow = workflowResponse.data.data || workflowResponse.data;
     
-    // Enviar apenas campos permitidos (não espalhar workflow completo)
+    console.log(`[N8N] 🔄 Despublicando workflow ${workflowId}...`);
+    console.log(`[N8N] 📋 Workflow atual - published: ${workflow.published}, active: ${workflow.active}`);
+    
+    // Enviar apenas campos permitidos (não incluir 'active' pois é read-only)
     const updatePayload: any = {
       name: workflow.name,
       nodes: workflow.nodes,
@@ -257,18 +261,33 @@ export async function deactivateWorkflow(workflowId: string): Promise<void> {
       staticData: workflow.staticData,
     };
     
-    // Tentar published primeiro (N8N 2.1.4+)
+    // N8N 2.1.4+ usa 'published', não 'active' (que é read-only)
     if (workflow.published !== undefined) {
       updatePayload.published = false;
+      console.log(`[N8N] 📋 Usando 'published: false' para despublicar`);
     } else {
-      // Se não tem published, usar active
-      updatePayload.active = false;
+      // Fallback para versões antigas (mas não incluir active no payload)
+      console.log(`[N8N] ⚠️ Campo 'published' não encontrado, tentando método alternativo`);
+      // Tentar usar endpoint de desativação se existir
+      try {
+        await n8nApi.post(`/workflows/${workflowId}/deactivate`, {});
+        console.log(`[N8N] ✅ Workflow ${workflowId} despublicado via POST /deactivate`);
+        return;
+      } catch (deactivateError: any) {
+        console.warn(`[N8N] ⚠️ POST /deactivate não disponível:`, deactivateError.response?.data || deactivateError.message);
+        // Continuar com PUT sem active
+      }
     }
     
     await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
-    console.log(`[N8N] ✅ Workflow ${workflowId} despublicado com sucesso`);
+    console.log(`[N8N] ✅ Workflow ${workflowId} despublicado com sucesso (método PUT)`);
+    
+    // Verificar se foi despublicado
+    const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
+    const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
+    console.log(`[N8N] ✅ Verificação - published: ${verifiedWorkflow.published}, active: ${verifiedWorkflow.active}`);
   } catch (error: any) {
-    console.error("[N8N] Erro ao despublicar workflow:", error.response?.data || error.message);
+    console.error("[N8N] ❌ Erro ao despublicar workflow:", error.response?.data || error.message);
     throw new Error(`Falha ao despublicar workflow: ${error.response?.data?.message || error.message}`);
   }
 }

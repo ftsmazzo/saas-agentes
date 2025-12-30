@@ -12,6 +12,7 @@ import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWor
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
 import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
+import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
 import axios from 'axios';
 
@@ -421,6 +422,12 @@ export const appRouter = router({
 
           console.log('✅ [STEP 2] Tenant criado com ID:', tenant.id);
           
+          // IMPORTANTE: Criar como não ativado (isActivated: false)
+          // O status pode ser 'active' mas isActivated deve ser false até o cliente ativar
+          await db.updateTenant(tenant.id, {
+            isActivated: false,
+          });
+          
           // 2. Provisionar recursos do tenant (modelo multi-tenant compartilhado)
           console.log('🔧 [STEP 3] Provisionando recursos do tenant...');
           const provisionResult = await provisionTenant({
@@ -547,16 +554,58 @@ export const appRouter = router({
           });
           console.log('✅ [STEP 6] Configura\u00e7\u00e3o criada!');
           
-          // 7. Notificar o proprietário (opcional - não bloqueia criação)
-          console.log('📧 [STEP 7] Notificando proprietário...');
+          // 7. Gerar token de ativação e enviar email
+          console.log('📧 [STEP 7] Gerando token de ativação e enviando email...');
+          try {
+            const crypto = await import('crypto');
+            const activationToken = crypto.randomBytes(32).toString("hex");
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+            
+            const dbInstance = await db.getDb();
+            if (!dbInstance) throw new Error("Database not available");
+            
+            await dbInstance.insert(activationTokens).values({
+              tenantId: tenant.id,
+              token: activationToken,
+              expiresAt,
+            });
+            
+            console.log(`[Admin Create] Activation token created: ${activationToken}`);
+            
+            // Enviar email de ativação
+            const { sendActivationEmail } = await import('./email');
+            await sendActivationEmail(input.email, activationToken, input.companyName);
+            console.log(`[Admin Create] Activation email sent to ${input.email}`);
+            
+            await db.createPlatformLog({
+              tenantId: tenant.id,
+              eventType: 'tenant_created',
+              severity: 'info',
+              message: `Tenant criado e email de ativação enviado para ${input.email}`,
+              metadata: JSON.stringify({ email: input.email, planId: input.planId }),
+            });
+          } catch (error: any) {
+            console.error(`[Admin Create] ❌ Erro ao gerar token/enviar email:`, error);
+            await db.createPlatformLog({
+              tenantId: tenant.id,
+              eventType: 'email_failed',
+              severity: 'error',
+              message: `Falha ao enviar email de ativação: ${error.message}`,
+              metadata: JSON.stringify({ error: error.message }),
+            });
+            // Não lançar erro - email é importante mas não bloqueia criação
+          }
+          
+          // 8. Notificar o proprietário (opcional - não bloqueia criação)
+          console.log('📧 [STEP 8] Notificando proprietário...');
           try {
             await notifyOwner({
               title: 'Novo Cliente Cadastrado',
               content: `Um novo cliente foi cadastrado: ${input.companyName} (${input.email})`,
             });
-            console.log('✅ [STEP 7] Notificação enviada!');
+            console.log('✅ [STEP 8] Notificação enviada!');
           } catch (error: any) {
-            console.warn('⚠️ [STEP 7] Erro ao notificar (não bloqueia criação):', error.message);
+            console.warn('⚠️ [STEP 8] Erro ao notificar (não bloqueia criação):', error.message);
             // Não lançar erro - notificação é opcional
           }
 
