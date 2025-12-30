@@ -185,7 +185,7 @@ export default function AgentConfigUnifiedPage() {
         </div>
 
         {/* Se não houver configuração OU não houver systemPrompt, mostrar assistente diretamente */}
-        {(!config || !config.systemPrompt) && !showAssistant && !assistantComplete && (
+        {(!config || !config.systemPrompt) && (
           <div className="mb-6">
             <AgentConfigAssistant
               onComplete={() => {
@@ -198,8 +198,8 @@ export default function AgentConfigUnifiedPage() {
           </div>
         )}
 
-        {/* Se houver config mas sem systemPrompt, mostrar botão para iniciar assistente */}
-        {config && !config.systemPrompt && !showAssistant && !assistantComplete && (
+        {/* Se houver config mas sem systemPrompt, mostrar botão para iniciar assistente (não deve aparecer se já estiver mostrando o assistente acima) */}
+        {config && !config.systemPrompt && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
