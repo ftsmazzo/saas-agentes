@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { trpc } from "@/lib/trpc";
 import { 
   Bot, 
   MessageSquare, 
@@ -20,12 +19,12 @@ import {
   LogOut,
   Menu,
   X,
-  Settings
+  Settings,
+  AlertCircle,
+  Smartphone
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Smartphone, Settings } from "lucide-react";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -36,25 +35,35 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const { user, logout, loading } = useAuth({ redirectOnUnauthenticated: true });
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => logout(),
-  });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      setIsLoggingOut(false);
+    }
+  };
   
   // Agora podemos fazer returns condicionais
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
+  // Mostrar loading enquanto verifica autenticação ou durante logout
+  if (loading || isLoggingOut) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Verificando autenticação...</p>
+          <p className="text-muted-foreground">
+            {isLoggingOut ? 'Saindo...' : 'Verificando autenticação...'}
+          </p>
         </div>
       </div>
     );
   }
   
-  // Verificar se usuário não é cliente
-  if (!user || (user.role !== 'client' && user.role !== 'admin')) {
+  // Verificar se usuário não é cliente (mas não durante logout)
+  if (!isLoggingOut && (!user || (user.role !== 'client' && user.role !== 'admin'))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4 max-w-md">
@@ -179,9 +188,9 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
+              <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                Sair
+                {isLoggingOut ? 'Saindo...' : 'Sair'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
