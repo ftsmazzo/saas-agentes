@@ -50,8 +50,12 @@ export default function WhatsAppQRCode() {
 
   const activateAgentMutation = trpc.clientPanel.activateAgent.useMutation({
     onSuccess: async () => {
+      // Atualizar status do agente e invalidar cache
+      await Promise.all([
+        refetchAgentStatus(),
+        refetchStatus(),
+      ]);
       alert("Agente ativado com sucesso! 🚀");
-      await refetchAgentStatus(); // Atualizar status do agente
     },
     onError: (error) => {
       console.error("Erro ao ativar agente:", error);
@@ -61,8 +65,12 @@ export default function WhatsAppQRCode() {
 
   const deactivateAgentMutation = trpc.clientPanel.deactivateAgent.useMutation({
     onSuccess: async () => {
+      // Atualizar status do agente e invalidar cache
+      await Promise.all([
+        refetchAgentStatus(),
+        refetchStatus(),
+      ]);
       alert("Agente desativado com sucesso! O robô foi desligado.");
-      await refetchAgentStatus(); // Atualizar status do agente
     },
     onError: (error) => {
       console.error("Erro ao desativar agente:", error);
@@ -116,7 +124,7 @@ export default function WhatsAppQRCode() {
   const isLoading = qrLoading || statusLoading || agentLoading || agentStatusLoading;
   
   // Verificar se o agente está ativado
-  const isAgentActivated = agentStatus?.isAgentActive || false;
+  const isAgentActivated = agentStatus?.isActivated || false;
   
   // Atualizar QR Code quando status mudar para conectado
   useEffect(() => {
@@ -132,7 +140,7 @@ export default function WhatsAppQRCode() {
     <ClientLayout>
       <div className="max-w-4xl mx-auto">
         {/* Aviso se não houver agente configurado */}
-        {!agentLoading && !agentConfig && (
+        {!agentLoading && (!agentConfig || !agentConfig.systemPrompt) && (
           <Alert className="mb-6 border-yellow-200 bg-yellow-50">
             <Bot className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-800">
@@ -198,8 +206,8 @@ export default function WhatsAppQRCode() {
                 </AlertDescription>
               </Alert>
               
-              {/* Só mostrar botões de ativar/desativar se houver agente configurado */}
-              {agentConfig ? (
+              {/* Só mostrar botões de ativar/desativar se houver agente configurado (com systemPrompt) */}
+              {agentConfig && agentConfig.systemPrompt ? (
                 isAgentActivated ? (
                   <>
                     <Button
