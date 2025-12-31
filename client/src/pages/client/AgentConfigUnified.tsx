@@ -188,6 +188,7 @@ export default function AgentConfigUnifiedPage() {
         {(!config || !config.systemPrompt) && (
           <div className="mb-6">
             <AgentConfigAssistant
+              existingConfig={config}
               onComplete={() => {
                 setShowAssistant(false);
                 setAssistantComplete(true);
@@ -198,9 +199,9 @@ export default function AgentConfigUnifiedPage() {
           </div>
         )}
 
-        {/* Se houver config mas sem systemPrompt, mostrar botão para iniciar assistente (não deve aparecer se já estiver mostrando o assistente acima) */}
-        {config && !config.systemPrompt && (
-          <Card className="border-primary/20 bg-primary/5">
+        {/* Se houver config com systemPrompt, mostrar opção para editar */}
+        {config && config.systemPrompt && !showAssistant && (
+          <Card className="border-primary/20 bg-primary/5 mb-6">
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
                 <div className="flex justify-center">
@@ -210,18 +211,22 @@ export default function AgentConfigUnifiedPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold mb-2">
-                    Configure seu Agente com Assistente de IA
+                    Seu Agente já está Configurado
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    Responda algumas perguntas simples e nosso assistente criará um agente personalizado para você
+                    Você pode editar as configurações abaixo ou usar o assistente para atualizar tudo
                   </p>
                   <Button
-                    onClick={() => setShowAssistant(true)}
+                    onClick={() => {
+                      setShowAssistant(true);
+                      setAssistantComplete(false);
+                    }}
                     size="lg"
+                    variant="outline"
                     className="w-full sm:w-auto"
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Começar Configuração Guiada
+                    Atualizar com Assistente de IA
                   </Button>
                 </div>
               </div>
@@ -229,15 +234,16 @@ export default function AgentConfigUnifiedPage() {
           </Card>
         )}
 
-        {/* Assistente de IA (quando usuário clica no botão) */}
+        {/* Assistente de IA (quando usuário clica para editar) */}
         {showAssistant && !assistantComplete && (
           <div className="mb-6">
             <AgentConfigAssistant
+              existingConfig={config}
               onComplete={() => {
                 setShowAssistant(false);
                 setAssistantComplete(true);
                 utils.agent.getConfig.invalidate();
-                toast.success('Configuração concluída! Você pode revisar e ajustar abaixo.');
+                toast.success('Configuração atualizada! Você pode revisar e ajustar abaixo.');
               }}
             />
           </div>

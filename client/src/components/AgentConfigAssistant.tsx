@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Bot, Send, Loader2, Sparkles, X } from 'lucide-react';
+import { Bot, Send, Loader2, Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -13,47 +14,77 @@ interface Message {
   timestamp: Date;
 }
 
-interface Rule {
-  id: string;
-  question: string;
-  answer: string;
-}
-
 interface AssistantState {
-  step: 'welcome' | 'business-name' | 'business-type' | 'address' | 'phone' | 'tone' | 'rules' | 'review' | 'complete';
+  step: 'welcome' | 'business-name' | 'business-type' | 'address-street' | 'address-neighborhood' | 'address-city' | 'address-state' | 'address-zip' | 'service-area' | 'phone' | 'business-hours' | 'payment-methods' | 'personality' | 'additional-info' | 'review' | 'complete';
   answers: {
     businessName: string;
     businessType: string;
-    address: string;
+    street: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    serviceArea: 'city' | 'state' | 'country' | '';
     phone: string;
-    tone: 'professional' | 'friendly' | 'casual' | 'formal' | '';
-    rules: Rule[];
+    businessHours: string;
+    paymentMethods: string[];
+    personality: 'professional' | 'friendly' | 'casual' | 'formal' | 'consultative' | 'empathetic' | 'energetic' | 'calm' | '';
+    additionalInfo: string;
   };
 }
 
-export default function AgentConfigAssistant({ onComplete }: { onComplete: () => void }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Olá! 👋 Vou te ajudar a configurar seu agente de IA. Vamos começar?',
-      timestamp: new Date(),
-    },
-  ]);
+const PERSONALITY_OPTIONS = [
+  { value: 'professional', label: 'Profissional', description: 'Técnico, objetivo e eficiente' },
+  { value: 'friendly', label: 'Amigável', description: 'Descontraído, acolhedor e caloroso' },
+  { value: 'casual', label: 'Casual', description: 'Próximo, informal mas respeitoso' },
+  { value: 'formal', label: 'Formal', description: 'Respeitoso, cerimonioso e distante' },
+  { value: 'consultative', label: 'Consultivo', description: 'Analítico, orientador e consultivo' },
+  { value: 'empathetic', label: 'Empático', description: 'Compreensivo, acolhedor e sensível' },
+  { value: 'energetic', label: 'Energético', description: 'Entusiasmado, motivador e dinâmico' },
+  { value: 'calm', label: 'Calmo', description: 'Sereno, paciente e tranquilo' },
+];
+
+const PAYMENT_METHODS = [
+  'Dinheiro',
+  'Cartão de Crédito',
+  'Cartão de Débito',
+  'PIX',
+  'Boleto',
+  'Transferência Bancária',
+  'Cheque',
+  'Cartão de Vale Alimentação',
+  'Cartão de Vale Refeição',
+];
+
+export default function AgentConfigAssistant({ 
+  onComplete,
+  existingConfig 
+}: { 
+  onComplete: () => void;
+  existingConfig?: any;
+}) {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [state, setState] = useState<AssistantState>({
     step: 'welcome',
     answers: {
-      businessName: '',
-      businessType: '',
-      address: '',
-      phone: '',
-      tone: '',
-      rules: [],
+      businessName: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).name || '' : '',
+      businessType: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).type || '' : '',
+      street: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).street || '' : '',
+      neighborhood: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).neighborhood || '' : '',
+      city: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).city || '' : '',
+      state: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).state || '' : '',
+      zipCode: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).zipCode || '' : '',
+      serviceArea: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).serviceArea || '' : '',
+      phone: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).phone || '' : '',
+      businessHours: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).businessHours || '' : '',
+      paymentMethods: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).paymentMethods || [] : [],
+      personality: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).personality || '' : '',
+      additionalInfo: existingConfig?.companyInfo ? JSON.parse(existingConfig.companyInfo).additionalInfo || '' : '',
     },
   });
   const [userInput, setUserInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showRuleForm, setShowRuleForm] = useState(false);
-  const [currentRule, setCurrentRule] = useState({ question: '', answer: '' });
+  const [showPaymentSelection, setShowPaymentSelection] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const generatePromptMutation = trpc.clientPanel.generateSystemPrompt.useMutation({
@@ -72,6 +103,20 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
     },
   });
 
+  // Inicializar mensagem de boas-vindas
+  useEffect(() => {
+    if (messages.length === 0) {
+      if (existingConfig?.systemPrompt) {
+        addMessage('assistant', `Olá! 👋 Vejo que você já tem um agente configurado. Posso ajudar você a atualizar as configurações. O que você gostaria de alterar?`);
+        addMessage('assistant', 'Você pode me dizer o que quer mudar ou podemos revisar tudo do zero. O que prefere?');
+      } else {
+        addMessage('assistant', 'Olá! 👋 Que bom ter você aqui!');
+        addMessage('assistant', 'Vou te ajudar a criar seu agente de IA de forma personalizada. Vamos fazer isso juntos, passo a passo, de forma bem natural.');
+        addMessage('assistant', 'Está pronto para começar? 😊');
+      }
+    }
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -84,215 +129,261 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
     setMessages((prev) => [...prev, { role, content, timestamp: new Date() }]);
   };
 
-  const handleNextStep = () => {
-    switch (state.step) {
-      case 'welcome':
-        setState((prev) => ({ ...prev, step: 'business-name' }));
-        addMessage('assistant', 'Ótimo! Vamos começar. Qual o nome da sua empresa?');
-        break;
-      case 'business-name':
-        if (!state.answers.businessName) {
-          toast.error('Por favor, informe o nome da empresa');
-          return;
-        }
-        setState((prev) => ({ ...prev, step: 'business-type' }));
-        addMessage('assistant', `Entendi! ${state.answers.businessName}. Qual o ramo de atividade? (ex: imobiliária, e-commerce, clínica, restaurante)`);
-        break;
-      case 'business-type':
-        setState((prev) => ({ ...prev, step: 'address' }));
-        addMessage('assistant', 'Perfeito! Qual o endereço da sua empresa?');
-        break;
-      case 'address':
-        setState((prev) => ({ ...prev, step: 'phone' }));
-        addMessage('assistant', 'E qual o telefone de contato?');
-        break;
-      case 'phone':
-        setState((prev) => ({ ...prev, step: 'tone' }));
-        addMessage('assistant', 'Ótimo! Agora, como você gostaria que seu agente se comunique?');
-        addMessage('assistant', '1. Profissional e técnico\n2. Amigável e descontraído\n3. Casual e próximo\n4. Formal e respeitoso\n\nDigite o número da opção (1-4):');
-        break;
-      case 'tone':
-        if (!state.answers.tone) {
-          toast.error('Por favor, selecione um tom de voz');
-          return;
-        }
-        setState((prev) => ({ ...prev, step: 'rules' }));
-        addMessage('assistant', 'Perfeito! Agora, existem perguntas específicas que você quer que o agente responda de forma particular?');
-        addMessage('assistant', 'Por exemplo: "Se perguntarem sobre horário de funcionamento, responda: Funcionamos de segunda a sexta, das 9h às 18h"');
-        addMessage('assistant', 'Deseja adicionar regras personalizadas? (responda "sim" ou "não")');
-        break;
-      case 'rules':
-        setState((prev) => ({ ...prev, step: 'review' }));
-        showReview();
-        break;
+  const formatPhone = (phone: string): string => {
+    // Remove tudo que não é número
+    const numbers = phone.replace(/\D/g, '');
+    
+    // Se já começa com 55, mantém
+    if (numbers.startsWith('55')) {
+      return numbers;
     }
+    
+    // Se tem 10 ou 11 dígitos (DDD + número), adiciona 55
+    if (numbers.length >= 10 && numbers.length <= 11) {
+      return `55${numbers}`;
+    }
+    
+    return numbers;
   };
 
   const handleUserMessage = (message: string) => {
     if (!message.trim()) return;
 
     addMessage('user', message);
-    const trimmedMessage = message.trim();
+    const trimmedMessage = message.trim().toLowerCase();
     setUserInput('');
 
-    // Processar resposta baseado no step atual
     switch (state.step) {
       case 'welcome':
-        if (trimmedMessage.toLowerCase().includes('sim') || trimmedMessage.toLowerCase().includes('s') || trimmedMessage.toLowerCase().includes('vamos') || trimmedMessage.toLowerCase() === 'ok') {
-          handleNextStep();
+        if (trimmedMessage.includes('sim') || trimmedMessage.includes('s') || trimmedMessage.includes('vamos') || trimmedMessage === 'ok' || trimmedMessage.includes('pronto')) {
+          setState((prev) => ({ ...prev, step: 'business-name' }));
+          addMessage('assistant', 'Ótimo! Vamos começar! 🚀');
+          addMessage('assistant', 'Primeiro, qual o nome da sua empresa ou negócio?');
         } else {
-          addMessage('assistant', 'Tudo bem! Quando estiver pronto, digite "sim" ou "ok" para começar.');
+          addMessage('assistant', 'Sem pressa! Quando estiver pronto, digite "sim" ou "ok" para começar. 😊');
         }
         break;
 
       case 'business-name':
         if (trimmedMessage.length < 2) {
-          addMessage('assistant', 'Por favor, informe um nome válido para sua empresa:');
+          addMessage('assistant', 'Por favor, me diga o nome da sua empresa ou negócio:');
           return;
         }
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, businessName: trimmedMessage },
+          answers: { ...prev.answers, businessName: message.trim() },
           step: 'business-type',
         }));
-        addMessage('assistant', `Entendi! ${trimmedMessage}. Qual o ramo de atividade? (ex: imobiliária, e-commerce, clínica, restaurante)`);
+        addMessage('assistant', `Perfeito! ${message.trim()}. Que legal! 😊`);
+        addMessage('assistant', 'Agora me conta: qual o ramo de atividade da sua empresa?');
+        addMessage('assistant', 'Por exemplo: imobiliária, e-commerce, clínica médica, restaurante, loja física, serviços, etc.');
         break;
 
       case 'business-type':
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, businessType: trimmedMessage },
-          step: 'address',
+          answers: { ...prev.answers, businessType: message.trim() },
+          step: 'address-street',
         }));
-        addMessage('assistant', 'Perfeito! Qual o endereço da sua empresa?');
+        addMessage('assistant', `Entendi! ${message.trim()}. Ótimo! 👍`);
+        addMessage('assistant', 'Agora vamos falar sobre o endereço. Qual a rua ou avenida da sua empresa?');
         break;
 
-      case 'address':
+      case 'address-street':
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, address: trimmedMessage },
-          step: 'phone',
+          answers: { ...prev.answers, street: message.trim() },
+          step: 'address-neighborhood',
         }));
-        addMessage('assistant', 'E qual o telefone de contato?');
+        addMessage('assistant', 'Ótimo! E qual o bairro?');
+        break;
+
+      case 'address-neighborhood':
+        setState((prev) => ({
+          ...prev,
+          answers: { ...prev.answers, neighborhood: message.trim() },
+          step: 'address-city',
+        }));
+        addMessage('assistant', 'Perfeito! Qual a cidade?');
+        break;
+
+      case 'address-city':
+        setState((prev) => ({
+          ...prev,
+          answers: { ...prev.answers, city: message.trim() },
+          step: 'address-state',
+        }));
+        addMessage('assistant', 'E qual o estado? (ex: São Paulo, Rio de Janeiro, Minas Gerais)');
+        break;
+
+      case 'address-state':
+        setState((prev) => ({
+          ...prev,
+          answers: { ...prev.answers, state: message.trim() },
+          step: 'address-zip',
+        }));
+        addMessage('assistant', 'E o CEP? (pode ser com ou sem hífen)');
+        break;
+
+      case 'address-zip':
+        const zipCode = message.trim().replace(/\D/g, '');
+        setState((prev) => ({
+          ...prev,
+          answers: { ...prev.answers, zipCode },
+          step: 'service-area',
+        }));
+        addMessage('assistant', 'Perfeito! Agora me conta: sua empresa atende apenas na sua cidade, em todo o estado ou em todo o Brasil?');
+        addMessage('assistant', 'Digite: "cidade", "estado" ou "brasil"');
+        break;
+
+      case 'service-area':
+        let serviceArea: 'city' | 'state' | 'country' | '' = '';
+        if (trimmedMessage.includes('cidade') || trimmedMessage.includes('local')) {
+          serviceArea = 'city';
+        } else if (trimmedMessage.includes('estado') || trimmedMessage.includes('estadual')) {
+          serviceArea = 'state';
+        } else if (trimmedMessage.includes('brasil') || trimmedMessage.includes('nacional') || trimmedMessage.includes('todo')) {
+          serviceArea = 'country';
+        }
+        
+        if (serviceArea) {
+          setState((prev) => ({
+            ...prev,
+            answers: { ...prev.answers, serviceArea },
+            step: 'phone',
+          }));
+          const areaText = serviceArea === 'city' ? 'sua cidade' : serviceArea === 'state' ? 'todo o estado' : 'todo o Brasil';
+          addMessage('assistant', `Ótimo! Atendimento em ${areaText}. 👍`);
+          addMessage('assistant', 'Agora preciso do telefone de contato. Por favor, informe com DDD.');
+          addMessage('assistant', 'Exemplo: (11) 98765-4321 ou 11987654321');
+          addMessage('assistant', '💡 Dica: Vou formatar automaticamente com código do país (55) se necessário.');
+        } else {
+          addMessage('assistant', 'Por favor, digite "cidade", "estado" ou "brasil":');
+        }
         break;
 
       case 'phone':
+        const formattedPhone = formatPhone(message.trim());
         setState((prev) => ({
           ...prev,
-          answers: { ...prev.answers, phone: trimmedMessage },
-          step: 'tone',
+          answers: { ...prev.answers, phone: formattedPhone },
+          step: 'business-hours',
         }));
-        addMessage('assistant', 'Ótimo! Agora, como você gostaria que seu agente se comunique?');
-        addMessage('assistant', '1. Profissional e técnico\n2. Amigável e descontraído\n3. Casual e próximo\n4. Formal e respeitoso\n\nDigite o número da opção (1-4):');
+        addMessage('assistant', `Telefone registrado: ${formattedPhone}. ✅`);
+        addMessage('assistant', 'Qual o horário de funcionamento da sua empresa?');
+        addMessage('assistant', 'Exemplo: "Segunda a sexta, das 9h às 18h" ou "Todos os dias, das 8h às 20h"');
         break;
 
-      case 'tone':
-        const toneMap: Record<string, 'professional' | 'friendly' | 'casual' | 'formal'> = {
-          '1': 'professional',
-          '2': 'friendly',
-          '3': 'casual',
-          '4': 'formal',
-          'professional': 'professional',
-          'friendly': 'friendly',
-          'casual': 'casual',
-          'formal': 'formal',
-          'profissional': 'professional',
-          'amigável': 'friendly',
-          'amigavel': 'friendly',
-          'casual': 'casual',
-          'formal': 'formal',
-        };
-        const selectedTone = toneMap[trimmedMessage.toLowerCase()] || toneMap[trimmedMessage];
-        if (selectedTone) {
+      case 'business-hours':
+        setState((prev) => ({
+          ...prev,
+          answers: { ...prev.answers, businessHours: message.trim() },
+          step: 'payment-methods',
+        }));
+        addMessage('assistant', 'Perfeito! Agora sobre formas de pagamento:');
+        addMessage('assistant', 'Quais formas de pagamento sua empresa aceita?');
+        addMessage('assistant', 'Você pode escolher várias opções. Digite os números separados por vírgula (ex: 1, 3, 5):');
+        addMessage('assistant', PAYMENT_METHODS.map((method, idx) => `${idx + 1}. ${method}`).join('\n'));
+        setShowPaymentSelection(true);
+        break;
+
+      case 'payment-methods':
+        const selectedIndices = trimmedMessage.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 1 && n <= PAYMENT_METHODS.length);
+        if (selectedIndices.length > 0) {
+          const selectedMethods = selectedIndices.map(idx => PAYMENT_METHODS[idx - 1]);
           setState((prev) => ({
             ...prev,
-            answers: { ...prev.answers, tone: selectedTone },
-            step: 'rules',
+            answers: { ...prev.answers, paymentMethods: selectedMethods },
+            step: 'personality',
           }));
-          const toneNames = {
-            professional: 'profissional e técnico',
-            friendly: 'amigável e descontraído',
-            casual: 'casual e próximo',
-            formal: 'formal e respeitoso',
-          };
-          addMessage('assistant', `Tom ${toneNames[selectedTone]} selecionado!`);
-          addMessage('assistant', 'Perfeito! Agora, existem perguntas específicas que você quer que o agente responda de forma particular?');
-          addMessage('assistant', 'Por exemplo: "Se perguntarem sobre horário de funcionamento, responda: Funcionamos de segunda a sexta, das 9h às 18h"');
-          addMessage('assistant', 'Deseja adicionar regras personalizadas? (responda "sim" ou "não")');
+          setShowPaymentSelection(false);
+          addMessage('assistant', `Ótimo! Formas de pagamento: ${selectedMethods.join(', ')}. ✅`);
+          addMessage('assistant', 'Agora vamos definir a personalidade do seu agente!');
+          addMessage('assistant', 'Como você quer que ele se comunique com seus clientes?');
+          addMessage('assistant', 'Escolha uma opção (digite o número):');
+          addMessage('assistant', PERSONALITY_OPTIONS.map((opt, idx) => `${idx + 1}. ${opt.label} - ${opt.description}`).join('\n'));
         } else {
-          addMessage('assistant', 'Por favor, digite um número de 1 a 4:');
+          addMessage('assistant', 'Por favor, escolha pelo menos uma forma de pagamento. Digite os números separados por vírgula:');
         }
         break;
 
-      case 'rules':
-        if (trimmedMessage.toLowerCase().includes('sim') || trimmedMessage.toLowerCase().includes('s')) {
-          setShowRuleForm(true);
-          addMessage('assistant', 'Perfeito! Qual a pergunta que você quer configurar?');
-        } else if (trimmedMessage.toLowerCase().includes('não') || trimmedMessage.toLowerCase().includes('nao') || trimmedMessage.toLowerCase().includes('n')) {
-          handleNextStep();
+      case 'personality':
+        const personalityIndex = parseInt(trimmedMessage);
+        if (personalityIndex >= 1 && personalityIndex <= PERSONALITY_OPTIONS.length) {
+          const selectedPersonality = PERSONALITY_OPTIONS[personalityIndex - 1].value as any;
+          setState((prev) => ({
+            ...prev,
+            answers: { ...prev.answers, personality: selectedPersonality },
+            step: 'additional-info',
+          }));
+          addMessage('assistant', `Perfeito! Personalidade "${PERSONALITY_OPTIONS[personalityIndex - 1].label}" selecionada. 😊`);
+          addMessage('assistant', 'Tem alguma informação adicional que você gostaria que eu soubesse sobre sua empresa?');
+          addMessage('assistant', 'Por exemplo: produtos especiais, diferenciais, valores, missão, etc.');
+          addMessage('assistant', '(Se não tiver nada adicional, digite "não" ou "pular")');
         } else {
-          addMessage('assistant', 'Por favor, responda "sim" ou "não":');
+          addMessage('assistant', 'Por favor, escolha um número de 1 a 8:');
+        }
+        break;
+
+      case 'additional-info':
+        if (trimmedMessage.includes('não') || trimmedMessage.includes('nao') || trimmedMessage.includes('pular') || trimmedMessage.includes('n')) {
+          setState((prev) => ({
+            ...prev,
+            answers: { ...prev.answers, additionalInfo: '' },
+            step: 'review',
+          }));
+          showReview();
+        } else {
+          setState((prev) => ({
+            ...prev,
+            answers: { ...prev.answers, additionalInfo: message.trim() },
+            step: 'review',
+          }));
+          addMessage('assistant', 'Ótimo! Informação registrada. ✅');
+          showReview();
         }
         break;
     }
-  };
-
-  const handleAddRule = () => {
-    if (!currentRule.question.trim() || !currentRule.answer.trim()) {
-      toast.error('Preencha pergunta e resposta');
-      return;
-    }
-
-    const newRule: Rule = {
-      id: Date.now().toString(),
-      question: currentRule.question.trim(),
-      answer: currentRule.answer.trim(),
-    };
-
-    setState((prev) => ({
-      ...prev,
-      answers: {
-        ...prev.answers,
-        rules: [...prev.answers.rules, newRule],
-      },
-    }));
-
-    addMessage('assistant', `✅ Regra adicionada!\n\n**Pergunta:** ${currentRule.question}\n**Resposta:** ${currentRule.answer}`);
-    addMessage('assistant', 'Deseja adicionar mais regras? (sim/não)');
-
-    setCurrentRule({ question: '', answer: '' });
-    setShowRuleForm(false);
-  };
-
-  const handleSkipRule = () => {
-    setShowRuleForm(false);
-    addMessage('assistant', 'Sem problemas! Você pode adicionar regras depois nas configurações.');
-    handleNextStep();
   };
 
   const showReview = () => {
-    addMessage('assistant', '📋 Vamos revisar suas configurações:\n\n');
+    addMessage('assistant', '📋 Perfeito! Vamos revisar tudo que você me contou:\n\n');
+    
     addMessage('assistant', `**Empresa:** ${state.answers.businessName}`);
     if (state.answers.businessType) {
       addMessage('assistant', `**Ramo:** ${state.answers.businessType}`);
     }
-    if (state.answers.address) {
-      addMessage('assistant', `**Endereço:** ${state.answers.address}`);
+    if (state.answers.street || state.answers.city) {
+      const addressParts = [];
+      if (state.answers.street) addressParts.push(state.answers.street);
+      if (state.answers.neighborhood) addressParts.push(state.answers.neighborhood);
+      if (state.answers.city) addressParts.push(state.answers.city);
+      if (state.answers.state) addressParts.push(state.answers.state);
+      if (state.answers.zipCode) addressParts.push(`CEP: ${state.answers.zipCode}`);
+      addMessage('assistant', `**Endereço:** ${addressParts.join(', ')}`);
+    }
+    if (state.answers.serviceArea) {
+      const areaText = state.answers.serviceArea === 'city' ? 'Apenas na cidade' : state.answers.serviceArea === 'state' ? 'Todo o estado' : 'Todo o Brasil';
+      addMessage('assistant', `**Área de atendimento:** ${areaText}`);
     }
     if (state.answers.phone) {
       addMessage('assistant', `**Telefone:** ${state.answers.phone}`);
     }
-    const toneNames = {
-      professional: 'Profissional e técnico',
-      friendly: 'Amigável e descontraído',
-      casual: 'Casual e próximo',
-      formal: 'Formal e respeitoso',
-    };
-    addMessage('assistant', `**Tom de voz:** ${toneNames[state.answers.tone as keyof typeof toneNames] || state.answers.tone}`);
-    if (state.answers.rules.length > 0) {
-      addMessage('assistant', `**Regras personalizadas:** ${state.answers.rules.length} regra(s) configurada(s)`);
+    if (state.answers.businessHours) {
+      addMessage('assistant', `**Horário:** ${state.answers.businessHours}`);
     }
-    addMessage('assistant', '\n✅ Tudo certo? Vou gerar o prompt do sistema agora! 🚀');
+    if (state.answers.paymentMethods.length > 0) {
+      addMessage('assistant', `**Formas de pagamento:** ${state.answers.paymentMethods.join(', ')}`);
+    }
+    if (state.answers.personality) {
+      const personality = PERSONALITY_OPTIONS.find(p => p.value === state.answers.personality);
+      addMessage('assistant', `**Personalidade:** ${personality?.label || state.answers.personality}`);
+    }
+    if (state.answers.additionalInfo) {
+      addMessage('assistant', `**Informações adicionais:** ${state.answers.additionalInfo}`);
+    }
+    
+    addMessage('assistant', '\n✅ Está tudo certo? Vou gerar o prompt do sistema agora! 🚀');
   };
 
   const handleGenerate = () => {
@@ -300,10 +391,17 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
     generatePromptMutation.mutate({
       businessName: state.answers.businessName,
       businessType: state.answers.businessType || undefined,
-      address: state.answers.address || undefined,
+      street: state.answers.street || undefined,
+      neighborhood: state.answers.neighborhood || undefined,
+      city: state.answers.city || undefined,
+      state: state.answers.state || undefined,
+      zipCode: state.answers.zipCode || undefined,
+      serviceArea: state.answers.serviceArea || undefined,
       phone: state.answers.phone || undefined,
-      tone: state.answers.tone || 'professional',
-      rules: state.answers.rules.map((r) => ({ question: r.question, answer: r.answer })),
+      businessHours: state.answers.businessHours || undefined,
+      paymentMethods: state.answers.paymentMethods.length > 0 ? state.answers.paymentMethods : undefined,
+      personality: state.answers.personality || 'professional',
+      additionalInfo: state.answers.additionalInfo || undefined,
     });
   };
 
@@ -352,78 +450,58 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Rule Form */}
-        {showRuleForm && (
+        {/* Payment Methods Selection */}
+        {showPaymentSelection && state.step === 'payment-methods' && (
           <div className="mb-4 p-4 border rounded-lg bg-muted/50">
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="font-semibold">Adicionar Regra Personalizada</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSkipRule}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <Input
-                placeholder="Pergunta (ex: Qual o horário de funcionamento?)"
-                value={currentRule.question}
-                onChange={(e) => setCurrentRule((prev) => ({ ...prev, question: e.target.value }))}
-              />
-              <Textarea
-                placeholder="Resposta (ex: Funcionamos de segunda a sexta, das 9h às 18h)"
-                value={currentRule.answer}
-                onChange={(e) => setCurrentRule((prev) => ({ ...prev, answer: e.target.value }))}
-                rows={3}
-              />
-              <div className="flex gap-2">
-                <Button onClick={handleAddRule} size="sm">
-                  Adicionar Regra
-                </Button>
-                <Button onClick={handleSkipRule} variant="outline" size="sm">
-                  Pular
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Rules List */}
-        {state.answers.rules.length > 0 && (
-          <div className="mb-4 p-4 border rounded-lg">
-            <h4 className="font-semibold mb-2">Regras Adicionadas ({state.answers.rules.length})</h4>
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {state.answers.rules.map((rule) => (
-                <div key={rule.id} className="flex justify-between items-start p-2 bg-background rounded border text-sm">
-                  <div className="flex-1">
-                    <p className="font-medium">Q: {rule.question}</p>
-                    <p className="text-muted-foreground">R: {rule.answer}</p>
-                  </div>
+            <h4 className="font-semibold mb-2">Selecione as formas de pagamento:</h4>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {PAYMENT_METHODS.map((method, idx) => {
+                const isSelected = state.answers.paymentMethods.includes(method);
+                return (
                   <Button
-                    variant="ghost"
+                    key={idx}
+                    variant={isSelected ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => {
-                      setState((prev) => ({
+                      const newMethods = isSelected
+                        ? state.answers.paymentMethods.filter(m => m !== method)
+                        : [...state.answers.paymentMethods, method];
+                      setState(prev => ({
                         ...prev,
-                        answers: {
-                          ...prev.answers,
-                          rules: prev.answers.rules.filter((r) => r.id !== rule.id),
-                        },
+                        answers: { ...prev.answers, paymentMethods: newMethods }
                       }));
-                      toast.success('Regra removida');
                     }}
                   >
-                    <X className="h-4 w-4" />
+                    {isSelected && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {method}
                   </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            <Button
+              onClick={() => {
+                if (state.answers.paymentMethods.length > 0) {
+                  setShowPaymentSelection(false);
+                  setState(prev => ({ ...prev, step: 'personality' }));
+                  addMessage('assistant', `Ótimo! Formas de pagamento: ${state.answers.paymentMethods.join(', ')}. ✅`);
+                  addMessage('assistant', 'Agora vamos definir a personalidade do seu agente!');
+                  addMessage('assistant', 'Como você quer que ele se comunique com seus clientes?');
+                  addMessage('assistant', 'Escolha uma opção (digite o número):');
+                  addMessage('assistant', PERSONALITY_OPTIONS.map((opt, idx) => `${idx + 1}. ${opt.label} - ${opt.description}`).join('\n'));
+                } else {
+                  toast.error('Selecione pelo menos uma forma de pagamento');
+                }
+              }}
+              size="sm"
+              className="w-full"
+            >
+              Continuar
+            </Button>
           </div>
         )}
 
         {/* Input */}
-        {state.step !== 'review' && state.step !== 'complete' && (
+        {state.step !== 'review' && state.step !== 'complete' && !showPaymentSelection && (
           <div className="flex gap-2">
             <Input
               value={userInput}
@@ -477,4 +555,3 @@ export default function AgentConfigAssistant({ onComplete }: { onComplete: () =>
     </Card>
   );
 }
-

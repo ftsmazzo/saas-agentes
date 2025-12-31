@@ -1771,13 +1771,33 @@ export const appRouter = router({
       .input(z.object({
         businessName: z.string().min(1, "Nome da empresa é obrigatório"),
         businessType: z.string().optional(),
-        address: z.string().optional(),
+        // Endereço completo
+        street: z.string().optional(),
+        neighborhood: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        zipCode: z.string().optional(),
+        // Área de atendimento
+        serviceArea: z.enum(['city', 'state', 'country']).optional(),
+        // Telefone formatado
         phone: z.string().optional(),
-        tone: z.enum(['professional', 'friendly', 'casual', 'formal']).optional(),
-        rules: z.array(z.object({
-          question: z.string(),
-          answer: z.string(),
-        })).optional(),
+        // Horário de funcionamento
+        businessHours: z.string().optional(),
+        // Formas de pagamento
+        paymentMethods: z.array(z.string()).optional(),
+        // Personalidade do agente
+        personality: z.enum([
+          'professional', 
+          'friendly', 
+          'casual', 
+          'formal',
+          'consultative',
+          'empathetic',
+          'energetic',
+          'calm'
+        ]).optional(),
+        // Informações adicionais
+        additionalInfo: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const tenant = ctx.tenant;
@@ -1785,32 +1805,81 @@ export const appRouter = router({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
         }
 
-        // Construir prompt para OpenAI
-        const systemPromptTemplate = `Você é um especialista em criar prompts de sistema para agentes de IA de atendimento.
+        // Verificar se já existe configuração
+        const existingConfig = await db.getAgentConfig(tenant.id);
+        const isUpdate = !!existingConfig;
 
-Crie um prompt de sistema completo, profissional e detalhado para um agente de atendimento virtual da empresa "${input.businessName}".
+        // Construir endereço completo
+        const addressParts = [];
+        if (input.street) addressParts.push(input.street);
+        if (input.neighborhood) addressParts.push(input.neighborhood);
+        if (input.city) addressParts.push(input.city);
+        if (input.state) addressParts.push(input.state);
+        if (input.zipCode) addressParts.push(`CEP: ${input.zipCode}`);
+        const fullAddress = addressParts.join(', ');
 
-${input.businessType ? `**Ramo de atividade:** ${input.businessType}` : ''}
-${input.address ? `**Endereço:** ${input.address}` : ''}
-${input.phone ? `**Telefone:** ${input.phone}` : ''}
-${input.tone ? `**Tom de voz:** ${input.tone === 'professional' ? 'Profissional e técnico' : input.tone === 'friendly' ? 'Amigável e descontraído' : input.tone === 'casual' ? 'Casual e próximo' : 'Formal e respeitoso'}` : 'Profissional'}
+        // Construir área de atendimento
+        const serviceAreaText = input.serviceArea === 'city' 
+          ? (input.city ? `apenas na cidade de ${input.city}` : 'apenas na sua cidade')
+          : input.serviceArea === 'state'
+          ? (input.state ? `em todo o estado de ${input.state}` : 'em todo o seu estado')
+          : input.serviceArea === 'country'
+          ? 'em todo o Brasil'
+          : '';
 
-${input.rules && input.rules.length > 0 ? `
-**Regras específicas de resposta:**
-${input.rules.map((r, idx) => `${idx + 1}. Se o cliente perguntar "${r.question}", você DEVE responder: "${r.answer}"`).join('\n')}
-` : ''}
+        // Construir prompt para OpenAI baseado no exemplo CaduIA mas adaptado para venda/orientação
+        const systemPromptTemplate = `Você é um especialista em criar prompts de sistema robustos e detalhados para agentes de IA de atendimento ao cliente, vendas e orientação.
 
-**Requisitos do prompt:**
-1. Defina claramente a identidade do agente (nome, papel, propósito)
-2. Estabeleça o tom de voz de forma consistente (${input.tone || 'profissional'})
-3. Inclua informações relevantes da empresa quando apropriado
-4. ${input.rules && input.rules.length > 0 ? 'Inclua TODAS as regras específicas listadas acima' : 'Seja objetivo e direto'}
-5. Instrua o agente a ser prestativo, educado e eficiente
-6. Mantenha respostas em português brasileiro
-7. Seja claro sobre quando transferir para atendimento humano (se necessário)
-8. O prompt deve ter entre 300-800 palavras
+Crie um prompt de sistema completo, profissional e altamente detalhado seguindo a estrutura do exemplo abaixo, mas adaptado para um agente de atendimento/vendas da empresa "${input.businessName}".
 
-**IMPORTANTE:** Retorne APENAS o prompt de sistema final, sem explicações, sem markdown, sem comentários. Apenas o texto do prompt que será usado diretamente.`;
+**INFORMAÇÕES DA EMPRESA:**
+${input.businessType ? `- Ramo de atividade: ${input.businessType}` : ''}
+${fullAddress ? `- Endereço completo: ${fullAddress}` : ''}
+${input.phone ? `- Telefone de contato: ${input.phone}` : ''}
+${serviceAreaText ? `- Área de atendimento: ${serviceAreaText}` : ''}
+${input.businessHours ? `- Horário de funcionamento: ${input.businessHours}` : ''}
+${input.paymentMethods && input.paymentMethods.length > 0 ? `- Formas de pagamento aceitas: ${input.paymentMethods.join(', ')}` : ''}
+${input.additionalInfo ? `- Informações adicionais: ${input.additionalInfo}` : ''}
+
+**PERSONALIDADE DO AGENTE:**
+${input.personality === 'professional' ? 'Profissional, técnico e objetivo. Foca em eficiência e precisão.' : ''}
+${input.personality === 'friendly' ? 'Amigável, descontraído e acolhedor. Cria conexão emocional com o cliente.' : ''}
+${input.personality === 'casual' ? 'Casual, próximo e descontraído. Comunicação informal mas respeitosa.' : ''}
+${input.personality === 'formal' ? 'Formal, respeitoso e cerimonioso. Mantém distância profissional adequada.' : ''}
+${input.personality === 'consultative' ? 'Consultivo, analítico e orientador. Foca em entender necessidades e oferecer soluções.' : ''}
+${input.personality === 'empathetic' ? 'Empático, compreensivo e acolhedor. Prioriza o bem-estar emocional do cliente.' : ''}
+${input.personality === 'energetic' ? 'Energético, entusiasmado e motivador. Transmite energia positiva e dinamismo.' : ''}
+${input.personality === 'calm' ? 'Calmo, sereno e paciente. Transmite tranquilidade e confiança.' : ''}
+
+**ESTRUTURA DO PROMPT (baseada no exemplo CaduIA, adaptada para venda/orientação):**
+
+1. **Identidade e Propósito** - Defina claramente quem é o agente, seu nome, papel e propósito principal (atendimento, vendas, suporte, orientação)
+
+2. **Contexto e Conhecimento** - Inclua informações relevantes da empresa, produtos/serviços, área de atuação, horários, formas de pagamento
+
+3. **Responsabilidades e Tarefas** - Liste claramente o que o agente deve fazer (responder dúvidas, apresentar produtos, agendar, orientar, etc.)
+
+4. **Diretrizes de Comportamento** - Estabeleça como o agente deve se comportar, tom de voz, nível de formalidade, abordagem
+
+5. **Regras e Restrições** - Defina o que o agente DEVE e NÃO DEVE fazer
+
+6. **Fluxo de Trabalho** - Descreva como o agente deve processar diferentes tipos de perguntas (dúvidas, pedidos, reclamações, etc.)
+
+7. **Tratamento de Casos Especiais** - Como lidar com situações específicas (cliente insatisfeito, dúvidas complexas, pedidos especiais, etc.)
+
+8. **Formato de Saída** - Como o agente deve estruturar suas respostas (discursivo, para venda/orientação, não técnico como o exemplo)
+
+**REQUISITOS ESPECÍFICOS:**
+- O prompt deve ser robusto, detalhado e com rigor técnico (como o exemplo CaduIA)
+- Adaptado para venda/orientação (não análise técnica)
+- Respostas devem ser discursivas, humanizadas e focadas em ajudar/vender
+- Inclua todas as informações da empresa fornecidas
+- Mantenha consistência na personalidade escolhida
+- O prompt deve ter entre 800-1500 palavras (mais robusto que antes)
+- Seja específico sobre quando usar tools (se aplicável)
+- Inclua instruções sobre gestão de contexto em conversas
+
+**IMPORTANTE:** Retorne APENAS o prompt de sistema final, sem explicações, sem markdown, sem comentários. Apenas o texto puro do prompt que será usado diretamente.`;
 
         // Chamar OpenAI
         const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -1829,11 +1898,11 @@ ${input.rules.map((r, idx) => `${idx + 1}. Se o cliente perguntar "${r.question}
               'Authorization': `Bearer ${openaiApiKey}`,
             },
             body: JSON.stringify({
-              model: 'gpt-4o', // Use 'gpt-4o-mini' para economizar
+              model: 'gpt-4o',
               messages: [
                 {
                   role: 'system',
-                  content: 'Você é um especialista em criar prompts de sistema para agentes de IA. Retorne APENAS o prompt final, sem explicações, sem markdown, sem comentários. Apenas o texto puro do prompt.',
+                  content: 'Você é um especialista em criar prompts de sistema robustos e detalhados para agentes de IA. Retorne APENAS o prompt final, sem explicações, sem markdown, sem comentários. Apenas o texto puro do prompt.',
                 },
                 {
                   role: 'user',
@@ -1841,7 +1910,7 @@ ${input.rules.map((r, idx) => `${idx + 1}. Se o cliente perguntar "${r.question}
                 },
               ],
               temperature: 0.7,
-              max_tokens: 2000,
+              max_tokens: 3000, // Aumentado para prompts mais robustos
             }),
           });
 
@@ -1854,31 +1923,51 @@ ${input.rules.map((r, idx) => `${idx + 1}. Se o cliente perguntar "${r.question}
           const data = await response.json();
           const generatedPrompt = data.choices[0].message.content.trim();
 
-          // Salvar configurações no banco
+          // Salvar configurações no banco com todos os dados
           const companyInfo = JSON.stringify({
             name: input.businessName,
             type: input.businessType || '',
-            address: input.address || '',
+            street: input.street || '',
+            neighborhood: input.neighborhood || '',
+            city: input.city || '',
+            state: input.state || '',
+            zipCode: input.zipCode || '',
+            fullAddress: fullAddress || '',
+            serviceArea: input.serviceArea || '',
             phone: input.phone || '',
+            businessHours: input.businessHours || '',
+            paymentMethods: input.paymentMethods || [],
+            personality: input.personality || 'professional',
+            additionalInfo: input.additionalInfo || '',
           });
 
-          await db.updateAgentConfig(tenant.id, {
-            systemPrompt: generatedPrompt,
-            companyInfo: companyInfo,
-            welcomeMessage: `Olá! Sou o assistente virtual da ${input.businessName}. Como posso ajudar você hoje?`,
-          });
+          // Se já existe config, atualizar. Se não, criar.
+          if (isUpdate) {
+            await db.updateAgentConfig(tenant.id, {
+              systemPrompt: generatedPrompt,
+              companyInfo: companyInfo,
+              welcomeMessage: `Olá! Sou o assistente virtual da ${input.businessName}. Como posso ajudar você hoje?`,
+            });
+          } else {
+            await db.createAgentConfig({
+              tenantId: tenant.id,
+              systemPrompt: generatedPrompt,
+              companyInfo: companyInfo,
+              welcomeMessage: `Olá! Sou o assistente virtual da ${input.businessName}. Como posso ajudar você hoje?`,
+            });
+          }
 
           await db.createPlatformLog({
             tenantId: tenant.id,
             eventType: 'config_updated',
             severity: 'info',
-            message: 'Configuração do agente gerada via Assistente de IA',
+            message: `Configuração do agente ${isUpdate ? 'atualizada' : 'criada'} via Assistente de IA`,
           });
 
           return {
             systemPrompt: generatedPrompt,
             success: true,
-            message: 'Configurações geradas e salvas com sucesso!',
+            message: `Configurações ${isUpdate ? 'atualizadas' : 'geradas'} e salvas com sucesso!`,
           };
         } catch (error: any) {
           console.error('[OpenAI] Erro ao gerar prompt:', error);
