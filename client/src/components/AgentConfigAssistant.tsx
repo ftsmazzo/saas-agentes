@@ -107,8 +107,14 @@ export default function AgentConfigAssistant({
   useEffect(() => {
     if (messages.length === 0) {
       if (existingConfig?.systemPrompt) {
-        addMessage('assistant', `Olá! 👋 Vejo que você já tem um agente configurado. Posso ajudar você a atualizar as configurações. O que você gostaria de alterar?`);
-        addMessage('assistant', 'Você pode me dizer o que quer mudar ou podemos revisar tudo do zero. O que prefere?');
+        addMessage('assistant', `Olá! 👋 Vejo que você já tem um agente configurado.`);
+        addMessage('assistant', 'Posso ajudar você a atualizar as configurações. Vou carregar os dados atuais e você pode me dizer o que quer alterar.');
+        addMessage('assistant', 'Vamos revisar tudo passo a passo. Está pronto? 😊');
+        // Pular direto para revisão se já tem config
+        setTimeout(() => {
+          setState(prev => ({ ...prev, step: 'review' }));
+          showReview();
+        }, 2000);
       } else {
         addMessage('assistant', 'Olá! 👋 Que bom ter você aqui!');
         addMessage('assistant', 'Vou te ajudar a criar seu agente de IA de forma personalizada. Vamos fazer isso juntos, passo a passo, de forma bem natural.');
@@ -156,9 +162,15 @@ export default function AgentConfigAssistant({
     switch (state.step) {
       case 'welcome':
         if (trimmedMessage.includes('sim') || trimmedMessage.includes('s') || trimmedMessage.includes('vamos') || trimmedMessage === 'ok' || trimmedMessage.includes('pronto')) {
-          setState((prev) => ({ ...prev, step: 'business-name' }));
-          addMessage('assistant', 'Ótimo! Vamos começar! 🚀');
-          addMessage('assistant', 'Primeiro, qual o nome da sua empresa ou negócio?');
+          // Se já tem config, ir direto para revisão
+          if (existingConfig?.systemPrompt) {
+            setState((prev) => ({ ...prev, step: 'review' }));
+            showReview();
+          } else {
+            setState((prev) => ({ ...prev, step: 'business-name' }));
+            addMessage('assistant', 'Ótimo! Vamos começar! 🚀');
+            addMessage('assistant', 'Primeiro, qual o nome da sua empresa ou negócio?');
+          }
         } else {
           addMessage('assistant', 'Sem pressa! Quando estiver pronto, digite "sim" ou "ok" para começar. 😊');
         }
@@ -347,43 +359,54 @@ export default function AgentConfigAssistant({
   };
 
   const showReview = () => {
-    addMessage('assistant', '📋 Perfeito! Vamos revisar tudo que você me contou:\n\n');
+    const hasData = state.answers.businessName || existingConfig?.systemPrompt;
     
-    addMessage('assistant', `**Empresa:** ${state.answers.businessName}`);
-    if (state.answers.businessType) {
-      addMessage('assistant', `**Ramo:** ${state.answers.businessType}`);
+    if (hasData) {
+      addMessage('assistant', '📋 Vamos revisar suas configurações:\n\n');
+      
+      if (state.answers.businessName) {
+        addMessage('assistant', `**Empresa:** ${state.answers.businessName}`);
+      }
+      if (state.answers.businessType) {
+        addMessage('assistant', `**Ramo:** ${state.answers.businessType}`);
+      }
+      if (state.answers.street || state.answers.city) {
+        const addressParts = [];
+        if (state.answers.street) addressParts.push(state.answers.street);
+        if (state.answers.neighborhood) addressParts.push(state.answers.neighborhood);
+        if (state.answers.city) addressParts.push(state.answers.city);
+        if (state.answers.state) addressParts.push(state.answers.state);
+        if (state.answers.zipCode) addressParts.push(`CEP: ${state.answers.zipCode}`);
+        if (addressParts.length > 0) {
+          addMessage('assistant', `**Endereço:** ${addressParts.join(', ')}`);
+        }
+      }
+      if (state.answers.serviceArea) {
+        const areaText = state.answers.serviceArea === 'city' ? 'Apenas na cidade' : state.answers.serviceArea === 'state' ? 'Todo o estado' : 'Todo o Brasil';
+        addMessage('assistant', `**Área de atendimento:** ${areaText}`);
+      }
+      if (state.answers.phone) {
+        addMessage('assistant', `**Telefone:** ${state.answers.phone}`);
+      }
+      if (state.answers.businessHours) {
+        addMessage('assistant', `**Horário:** ${state.answers.businessHours}`);
+      }
+      if (state.answers.paymentMethods.length > 0) {
+        addMessage('assistant', `**Formas de pagamento:** ${state.answers.paymentMethods.join(', ')}`);
+      }
+      if (state.answers.personality) {
+        const personality = PERSONALITY_OPTIONS.find(p => p.value === state.answers.personality);
+        addMessage('assistant', `**Personalidade:** ${personality?.label || state.answers.personality}`);
+      }
+      if (state.answers.additionalInfo) {
+        addMessage('assistant', `**Informações adicionais:** ${state.answers.additionalInfo}`);
+      }
+      
+      addMessage('assistant', '\n✅ Está tudo certo? Vou gerar o prompt do sistema agora! 🚀');
+    } else {
+      addMessage('assistant', 'Vamos começar do zero! Qual o nome da sua empresa ou negócio?');
+      setState(prev => ({ ...prev, step: 'business-name' }));
     }
-    if (state.answers.street || state.answers.city) {
-      const addressParts = [];
-      if (state.answers.street) addressParts.push(state.answers.street);
-      if (state.answers.neighborhood) addressParts.push(state.answers.neighborhood);
-      if (state.answers.city) addressParts.push(state.answers.city);
-      if (state.answers.state) addressParts.push(state.answers.state);
-      if (state.answers.zipCode) addressParts.push(`CEP: ${state.answers.zipCode}`);
-      addMessage('assistant', `**Endereço:** ${addressParts.join(', ')}`);
-    }
-    if (state.answers.serviceArea) {
-      const areaText = state.answers.serviceArea === 'city' ? 'Apenas na cidade' : state.answers.serviceArea === 'state' ? 'Todo o estado' : 'Todo o Brasil';
-      addMessage('assistant', `**Área de atendimento:** ${areaText}`);
-    }
-    if (state.answers.phone) {
-      addMessage('assistant', `**Telefone:** ${state.answers.phone}`);
-    }
-    if (state.answers.businessHours) {
-      addMessage('assistant', `**Horário:** ${state.answers.businessHours}`);
-    }
-    if (state.answers.paymentMethods.length > 0) {
-      addMessage('assistant', `**Formas de pagamento:** ${state.answers.paymentMethods.join(', ')}`);
-    }
-    if (state.answers.personality) {
-      const personality = PERSONALITY_OPTIONS.find(p => p.value === state.answers.personality);
-      addMessage('assistant', `**Personalidade:** ${personality?.label || state.answers.personality}`);
-    }
-    if (state.answers.additionalInfo) {
-      addMessage('assistant', `**Informações adicionais:** ${state.answers.additionalInfo}`);
-    }
-    
-    addMessage('assistant', '\n✅ Está tudo certo? Vou gerar o prompt do sistema agora! 🚀');
   };
 
   const handleGenerate = () => {
@@ -532,24 +555,31 @@ export default function AgentConfigAssistant({
 
         {/* Generate Button */}
         {state.step === 'review' && (
-          <Button
-            onClick={handleGenerate}
-            disabled={isProcessing}
-            className="w-full"
-            size="lg"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Gerar e Salvar Configurações
-              </>
+          <div className="space-y-2">
+            <Button
+              onClick={handleGenerate}
+              disabled={isProcessing || !state.answers.businessName}
+              className="w-full"
+              size="lg"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {existingConfig?.systemPrompt ? 'Atualizar Configurações' : 'Gerar e Salvar Configurações'}
+                </>
+              )}
+            </Button>
+            {!state.answers.businessName && (
+              <p className="text-sm text-muted-foreground text-center">
+                Por favor, preencha pelo menos o nome da empresa antes de gerar.
+              </p>
             )}
-          </Button>
+          </div>
         )}
       </CardContent>
     </Card>
