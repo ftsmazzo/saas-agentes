@@ -46,13 +46,27 @@ async function startServer() {
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
   
   // N8N webhook - recebe dados do workflow
+  // IMPORTANTE: Registrar ANTES do body parser global para garantir que seja processado
   const { handleN8NWebhook } = await import("../webhooks/n8n");
-  app.post("/api/webhooks/n8n/:tenantId", express.json(), handleN8NWebhook);
+  app.post("/api/webhooks/n8n/:tenantId", express.json({ limit: "50mb" }), handleN8NWebhook);
   console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/:tenantId");
   
   // Configure body parser with larger size limit for file uploads
+  // NOTA: N8N webhook já tem seu próprio body parser acima
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  
+  // Handler 404 para rotas de API não encontradas (DEPOIS de todas as rotas de API)
+  app.use("/api/*", (req, res) => {
+    console.error(`[404] ❌ Rota de API não encontrada: ${req.method} ${req.originalUrl}`);
+    console.error(`[404] 📍 Params:`, req.params);
+    console.error(`[404] 🔗 Query:`, req.query);
+    res.status(404).json({ 
+      message: `Route ${req.method}:${req.originalUrl} not found`,
+      error: "Not Found",
+      statusCode: 404
+    });
+  });
   // Health check endpoint (para Docker/EasyPanel)
   app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
@@ -66,18 +80,6 @@ async function startServer() {
       createContext,
     })
   );
-  
-  // Handler 404 para rotas de API não encontradas (antes do serveStatic)
-  app.use("/api/*", (req, res) => {
-    console.error(`[404] ❌ Rota de API não encontrada: ${req.method} ${req.originalUrl}`);
-    console.error(`[404] 📍 Params:`, req.params);
-    console.error(`[404] 🔗 Query:`, req.query);
-    res.status(404).json({ 
-      message: `Route ${req.method}:${req.originalUrl} not found`,
-      error: "Not Found",
-      statusCode: 404
-    });
-  });
   
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
