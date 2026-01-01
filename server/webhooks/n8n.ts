@@ -9,11 +9,17 @@ import { calculateCost, recordUsageTransaction, UsageData } from "../credit-syst
  */
 export async function handleN8NWebhook(req: Request, res: Response) {
   try {
+    console.log(`[N8N Webhook] 📥 Recebido: ${req.method} ${req.originalUrl}`);
+    console.log(`[N8N Webhook] 📦 Body:`, JSON.stringify(req.body, null, 2));
+    
     const tenantId = parseInt(req.params.tenantId);
     
     if (!tenantId || isNaN(tenantId)) {
+      console.error(`[N8N Webhook] ❌ tenantId inválido: ${req.params.tenantId}`);
       return res.status(400).json({ error: "tenantId inválido" });
     }
+    
+    console.log(`[N8N Webhook] ✅ tenantId válido: ${tenantId}`);
 
     // Validar payload
     const payloadSchema = z.object({
@@ -25,6 +31,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         "error",
         "metrics",
         "usage_tracking", // Novo: rastreamento de consumo OpenAI
+        "usage_tracking_batch", // Processamento em lote
       ]),
       data: z.any(),
       timestamp: z.string().optional(),

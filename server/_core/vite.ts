@@ -98,7 +98,13 @@ function serveFromPath(app: Express, distPath: string) {
 
   // fall through to index.html if the file doesn't exist
   // IMPORTANTE: Sempre servir index.html sem cache para garantir atualizações
-  app.use("*", (_req, res) => {
+  // CRÍTICO: Não capturar rotas de API - elas devem ser processadas antes
+  app.use("*", (req, res, next) => {
+    // Se for rota de API, não processar aqui - deixar passar para as rotas de API
+    if (req.originalUrl.startsWith("/api/")) {
+      return next();
+    }
+    
     const indexPath = path.resolve(distPath, "index.html");
     if (!fs.existsSync(indexPath)) {
       console.error(`❌ index.html não encontrado em: ${indexPath}`);
