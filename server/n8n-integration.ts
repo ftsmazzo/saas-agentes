@@ -437,7 +437,13 @@ export async function updateModelInWorkflow(
       // 2. Nodes do tipo openAi (para análise de imagem, formatação, etc)
       if (node.type === '@n8n/n8n-nodes-langchain.openAi') {
         if (node.parameters) {
-          // Se tiver modelId, atualizar
+          // NÃO atualizar nodes de transcrição de áudio (Whisper)
+          if (node.parameters.resource === 'audio' && node.parameters.operation === 'transcribe') {
+            console.log(`[N8N] ⏭️ Node "${node.name}" é de transcrição de áudio, mantendo modelo original`);
+            return node; // Não alterar
+          }
+
+          // Atualizar análise de imagem e outros usos
           if (node.parameters.modelId) {
             if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
               node.parameters.modelId.value = model;
@@ -481,6 +487,7 @@ export async function updateModelInWorkflow(
     }
 
     // Atualizar workflow
+    // IMPORTANTE: 'active' é read-only no N8N 2.1.4+, não incluir no payload
     const updatePayload: any = {
       name: workflow.name,
       nodes: updatedNodes,
@@ -489,15 +496,18 @@ export async function updateModelInWorkflow(
       staticData: workflow.staticData,
     };
 
-    // Manter published/active se existir
+    // Manter apenas published (active é read-only e não pode ser incluído)
     if (workflow.published !== undefined) {
       updatePayload.published = workflow.published;
     }
-    if (workflow.active !== undefined) {
-      updatePayload.active = workflow.active;
-    }
+    // NÃO incluir active - é read-only e causa erro
 
     await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
+
+    // Verificar se workflow precisa ser republicado após atualização
+    if (workflow.published === true) {
+      console.log(`[N8N] 📋 Workflow estava publicado, mantendo estado publicado`);
+    }
 
     console.log(`[N8N] ✅ Modelo atualizado em ${updatedCount} node(s) do workflow ${workflowId}`);
     return true;
