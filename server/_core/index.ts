@@ -56,17 +56,6 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   
-  // Handler 404 para rotas de API não encontradas (DEPOIS de todas as rotas de API)
-  app.use("/api/*", (req, res) => {
-    console.error(`[404] ❌ Rota de API não encontrada: ${req.method} ${req.originalUrl}`);
-    console.error(`[404] 📍 Params:`, req.params);
-    console.error(`[404] 🔗 Query:`, req.query);
-    res.status(404).json({ 
-      message: `Route ${req.method}:${req.originalUrl} not found`,
-      error: "Not Found",
-      statusCode: 404
-    });
-  });
   // Health check endpoint (para Docker/EasyPanel)
   app.get("/api/health", (req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
@@ -80,6 +69,18 @@ async function startServer() {
       createContext,
     })
   );
+  
+  // Handler 404 para rotas de API não encontradas (DEPOIS de TODAS as rotas de API)
+  app.use("/api/*", (req, res) => {
+    console.error(`[404] ❌ Rota de API não encontrada: ${req.method} ${req.originalUrl}`);
+    console.error(`[404] 📍 Params:`, req.params);
+    console.error(`[404] 🔗 Query:`, req.query);
+    res.status(404).json({ 
+      message: `Route ${req.method}:${req.originalUrl} not found`,
+      error: "Not Found",
+      statusCode: 404
+    });
+  });
   
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
