@@ -399,7 +399,10 @@ export async function syncAgentConfigToN8N(
 
 /**
  * Atualiza modelo OpenAI no workflow N8N
- * Atualiza todos os nodes do tipo lmChatOpenAi
+ * Atualiza todos os nodes que usam modelos OpenAI:
+ * - @n8n/n8n-nodes-langchain.lmChatOpenAi (modelo principal do agente)
+ * - @n8n/n8n-nodes-langchain.openAi (para análise de imagem, etc)
+ * - Nodes com modelId em parameters
  */
 export async function updateModelInWorkflow(
   workflowId: string,
@@ -417,21 +420,63 @@ export async function updateModelInWorkflow(
       return false;
     }
 
-    // Atualizar todos os nodes do tipo lmChatOpenAi
+    // Atualizar todos os nodes que usam modelos OpenAI
     let updatedCount = 0;
     const updatedNodes = workflow.nodes.map((node: any) => {
+      let nodeUpdated = false;
+
+      // 1. Nodes do tipo lmChatOpenAi (modelo principal do agente)
       if (node.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi') {
         if (node.parameters) {
           node.parameters.model = model;
-          updatedCount++;
-          console.log(`[N8N] ✅ Node "${node.name}" atualizado para modelo ${model}`);
+          nodeUpdated = true;
+          console.log(`[N8N] ✅ Node "${node.name}" (lmChatOpenAi) atualizado para modelo ${model}`);
         }
       }
+
+      // 2. Nodes do tipo openAi (para análise de imagem, formatação, etc)
+      if (node.type === '@n8n/n8n-nodes-langchain.openAi') {
+        if (node.parameters) {
+          // Se tiver modelId, atualizar
+          if (node.parameters.modelId) {
+            if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
+              node.parameters.modelId.value = model;
+            } else {
+              node.parameters.modelId = model;
+            }
+            nodeUpdated = true;
+            console.log(`[N8N] ✅ Node "${node.name}" (openAi) atualizado para modelo ${model}`);
+          }
+          // Se tiver model diretamente, atualizar também
+          if (node.parameters.model) {
+            node.parameters.model = model;
+            nodeUpdated = true;
+          }
+        }
+      }
+
+      // 3. Nodes com modelId em parameters (análise de imagem, etc)
+      if (node.parameters?.modelId && !nodeUpdated) {
+        if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
+          // Só atualizar se for um modelo de texto (não vision específico)
+          const currentModel = node.parameters.modelId.value;
+          if (currentModel && !currentModel.includes('vision') && !currentModel.includes('whisper')) {
+            node.parameters.modelId.value = model;
+            nodeUpdated = true;
+            console.log(`[N8N] ✅ Node "${node.name}" (modelId) atualizado para modelo ${model}`);
+          }
+        }
+      }
+
+      if (nodeUpdated) {
+        updatedCount++;
+      }
+
       return node;
     });
 
     if (updatedCount === 0) {
-      console.warn("[N8N] ⚠️ Nenhum node do tipo lmChatOpenAi encontrado no workflow");
+      console.warn("[N8N] ⚠️ Nenhum node de modelo OpenAI encontrado no workflow");
       return false;
     }
 

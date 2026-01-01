@@ -8,7 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
-import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished } from "./n8n-integration";
+import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished, updateModelInWorkflow } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
 import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
@@ -1052,7 +1052,6 @@ export const appRouter = router({
             if (tenant?.n8nWorkflowId) {
               // Se o modelo foi alterado, atualizar diretamente no workflow
               if (input.openaiModel) {
-                const { updateModelInWorkflow } = await import('../n8n-integration');
                 await updateModelInWorkflow(tenant.n8nWorkflowId, input.openaiModel);
               }
               
