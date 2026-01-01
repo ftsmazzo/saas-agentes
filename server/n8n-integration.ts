@@ -538,21 +538,54 @@ export async function updateModelInWorkflow(
     console.log(`[N8N] ✅ Workflow atualizado via PUT`);
 
     // Se workflow estava publicado, republicar para aplicar mudanças
+    // IMPORTANTE: No N8N, quando você atualiza um workflow publicado via API,
+    // as mudanças são salvas mas podem não ser aplicadas até republicar
     if (workflow.published === true) {
-      console.log(`[N8N] 🔄 Workflow estava publicado, republicando para aplicar mudanças...`);
+      console.log(`[N8N] 🔄 Workflow estava publicado, republicando para aplicar mudanças em execução...`);
       try {
-        // Tentar republicar usando o mesmo método do activateWorkflow
-        const republishPayload: any = {
-          name: workflow.name,
-          nodes: updatedNodes,
-          connections: workflow.connections,
-          settings: workflow.settings,
-          staticData: workflow.staticData,
-          published: true, // Forçar republicação
-        };
-        
-        await n8nApi.put(`/workflows/${workflowId}`, republishPayload);
-        console.log(`[N8N] ✅ Workflow republicado com sucesso`);
+        // Método 1: Tentar despublicar e republicar (força reload)
+        try {
+          // Despublicar primeiro
+          const unpublishPayload: any = {
+            name: workflow.name,
+            nodes: updatedNodes,
+            connections: workflow.connections,
+            settings: workflow.settings,
+            staticData: workflow.staticData,
+            published: false,
+          };
+          await n8nApi.put(`/workflows/${workflowId}`, unpublishPayload);
+          console.log(`[N8N] 📋 Workflow despublicado temporariamente`);
+          
+          // Aguardar um pouco para garantir que o N8N processou
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Republicar com nodes atualizados
+          const republishPayload: any = {
+            name: workflow.name,
+            nodes: updatedNodes,
+            connections: workflow.connections,
+            settings: workflow.settings,
+            staticData: workflow.staticData,
+            published: true,
+          };
+          await n8nApi.put(`/workflows/${workflowId}`, republishPayload);
+          console.log(`[N8N] ✅ Workflow republicado com sucesso (método despublicar/republicar)`);
+        } catch (unpubError: any) {
+          // Se falhar, tentar método direto
+          console.warn(`[N8N] ⚠️ Método despublicar/republicar falhou, tentando direto:`, unpubError.response?.data || unpubError.message);
+          
+          const republishPayload: any = {
+            name: workflow.name,
+            nodes: updatedNodes,
+            connections: workflow.connections,
+            settings: workflow.settings,
+            staticData: workflow.staticData,
+            published: true,
+          };
+          await n8nApi.put(`/workflows/${workflowId}`, republishPayload);
+          console.log(`[N8N] ✅ Workflow republicado com sucesso (método direto)`);
+        }
         
         // Verificar se realmente foi republicado e se os modelos foram atualizados
         const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
@@ -578,11 +611,16 @@ export async function updateModelInWorkflow(
           updatedNodesCheck.forEach((n: any) => {
             console.log(`[N8N]   ✓ Node "${n.name}" confirmado com modelo ${model}`);
           });
+        } else {
+          console.warn(`[N8N] ⚠️ Workflow não está publicado após republicação`);
         }
       } catch (republishError: any) {
         console.warn(`[N8N] ⚠️ Erro ao republicar workflow (não bloqueia):`, republishError.response?.data || republishError.message);
-        // Não falhar - a atualização já foi feita
+        // Não falhar - a atualização já foi feita no banco
+        // A interface do N8N precisará de F5 para mostrar, mas as mudanças já estão salvas
       }
+    } else {
+      console.log(`[N8N] ℹ️ Workflow não estava publicado. Mudanças salvas, mas será necessário publicar manualmente para aplicar.`);
     }
 
     console.log(`[N8N] ✅ Modelo atualizado em ${updatedCount} node(s) do workflow ${workflowId}`);
