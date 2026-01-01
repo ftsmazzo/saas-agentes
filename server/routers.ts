@@ -1018,6 +1018,7 @@ export const appRouter = router({
         enableHumanHandoff: z.boolean().optional(),
         enableAudioTranscription: z.boolean().optional(),
         enableImageProcessing: z.boolean().optional(),
+        openaiModel: z.string().optional(), // Modelo OpenAI: 'gpt-4o', 'gpt-4o-mini', etc.
         toolsConfig: z.string().optional(), // JSON string
         schedulingConfig: z.string().optional(), // JSON string
         ragConfig: z.string().optional(), // JSON string
@@ -1049,6 +1050,13 @@ export const appRouter = router({
           try {
             const tenant = await db.getTenantById(tenantId);
             if (tenant?.n8nWorkflowId) {
+              // Se o modelo foi alterado, atualizar diretamente no workflow
+              if (input.openaiModel) {
+                const { updateModelInWorkflow } = await import('../n8n-integration');
+                await updateModelInWorkflow(tenant.n8nWorkflowId, input.openaiModel);
+              }
+              
+              // Sincronizar outras configurações
               await syncAgentConfigToN8N(tenant.n8nWorkflowId, tenantId, input);
             }
           } catch (error: any) {

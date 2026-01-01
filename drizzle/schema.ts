@@ -134,6 +134,9 @@ export const agentConfigs = pgTable("agentConfigs", {
   enableAudioTranscription: boolean("enableAudioTranscription").default(true),
   enableImageProcessing: boolean("enableImageProcessing").default(true),
   
+  // Modelo de IA
+  openaiModel: varchar("openaiModel", { length: 50 }).default("gpt-4o-mini"),
+  
   // Configurações de Tools/Agentes Especialistas (JSON)
   toolsConfig: text("toolsConfig"), // JSON: { enabledTools: [], toolSettings: {} }
   schedulingConfig: text("schedulingConfig"), // JSON: { enabled: boolean, settings: {} }

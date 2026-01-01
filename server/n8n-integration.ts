@@ -348,6 +348,7 @@ export async function syncAgentConfigToN8N(
     enableHumanHandoff?: boolean;
     enableAudioTranscription?: boolean;
     enableImageProcessing?: boolean;
+    openaiModel?: string;
   }
 ): Promise<boolean> {
   if (!process.env.N8N_API_URL) {
@@ -367,6 +368,7 @@ export async function syncAgentConfigToN8N(
         systemPrompt: config.systemPrompt,
         welcomeMessage: config.welcomeMessage,
         companyInfo: config.companyInfo,
+        openaiModel: config.openaiModel,
         tools: config.toolsConfig ? JSON.parse(config.toolsConfig) : null,
         scheduling: config.schedulingConfig ? JSON.parse(config.schedulingConfig) : null,
         rag: config.ragConfig ? JSON.parse(config.ragConfig) : null,
@@ -396,6 +398,71 @@ export async function syncAgentConfigToN8N(
 }
 
 /**
+ * Atualiza modelo OpenAI no workflow N8N
+ * Atualiza todos os nodes do tipo lmChatOpenAi
+ */
+export async function updateModelInWorkflow(
+  workflowId: string,
+  model: string // 'gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo', etc.
+): Promise<boolean> {
+  try {
+    console.log(`[N8N] 🔄 Atualizando modelo para ${model} no workflow ${workflowId}...`);
+    
+    // Buscar workflow atual
+    const workflowResponse = await n8nApi.get(`/workflows/${workflowId}`);
+    const workflow = workflowResponse.data.data || workflowResponse.data;
+
+    if (!workflow || !workflow.nodes) {
+      console.error("[N8N] Workflow não encontrado ou sem nodes");
+      return false;
+    }
+
+    // Atualizar todos os nodes do tipo lmChatOpenAi
+    let updatedCount = 0;
+    const updatedNodes = workflow.nodes.map((node: any) => {
+      if (node.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi') {
+        if (node.parameters) {
+          node.parameters.model = model;
+          updatedCount++;
+          console.log(`[N8N] ✅ Node "${node.name}" atualizado para modelo ${model}`);
+        }
+      }
+      return node;
+    });
+
+    if (updatedCount === 0) {
+      console.warn("[N8N] ⚠️ Nenhum node do tipo lmChatOpenAi encontrado no workflow");
+      return false;
+    }
+
+    // Atualizar workflow
+    const updatePayload: any = {
+      name: workflow.name,
+      nodes: updatedNodes,
+      connections: workflow.connections,
+      settings: workflow.settings,
+      staticData: workflow.staticData,
+    };
+
+    // Manter published/active se existir
+    if (workflow.published !== undefined) {
+      updatePayload.published = workflow.published;
+    }
+    if (workflow.active !== undefined) {
+      updatePayload.active = workflow.active;
+    }
+
+    await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
+
+    console.log(`[N8N] ✅ Modelo atualizado em ${updatedCount} node(s) do workflow ${workflowId}`);
+    return true;
+  } catch (error: any) {
+    console.error("[N8N] Erro ao atualizar modelo:", error.response?.data || error.message);
+    return false;
+  }
+}
+
+/**
  * Atualiza workflow via API N8N (método alternativo)
  * Modifica nodes diretamente no workflow
  */
@@ -405,6 +472,7 @@ export async function updateWorkflowConfig(
     systemPrompt?: string;
     welcomeMessage?: string;
     toolsConfig?: any;
+    openaiModel?: string;
   }
 ): Promise<boolean> {
   try {
@@ -414,6 +482,13 @@ export async function updateWorkflowConfig(
 
     // Modificar nodes com novas configurações
     const updatedNodes = workflow.nodes.map((node: any) => {
+      // Atualizar modelo OpenAI
+      if (config.openaiModel && node.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi') {
+        if (node.parameters) {
+          node.parameters.model = config.openaiModel;
+        }
+      }
+
       // Atualizar prompt do sistema no node Supervisor
       if (node.name === 'Supervisor' && node.type === '@n8n/n8n-nodes-langchain.agent') {
         if (config.systemPrompt && node.parameters?.text) {

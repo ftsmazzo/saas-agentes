@@ -27,6 +27,7 @@ import {
   Sparkles
 } from "lucide-react";
 import AgentConfigAssistant from "@/components/AgentConfigAssistant";
+import ModelSelector from "@/components/ModelSelector";
 
 // Tools disponíveis baseados no workflow N8N
 const AVAILABLE_TOOLS = [
@@ -78,6 +79,7 @@ export default function AgentConfigUnifiedPage() {
     systemPrompt: "",
     welcomeMessage: "",
     companyInfo: "",
+    openaiModel: "gpt-4o-mini", // Modelo padrão
     enableHumanHandoff: true,
     enableAudioTranscription: true,
     enableImageProcessing: true,
@@ -109,6 +111,7 @@ export default function AgentConfigUnifiedPage() {
         systemPrompt: config.systemPrompt || "",
         welcomeMessage: config.welcomeMessage || "",
         companyInfo: config.companyInfo || "",
+        openaiModel: config.openaiModel || "gpt-4o-mini",
         enableHumanHandoff: config.enableHumanHandoff ?? true,
         enableAudioTranscription: config.enableAudioTranscription ?? true,
         enableImageProcessing: config.enableImageProcessing ?? true,
@@ -140,6 +143,7 @@ export default function AgentConfigUnifiedPage() {
       systemPrompt: formData.systemPrompt,
       welcomeMessage: formData.welcomeMessage,
       companyInfo: formData.companyInfo,
+      openaiModel: formData.openaiModel,
       enableHumanHandoff: formData.enableHumanHandoff,
       enableAudioTranscription: formData.enableAudioTranscription,
       enableImageProcessing: formData.enableImageProcessing,
@@ -585,6 +589,26 @@ export default function AgentConfigUnifiedPage() {
 
           {/* Aba Funcionalidades */}
           <TabsContent value="features" className="space-y-6">
+            {/* Seletor de Modelo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Configurações de IA
+                </CardTitle>
+                <CardDescription>
+                  Escolha o modelo de IA que será usado pelo agente
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ModelSelector
+                  value={formData.openaiModel}
+                  onChange={(value) => setFormData({ ...formData, openaiModel: value })}
+                  disabled={updateMutation.isPending}
+                />
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Funcionalidades do Agente</CardTitle>
