@@ -428,9 +428,10 @@ export async function updateModelInWorkflow(
       // 1. Nodes do tipo lmChatOpenAi (modelo principal do agente)
       if (node.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi') {
         if (node.parameters) {
+          const oldModel = node.parameters.model;
           node.parameters.model = model;
           nodeUpdated = true;
-          console.log(`[N8N] ✅ Node "${node.name}" (lmChatOpenAi) atualizado para modelo ${model}`);
+          console.log(`[N8N] ✅ Node "${node.name}" (lmChatOpenAi) atualizado: ${oldModel} → ${model}`);
         }
       }
 
@@ -449,27 +450,100 @@ export async function updateModelInWorkflow(
             return node; // Não alterar
           }
 
-          // ATUALIZAR outros usos: formatação, processamento de PDF ("Message a model"), etc
-          // "Message a model" (resource: "text", operation: "message") DEVE ser atualizado
-          if (node.parameters.modelId) {
-            if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
-              const oldModel = node.parameters.modelId.value;
-              node.parameters.modelId.value = model;
+          // ATUALIZAR "Message a model" (resource: "text", operation: "message" ou "message a model")
+          // Este é o node que processa PDF e deve ser atualizado
+          const isMessageModel = node.parameters.resource === 'text' && 
+            (node.parameters.operation === 'message' || 
+             node.parameters.operation === 'message a model' ||
+             node.parameters.operation?.toLowerCase().includes('message'));
+          
+          if (isMessageModel) {
+            console.log(`[N8N] 🔍 Detectado node "Message a model" (PDF): "${node.name}"`);
+            console.log(`[N8N] 🔍 Estrutura do node:`, {
+              hasModel: !!node.parameters.model,
+              hasModelId: !!node.parameters.modelId,
+              modelType: typeof node.parameters.model,
+              modelIdType: typeof node.parameters.modelId,
+              modelValue: node.parameters.model,
+              modelIdValue: node.parameters.modelId,
+            });
+            
+            // "Message a model" pode usar 'model' diretamente ou 'modelId'
+            // Priorizar 'model' se existir
+            if (node.parameters.model !== undefined && node.parameters.model !== null) {
+              const oldModel = typeof node.parameters.model === 'object' 
+                ? (node.parameters.model.value || node.parameters.model.name || JSON.stringify(node.parameters.model))
+                : node.parameters.model;
+              
+              // Se for objeto com 'value', atualizar 'value'
+              if (typeof node.parameters.model === 'object' && node.parameters.model !== null) {
+                if ('value' in node.parameters.model) {
+                  node.parameters.model.value = model;
+                } else if ('name' in node.parameters.model) {
+                  node.parameters.model.name = model;
+                } else {
+                  // Se for objeto mas sem 'value', tentar substituir completamente
+                  node.parameters.model = model;
+                }
+              } else {
+                // Se for string direta
+                node.parameters.model = model;
+              }
               nodeUpdated = true;
-              console.log(`[N8N] ✅ Node "${node.name}" (openAi - ${node.parameters.resource || 'text'}) atualizado: ${oldModel} → ${model}`);
+              console.log(`[N8N] ✅ Node "${node.name}" (Message a model - PDF) atualizado via 'model': ${oldModel} → ${model}`);
+            } else if (node.parameters.modelId !== undefined && node.parameters.modelId !== null) {
+              const oldModel = typeof node.parameters.modelId === 'object' 
+                ? (node.parameters.modelId.value || node.parameters.modelId.name || JSON.stringify(node.parameters.modelId))
+                : node.parameters.modelId;
+              
+              // Se for objeto com 'value', atualizar 'value'
+              if (typeof node.parameters.modelId === 'object' && node.parameters.modelId !== null) {
+                if ('value' in node.parameters.modelId) {
+                  node.parameters.modelId.value = model;
+                } else if ('name' in node.parameters.modelId) {
+                  node.parameters.modelId.name = model;
+                } else {
+                  node.parameters.modelId = model;
+                }
+              } else {
+                node.parameters.modelId = model;
+              }
+              nodeUpdated = true;
+              console.log(`[N8N] ✅ Node "${node.name}" (Message a model - PDF) atualizado via 'modelId': ${oldModel} → ${model}`);
             } else {
-              const oldModel = node.parameters.modelId;
-              node.parameters.modelId = model;
-              nodeUpdated = true;
-              console.log(`[N8N] ✅ Node "${node.name}" (openAi - modelId string) atualizado: ${oldModel} → ${model}`);
+              console.warn(`[N8N] ⚠️ Node "${node.name}" (Message a model) não tem 'model' nem 'modelId' definidos`);
             }
           }
-          // Se tiver model diretamente, atualizar também
-          if (node.parameters.model && !nodeUpdated) {
-            const oldModel = node.parameters.model;
-            node.parameters.model = model;
-            nodeUpdated = true;
-            console.log(`[N8N] ✅ Node "${node.name}" (openAi - model direto) atualizado: ${oldModel} → ${model}`);
+
+          // ATUALIZAR outros usos: formatação, etc (se não foi atualizado acima)
+          if (!nodeUpdated) {
+            if (node.parameters.modelId) {
+              if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
+                const oldModel = node.parameters.modelId.value;
+                node.parameters.modelId.value = model;
+                nodeUpdated = true;
+                console.log(`[N8N] ✅ Node "${node.name}" (openAi - ${node.parameters.resource || 'text'}) atualizado: ${oldModel} → ${model}`);
+              } else {
+                const oldModel = node.parameters.modelId;
+                node.parameters.modelId = model;
+                nodeUpdated = true;
+                console.log(`[N8N] ✅ Node "${node.name}" (openAi - modelId string) atualizado: ${oldModel} → ${model}`);
+              }
+            }
+            // Se tiver model diretamente, atualizar também
+            if (node.parameters.model && !nodeUpdated) {
+              const oldModel = typeof node.parameters.model === 'object'
+                ? node.parameters.model.value || node.parameters.model
+                : node.parameters.model;
+              
+              if (typeof node.parameters.model === 'object' && node.parameters.model.value !== undefined) {
+                node.parameters.model.value = model;
+              } else {
+                node.parameters.model = model;
+              }
+              nodeUpdated = true;
+              console.log(`[N8N] ✅ Node "${node.name}" (openAi - model direto) atualizado: ${oldModel} → ${model}`);
+            }
           }
         }
       }
