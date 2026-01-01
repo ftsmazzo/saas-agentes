@@ -22,6 +22,11 @@ export async function setupVite(app: Express, server: Server) {
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    // Se for rota de API, não processar aqui - deixar passar para as rotas de API
+    if (req.originalUrl.startsWith("/api/")) {
+      return next();
+    }
+    
     const url = req.originalUrl;
 
     try {
