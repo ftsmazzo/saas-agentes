@@ -434,7 +434,7 @@ export async function updateModelInWorkflow(
         }
       }
 
-      // 2. Nodes do tipo openAi (para análise de imagem, formatação, etc)
+      // 2. Nodes do tipo openAi (para análise de imagem, formatação, processamento de PDF, etc)
       if (node.type === '@n8n/n8n-nodes-langchain.openAi') {
         if (node.parameters) {
           // NÃO atualizar nodes de transcrição de áudio (Whisper)
@@ -443,33 +443,65 @@ export async function updateModelInWorkflow(
             return node; // Não alterar
           }
 
-          // Atualizar análise de imagem e outros usos
+          // NÃO atualizar análise de imagem (Vision) - manter modelo específico
+          if (node.parameters.resource === 'image' && node.parameters.operation === 'analyze') {
+            console.log(`[N8N] ⏭️ Node "${node.name}" é de análise de imagem, mantendo modelo vision específico`);
+            return node; // Não alterar
+          }
+
+          // ATUALIZAR outros usos: formatação, processamento de PDF ("Message a model"), etc
+          // "Message a model" (resource: "text", operation: "message") DEVE ser atualizado
           if (node.parameters.modelId) {
             if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
+              const oldModel = node.parameters.modelId.value;
               node.parameters.modelId.value = model;
+              nodeUpdated = true;
+              console.log(`[N8N] ✅ Node "${node.name}" (openAi - ${node.parameters.resource || 'text'}) atualizado: ${oldModel} → ${model}`);
             } else {
+              const oldModel = node.parameters.modelId;
               node.parameters.modelId = model;
+              nodeUpdated = true;
+              console.log(`[N8N] ✅ Node "${node.name}" (openAi - modelId string) atualizado: ${oldModel} → ${model}`);
             }
-            nodeUpdated = true;
-            console.log(`[N8N] ✅ Node "${node.name}" (openAi) atualizado para modelo ${model}`);
           }
           // Se tiver model diretamente, atualizar também
-          if (node.parameters.model) {
+          if (node.parameters.model && !nodeUpdated) {
+            const oldModel = node.parameters.model;
             node.parameters.model = model;
             nodeUpdated = true;
+            console.log(`[N8N] ✅ Node "${node.name}" (openAi - model direto) atualizado: ${oldModel} → ${model}`);
           }
         }
       }
 
-      // 3. Nodes com modelId em parameters (análise de imagem, etc)
+      // 3. Nodes com modelId em parameters (análise de imagem, formatação, processamento de PDF, etc)
       if (node.parameters?.modelId && !nodeUpdated) {
         if (typeof node.parameters.modelId === 'object' && node.parameters.modelId.value) {
-          // Só atualizar se for um modelo de texto (não vision específico)
           const currentModel = node.parameters.modelId.value;
-          if (currentModel && !currentModel.includes('vision') && !currentModel.includes('whisper')) {
+          
+          // NÃO atualizar nodes específicos:
+          // - Vision (análise de imagem) - pode manter específico ou atualizar dependendo da estratégia
+          // - Whisper (transcrição de áudio) - sempre manter fixo
+          const isVision = currentModel && (currentModel.includes('vision') || currentModel.includes('gpt-4o-vision'));
+          const isWhisper = currentModel && currentModel.includes('whisper');
+          
+          // Atualizar apenas modelos de texto/conversa (não vision, não whisper)
+          if (currentModel && !isVision && !isWhisper) {
             node.parameters.modelId.value = model;
             nodeUpdated = true;
             console.log(`[N8N] ✅ Node "${node.name}" (modelId) atualizado para modelo ${model}`);
+          } else if (isVision) {
+            console.log(`[N8N] ⏭️ Node "${node.name}" é de análise de imagem (vision), mantendo modelo específico`);
+          } else if (isWhisper) {
+            console.log(`[N8N] ⏭️ Node "${node.name}" é de transcrição de áudio (whisper), mantendo modelo específico`);
+          }
+        } else if (typeof node.parameters.modelId === 'string' && !nodeUpdated) {
+          // Se modelId for string direta (não objeto)
+          const currentModel = node.parameters.modelId;
+          if (currentModel && !currentModel.includes('vision') && !currentModel.includes('whisper')) {
+            node.parameters.modelId = model;
+            nodeUpdated = true;
+            console.log(`[N8N] ✅ Node "${node.name}" (modelId string) atualizado para modelo ${model}`);
           }
         }
       }
@@ -503,10 +535,54 @@ export async function updateModelInWorkflow(
     // NÃO incluir active - é read-only e causa erro
 
     await n8nApi.put(`/workflows/${workflowId}`, updatePayload);
+    console.log(`[N8N] ✅ Workflow atualizado via PUT`);
 
-    // Verificar se workflow precisa ser republicado após atualização
+    // Se workflow estava publicado, republicar para aplicar mudanças
     if (workflow.published === true) {
-      console.log(`[N8N] 📋 Workflow estava publicado, mantendo estado publicado`);
+      console.log(`[N8N] 🔄 Workflow estava publicado, republicando para aplicar mudanças...`);
+      try {
+        // Tentar republicar usando o mesmo método do activateWorkflow
+        const republishPayload: any = {
+          name: workflow.name,
+          nodes: updatedNodes,
+          connections: workflow.connections,
+          settings: workflow.settings,
+          staticData: workflow.staticData,
+          published: true, // Forçar republicação
+        };
+        
+        await n8nApi.put(`/workflows/${workflowId}`, republishPayload);
+        console.log(`[N8N] ✅ Workflow republicado com sucesso`);
+        
+        // Verificar se realmente foi republicado e se os modelos foram atualizados
+        const verifyResponse = await n8nApi.get(`/workflows/${workflowId}`);
+        const verifiedWorkflow = verifyResponse.data.data || verifyResponse.data;
+        if (verifiedWorkflow.published === true) {
+          console.log(`[N8N] ✅ Confirmação: Workflow ${workflowId} está publicado`);
+          
+          // Verificar se os modelos foram realmente atualizados
+          const updatedNodesCheck = verifiedWorkflow.nodes.filter((n: any) => {
+            if (n.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi' && n.parameters?.model) {
+              return n.parameters.model === model;
+            }
+            if (n.type === '@n8n/n8n-nodes-langchain.openAi' && n.parameters?.modelId) {
+              const modelIdValue = typeof n.parameters.modelId === 'object' 
+                ? n.parameters.modelId.value 
+                : n.parameters.modelId;
+              return modelIdValue === model;
+            }
+            return false;
+          });
+          
+          console.log(`[N8N] 📊 Verificação: ${updatedNodesCheck.length} node(s) confirmado(s) com modelo ${model}`);
+          updatedNodesCheck.forEach((n: any) => {
+            console.log(`[N8N]   ✓ Node "${n.name}" confirmado com modelo ${model}`);
+          });
+        }
+      } catch (republishError: any) {
+        console.warn(`[N8N] ⚠️ Erro ao republicar workflow (não bloqueia):`, republishError.response?.data || republishError.message);
+        // Não falhar - a atualização já foi feita
+      }
     }
 
     console.log(`[N8N] ✅ Modelo atualizado em ${updatedCount} node(s) do workflow ${workflowId}`);
