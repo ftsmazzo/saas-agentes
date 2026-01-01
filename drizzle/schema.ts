@@ -109,6 +109,9 @@ export const plans = pgTable("plans", {
   maxConversations: integer("maxConversations").default(10000),
   maxStorageGB: integer("maxStorageGB").default(5),
   
+  // Sistema de créditos
+  monthlyCredits: integer("monthlyCredits").default(10000), // Créditos mensais incluídos
+  
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
@@ -166,6 +169,18 @@ export const usageMetrics = pgTable("usageMetrics", {
   totalMessages: integer("totalMessages").default(0),
   apiCallsOpenAI: integer("apiCallsOpenAI").default(0),
   storageUsedMB: integer("storageUsedMB").default(0),
+  
+  // Métricas de tokens e custos (agregação mensal)
+  tokensChat: integer("tokensChat").default(0),
+  tokensAudio: integer("tokensAudio").default(0),
+  tokensImage: integer("tokensImage").default(0),
+  tokensFormat: integer("tokensFormat").default(0), // Formatação de resposta
+  costChatUSD: numeric("costChatUSD", { precision: 10, scale: 6 }).default("0"),
+  costAudioUSD: numeric("costAudioUSD", { precision: 10, scale: 6 }).default("0"),
+  costImageUSD: numeric("costImageUSD", { precision: 10, scale: 6 }).default("0"),
+  costFormatUSD: numeric("costFormatUSD", { precision: 10, scale: 6 }).default("0"),
+  totalCostUSD: numeric("totalCostUSD", { precision: 10, scale: 6 }).default("0"),
+  totalCreditsUsed: integer("totalCreditsUsed").default(0),
   
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -356,3 +371,89 @@ export const documents = pgTable("documents", {
 
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = typeof documents.$inferInsert;
+
+/**
+ * Transações detalhadas de uso (histórico completo)
+ */
+export const usageTransactions = pgTable("usageTransactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  
+  // Tipo de operação
+  operation: varchar("operation", { length: 20 }).notNull(), // 'chat', 'audio', 'image', 'format', 'pdf'
+  model: varchar("model", { length: 50 }).notNull(), // 'gpt-4o', 'whisper-1', 'gpt-4o-vision', etc.
+  
+  // Tokens utilizados
+  tokensInput: integer("tokensInput").default(0),
+  tokensOutput: integer("tokensOutput").default(0),
+  totalTokens: integer("totalTokens").default(0),
+  
+  // Custos e créditos
+  costUSD: numeric("costUSD", { precision: 10, scale: 6 }).default("0"), // Custo real em USD
+  creditsUsed: integer("creditsUsed").default(0), // Créditos internos consumidos
+  
+  // Metadados
+  metadata: text("metadata"), // JSON com detalhes adicionais (workflowId, nodeName, etc)
+  
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type UsageTransaction = typeof usageTransactions.$inferSelect;
+export type InsertUsageTransaction = typeof usageTransactions.$inferInsert;
+
+/**
+ * Saldo de créditos por tenant
+ */
+export const tenantCredits = pgTable("tenantCredits", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull().unique(),
+  
+  // Saldo atual
+  currentCredits: integer("currentCredits").default(0),
+  
+  // Totais acumulados
+  totalCreditsPurchased: integer("totalCreditsPurchased").default(0),
+  totalCreditsUsed: integer("totalCreditsUsed").default(0),
+  totalCreditsBonus: integer("totalCreditsBonus").default(0), // Bônus e resets mensais
+  
+  // Controle de reset mensal
+  lastResetDate: timestamp("lastResetDate", { withTimezone: true }),
+  
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type TenantCredit = typeof tenantCredits.$inferSelect;
+export type InsertTenantCredit = typeof tenantCredits.$inferInsert;
+
+/**
+ * Preços dos modelos OpenAI (parametrizável)
+ */
+export const openaiPricing = pgTable("openaiPricing", {
+  id: serial("id").primaryKey(),
+  model: varchar("model", { length: 50 }).notNull().unique(),
+  
+  // Preços por 1M tokens (USD)
+  priceInputPer1M: numeric("priceInputPer1M", { precision: 10, scale: 4 }), // Input tokens
+  priceOutputPer1M: numeric("priceOutputPer1M", { precision: 10, scale: 4 }), // Output tokens
+  pricePerMinute: numeric("pricePerMinute", { precision: 10, scale: 4 }), // Para Whisper (por minuto de áudio)
+  
+  isActive: boolean("isActive").default(true).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type OpenAIPricing = typeof openaiPricing.$inferSelect;
+export type InsertOpenAIPricing = typeof openaiPricing.$inferInsert;
+
+/**
+ * Configuração de conversão de créditos (parametrizável)
+ */
+export const creditConfig = pgTable("creditConfig", {
+  id: serial("id").primaryKey(),
+  configKey: varchar("configKey", { length: 100 }).notNull().unique(),
+  configValue: text("configValue").notNull(), // JSON com configurações
+  description: text("description"),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CreditConfig = typeof creditConfig.$inferSelect;
+export type InsertCreditConfig = typeof creditConfig.$inferInsert;

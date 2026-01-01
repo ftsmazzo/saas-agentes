@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as db from "../db";
 import { z } from "zod";
+import { calculateCost, recordUsageTransaction, UsageData } from "../credit-system";
 
 /**
  * Webhook para receber dados do N8N
@@ -23,6 +24,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         "whatsapp_status",
         "error",
         "metrics",
+        "usage_tracking", // Novo: rastreamento de consumo OpenAI
       ]),
       data: z.any(),
       timestamp: z.string().optional(),
@@ -51,6 +53,19 @@ export async function handleN8NWebhook(req: Request, res: Response) {
 
       case "metrics":
         await handleMetricsEvent(tenantId, payload);
+        break;
+
+      case "usage_tracking":
+        await handleUsageTracking(tenantId, payload);
+        break;
+
+      case "usage_tracking_batch":
+        // Processar múltiplos usos em lote
+        if (Array.isArray(payload.data)) {
+          for (const usageData of payload.data) {
+            await handleUsageTracking(tenantId, { data: usageData });
+          }
+        }
         break;
 
       default:
@@ -126,5 +141,37 @@ async function handleMetricsEvent(tenantId: number, payload: any) {
   const metricsData = payload.data;
   console.log(`[N8N Webhook] Métricas recebidas para tenant ${tenantId}`);
   // Implementar salvamento de métricas
+}
+
+/**
+ * Processa eventos de rastreamento de uso (consumo OpenAI)
+ */
+async function handleUsageTracking(tenantId: number, payload: any) {
+  try {
+    const usageData: UsageData = payload.data;
+
+    // Validar dados obrigatórios
+    if (!usageData.operation || !usageData.model) {
+      console.warn(`[N8N Webhook] ⚠️ Dados de uso incompletos para tenant ${tenantId}:`, usageData);
+      return;
+    }
+
+    // Calcular custo e créditos
+    const costCalculation = await calculateCost(usageData);
+
+    // Registrar transação
+    await recordUsageTransaction(tenantId, usageData, costCalculation);
+
+    console.log(`[N8N Webhook] ✅ Uso registrado para tenant ${tenantId}:`, {
+      operation: usageData.operation,
+      model: usageData.model,
+      tokens: usageData.totalTokens || (usageData.tokensInput || 0) + (usageData.tokensOutput || 0),
+      costUSD: costCalculation.costUSD.toFixed(6),
+      creditsUsed: costCalculation.creditsUsed,
+    });
+  } catch (error: any) {
+    console.error(`[N8N Webhook] ❌ Erro ao processar uso para tenant ${tenantId}:`, error);
+    // Não falhar o webhook - apenas logar o erro
+  }
 }
 

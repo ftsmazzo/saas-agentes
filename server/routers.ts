@@ -15,6 +15,9 @@ import { notifyOwner } from "./_core/notification";
 import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
 import axios from 'axios';
+import { getTenantCredits } from "./credit-system";
+import { usageTransactions, tenantCredits } from "../drizzle/schema";
+import { desc, and, gte, lte, eq } from "drizzle-orm";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
 if (stripeApiKey === 'sk_test_dummy') {
@@ -1109,6 +1112,245 @@ export const appRouter = router({
         workflowStats,
       };
     }),
+
+    // ========== SISTEMA DE CRÉDITOS ==========
+
+    // Obter saldo de créditos (cliente)
+    getMyCredits: protectedProcedure.query(async ({ ctx }) => {
+      const tenants = await db.getAllTenants();
+      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      
+      if (!userTenant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+      }
+
+      const credits = await getTenantCredits(userTenant.id);
+      const plan = userTenant.currentPlanId ? await db.getPlanById(userTenant.currentPlanId) : null;
+
+      return {
+        currentCredits: credits.currentCredits,
+        totalCreditsPurchased: credits.totalCreditsPurchased,
+        totalCreditsUsed: credits.totalCreditsUsed,
+        totalCreditsBonus: credits.totalCreditsBonus,
+        monthlyCredits: plan?.monthlyCredits || 0,
+        lastResetDate: credits.lastResetDate,
+      };
+    }),
+
+    // Obter saldo de créditos de um tenant (admin)
+    getTenantCredits: adminProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const credits = await getTenantCredits(input.tenantId);
+        const tenant = await db.getTenantById(input.tenantId);
+        const plan = tenant?.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+
+        return {
+          currentCredits: credits.currentCredits,
+          totalCreditsPurchased: credits.totalCreditsPurchased,
+          totalCreditsUsed: credits.totalCreditsUsed,
+          totalCreditsBonus: credits.totalCreditsBonus,
+          monthlyCredits: plan?.monthlyCredits || 0,
+          lastResetDate: credits.lastResetDate,
+        };
+      }),
+
+    // Obter transações de uso (cliente - mostra créditos)
+    getMyUsageTransactions: protectedProcedure
+      .input(z.object({
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+        operation: z.enum(['chat', 'audio', 'image', 'format', 'pdf']).optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        const dbInstance = await db.getDb();
+        if (!dbInstance) throw new Error("Database not available");
+
+        let query = dbInstance
+          .select()
+          .from(usageTransactions)
+          .where(eq(usageTransactions.tenantId, userTenant.id));
+
+        if (input.operation) {
+          query = query.where(and(
+            eq(usageTransactions.tenantId, userTenant.id),
+            eq(usageTransactions.operation, input.operation)
+          ));
+        }
+
+        const transactions = await query
+          .orderBy(desc(usageTransactions.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        // Para cliente: mostrar apenas créditos (não custo real)
+        return transactions.map(t => ({
+          id: t.id,
+          operation: t.operation,
+          model: t.model,
+          tokensInput: t.tokensInput,
+          tokensOutput: t.tokensOutput,
+          totalTokens: t.totalTokens,
+          creditsUsed: t.creditsUsed, // Cliente vê créditos
+          createdAt: t.createdAt,
+        }));
+      }),
+
+    // Obter transações de uso (admin - mostra custo real em USD)
+    getTenantUsageTransactions: adminProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+        operation: z.enum(['chat', 'audio', 'image', 'format', 'pdf']).optional(),
+      }))
+      .query(async ({ input }) => {
+        const dbInstance = await db.getDb();
+        if (!dbInstance) throw new Error("Database not available");
+
+        let query = dbInstance
+          .select()
+          .from(usageTransactions)
+          .where(eq(usageTransactions.tenantId, input.tenantId));
+
+        if (input.operation) {
+          query = query.where(and(
+            eq(usageTransactions.tenantId, input.tenantId),
+            eq(usageTransactions.operation, input.operation)
+          ));
+        }
+
+        const transactions = await query
+          .orderBy(desc(usageTransactions.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        // Para admin: mostrar custo real em USD
+        return transactions.map(t => ({
+          id: t.id,
+          operation: t.operation,
+          model: t.model,
+          tokensInput: t.tokensInput,
+          tokensOutput: t.tokensOutput,
+          totalTokens: t.totalTokens,
+          costUSD: parseFloat(t.costUSD), // Admin vê custo real
+          creditsUsed: t.creditsUsed,
+          metadata: t.metadata ? JSON.parse(t.metadata) : null,
+          createdAt: t.createdAt,
+        }));
+      }),
+
+    // Obter consumo agregado do mês (cliente - mostra créditos)
+    getMyMonthlyConsumption: protectedProcedure.query(async ({ ctx }) => {
+      const tenants = await db.getAllTenants();
+      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      
+      if (!userTenant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+      }
+
+      const currentMonth = await db.getCurrentMonthUsage(userTenant.id);
+      const plan = userTenant.currentPlanId ? await db.getPlanById(userTenant.currentPlanId) : null;
+
+      if (!currentMonth) {
+        return {
+          creditsUsed: 0,
+          monthlyCredits: plan?.monthlyCredits || 0,
+          creditsRemaining: plan?.monthlyCredits || 0,
+          breakdown: {
+            chat: { credits: 0, tokens: 0 },
+            audio: { credits: 0, tokens: 0 },
+            image: { credits: 0, tokens: 0 },
+            format: { credits: 0, tokens: 0 },
+          },
+        };
+      }
+
+      // Converter custos para créditos para exibição ao cliente
+      // (O cálculo real já foi feito, mas aqui mostramos apenas créditos)
+      return {
+        creditsUsed: currentMonth.totalCreditsUsed || 0,
+        monthlyCredits: plan?.monthlyCredits || 0,
+        creditsRemaining: Math.max(0, (plan?.monthlyCredits || 0) - (currentMonth.totalCreditsUsed || 0)),
+        breakdown: {
+          chat: {
+            credits: Math.ceil(parseFloat(currentMonth.costChatUSD || "0") / 0.002 * 1.5), // Aproximação
+            tokens: currentMonth.tokensChat || 0,
+          },
+          audio: {
+            credits: Math.ceil(parseFloat(currentMonth.costAudioUSD || "0") / 0.002 * 1.5),
+            tokens: currentMonth.tokensAudio || 0,
+          },
+          image: {
+            credits: Math.ceil(parseFloat(currentMonth.costImageUSD || "0") / 0.002 * 1.5),
+            tokens: currentMonth.tokensImage || 0,
+          },
+          format: {
+            credits: Math.ceil(parseFloat(currentMonth.costFormatUSD || "0") / 0.002 * 1.5),
+            tokens: currentMonth.tokensFormat || 0,
+          },
+        },
+      };
+    }),
+
+    // Obter consumo agregado do mês (admin - mostra custo real em USD)
+    getTenantMonthlyConsumption: adminProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const currentMonth = await db.getCurrentMonthUsage(input.tenantId);
+        const tenant = await db.getTenantById(input.tenantId);
+        const plan = tenant?.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+
+        if (!currentMonth) {
+          return {
+            costUSD: 0,
+            creditsUsed: 0,
+            monthlyCredits: plan?.monthlyCredits || 0,
+            breakdown: {
+              chat: { costUSD: 0, credits: 0, tokens: 0 },
+              audio: { costUSD: 0, credits: 0, tokens: 0 },
+              image: { costUSD: 0, credits: 0, tokens: 0 },
+              format: { costUSD: 0, credits: 0, tokens: 0 },
+            },
+          };
+        }
+
+        // Para admin: mostrar custo real em USD
+        return {
+          costUSD: parseFloat(currentMonth.totalCostUSD || "0"),
+          creditsUsed: currentMonth.totalCreditsUsed || 0,
+          monthlyCredits: plan?.monthlyCredits || 0,
+          breakdown: {
+            chat: {
+              costUSD: parseFloat(currentMonth.costChatUSD || "0"),
+              credits: Math.ceil(parseFloat(currentMonth.costChatUSD || "0") / 0.002 * 1.5),
+              tokens: currentMonth.tokensChat || 0,
+            },
+            audio: {
+              costUSD: parseFloat(currentMonth.costAudioUSD || "0"),
+              credits: Math.ceil(parseFloat(currentMonth.costAudioUSD || "0") / 0.002 * 1.5),
+              tokens: currentMonth.tokensAudio || 0,
+            },
+            image: {
+              costUSD: parseFloat(currentMonth.costImageUSD || "0"),
+              credits: Math.ceil(parseFloat(currentMonth.costImageUSD || "0") / 0.002 * 1.5),
+              tokens: currentMonth.tokensImage || 0,
+            },
+            format: {
+              costUSD: parseFloat(currentMonth.costFormatUSD || "0"),
+              credits: Math.ceil(parseFloat(currentMonth.costFormatUSD || "0") / 0.002 * 1.5),
+              tokens: currentMonth.tokensFormat || 0,
+            },
+          },
+        };
+      }),
   }),
 
   // ========== ROTAS DE LOGS ==========
