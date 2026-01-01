@@ -359,6 +359,7 @@ export async function syncAgentConfigToN8N(
   try {
     // URL do webhook do workflow para receber atualizações de configuração
     // O workflow precisa ter um webhook configurado para receber essas atualizações
+    // NOTA: Este webhook não é obrigatório - se não existir, apenas ignora
     const configWebhookUrl = `${process.env.N8N_API_URL}/webhook/config/tenant_${tenantId}`;
     
     const payload = {
@@ -385,12 +386,29 @@ export async function syncAgentConfigToN8N(
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 10000,
+      timeout: 5000, // Timeout menor
+    }).catch((error: any) => {
+      // Se o webhook não existir (404), apenas ignorar silenciosamente
+      if (error.response?.status === 404) {
+        // Webhook de config não existe - isso é normal, não é obrigatório
+        return null;
+      }
+      throw error; // Re-lançar outros erros
     });
 
-    console.log(`[N8N] ✅ Configuração sincronizada para workflow ${workflowId}`);
-    return response.status === 200;
+    if (response && response.status === 200) {
+      console.log(`[N8N] ✅ Configuração sincronizada para workflow ${workflowId}`);
+      return true;
+    }
+    
+    // Webhook não existe - não é erro, apenas não sincroniza
+    return false;
   } catch (error: any) {
+    // Ignorar erros 404 (webhook não existe) silenciosamente
+    if (error.response?.status === 404) {
+      // Webhook de config não existe - isso é normal
+      return false;
+    }
     console.warn(`[N8N] ⚠️ Erro ao sincronizar configuração (não bloqueia):`, error.message);
     // Não lançar erro - sincronização é opcional
     return false;
