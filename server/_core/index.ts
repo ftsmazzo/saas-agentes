@@ -31,15 +31,11 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   
-  // Middleware de debug para todas as requisições (apenas em produção para debug)
-  app.use((req, res, next) => {
-    if (req.originalUrl.startsWith("/api/webhooks/n8n/")) {
-      console.log(`[Debug] 🔍 Requisição recebida: ${req.method} ${req.originalUrl}`);
-      console.log(`[Debug] 📍 Params:`, req.params);
-      console.log(`[Debug] 🔗 Query:`, req.query);
-    }
-    next();
+  // Health check endpoint (para Docker/EasyPanel) - REGISTRAR PRIMEIRO
+  app.get("/api/health", (req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
   });
+  console.log("✅ [Routes] Health check registrado: GET /api/health");
   
   // Stripe webhook needs raw body, so register BEFORE body parser
   app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), handleStripeWebhook);
@@ -55,11 +51,6 @@ async function startServer() {
   // NOTA: N8N webhook já tem seu próprio body parser acima
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  
-  // Health check endpoint (para Docker/EasyPanel)
-  app.get("/api/health", (req, res) => {
-    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-  });
 
   // tRPC API
   app.use(
@@ -69,18 +60,6 @@ async function startServer() {
       createContext,
     })
   );
-  
-  // Handler 404 para rotas de API não encontradas (DEPOIS de TODAS as rotas de API)
-  app.use("/api/*", (req, res) => {
-    console.error(`[404] ❌ Rota de API não encontrada: ${req.method} ${req.originalUrl}`);
-    console.error(`[404] 📍 Params:`, req.params);
-    console.error(`[404] 🔗 Query:`, req.query);
-    res.status(404).json({ 
-      message: `Route ${req.method}:${req.originalUrl} not found`,
-      error: "Not Found",
-      statusCode: 404
-    });
-  });
   
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
