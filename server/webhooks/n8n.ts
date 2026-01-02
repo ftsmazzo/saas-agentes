@@ -89,18 +89,51 @@ export async function handleN8NWebhook(req: Request, res: Response) {
 
       case "usage_tracking_batch":
         // Processar múltiplos usos em lote
-        // Limpar expressões do N8N que podem vir como strings (ex: "=[]")
         let dataArray = payload.data;
         
-        // Se data é uma string, tentar parsear
-        if (typeof dataArray === "string") {
-          // Tratar "[object Object]" - significa que o N8N converteu objeto para string
-          if (dataArray === "[object Object]" || dataArray === "=[object Object]") {
-            console.warn(`[N8N Webhook] ⚠️ Data recebido como "[object Object]" - tentando buscar do payload completo`);
-            // Tentar buscar do payload original se disponível
-            dataArray = [];
-          } else if (dataArray.startsWith("=")) {
-            // Remover o "=" e tentar parsear como JSON
+        console.log(`[N8N Webhook] 🔍 Data recebido (tipo: ${typeof dataArray}):`, dataArray);
+        
+        // Se data é "[object Object]", tentar buscar do body completo
+        if (typeof dataArray === "string" && (dataArray === "[object Object]" || dataArray === "=[object Object]")) {
+          console.warn(`[N8N Webhook] ⚠️ Data recebido como "[object Object]" - tentando buscar do body completo`);
+          
+          // Tentar buscar do req.body completo (pode estar em outro lugar)
+          const fullBody = req.body;
+          console.log(`[N8N Webhook] 🔍 Body completo:`, JSON.stringify(fullBody, null, 2));
+          
+          // Tentar encontrar allUsageData em diferentes lugares
+          if (fullBody.data && typeof fullBody.data === "object" && !Array.isArray(fullBody.data)) {
+            // Se data é um objeto, pode ser que o array esteja dentro
+            const possibleArray = fullBody.data.allUsageData || 
+                                 fullBody.data.data || 
+                                 Object.values(fullBody.data)[0];
+            
+            if (Array.isArray(possibleArray)) {
+              dataArray = possibleArray;
+              console.log(`[N8N Webhook] ✅ Encontrado array em data.allUsageData ou similar`);
+            } else {
+              // Tentar converter objeto único para array
+              dataArray = [fullBody.data];
+              console.log(`[N8N Webhook] ⚠️ Convertendo objeto único para array`);
+            }
+          } else if (Array.isArray(fullBody.data)) {
+            // Se já é array no body, usar direto
+            dataArray = fullBody.data;
+            console.log(`[N8N Webhook] ✅ Array encontrado diretamente no body.data`);
+          } else {
+            // Tentar buscar em qualquer propriedade do body que seja array
+            const arrayKeys = Object.keys(fullBody).filter(key => Array.isArray(fullBody[key]));
+            if (arrayKeys.length > 0) {
+              dataArray = fullBody[arrayKeys[0]];
+              console.log(`[N8N Webhook] ✅ Array encontrado em body.${arrayKeys[0]}`);
+            } else {
+              dataArray = [];
+              console.warn(`[N8N Webhook] ❌ Não foi possível encontrar array no body`);
+            }
+          }
+        } else if (typeof dataArray === "string") {
+          // Se é string, tentar parsear
+          if (dataArray.startsWith("=")) {
             const cleaned = dataArray.substring(1).trim();
             try {
               dataArray = cleaned === "[]" ? [] : JSON.parse(cleaned);
@@ -109,7 +142,6 @@ export async function handleN8NWebhook(req: Request, res: Response) {
               dataArray = [];
             }
           } else {
-            // Tentar parsear como JSON
             try {
               dataArray = JSON.parse(dataArray);
             } catch (e) {
@@ -117,6 +149,10 @@ export async function handleN8NWebhook(req: Request, res: Response) {
               dataArray = [];
             }
           }
+        } else if (typeof dataArray === "object" && !Array.isArray(dataArray)) {
+          // Se é objeto único, converter para array
+          console.log(`[N8N Webhook] ⚠️ Data é objeto único, convertendo para array`);
+          dataArray = [dataArray];
         }
         
         if (Array.isArray(dataArray)) {
@@ -125,7 +161,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
             await handleUsageTracking(tenantId, { data: usageData });
           }
         } else {
-          console.warn(`[N8N Webhook] ⚠️ usage_tracking_batch espera um array, recebeu:`, typeof dataArray);
+          console.warn(`[N8N Webhook] ⚠️ usage_tracking_batch espera um array, recebeu:`, typeof dataArray, dataArray);
         }
         break;
 
