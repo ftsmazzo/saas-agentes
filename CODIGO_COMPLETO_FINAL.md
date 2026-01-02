@@ -275,12 +275,12 @@ JSON
 
 ## 🐛 CORRIGIR PROBLEMA "[object Object]"
 
-**O problema é que está usando `"={{ ... }}"` com aspas, o que converte para string.**
+**O problema é que o N8N converte objetos para `[object Object]` quando não são strings JSON.**
 
 **Solução:**
-- **NÃO use aspas** no campo `data`
-- Use: `"data": {{ $json._credits.allUsageData }}` (sem aspas)
-- Ou use: `"data": "={{ JSON.stringify($json._credits.allUsageData) }}"` (com JSON.stringify)
+- **No Code node:** Criar `allUsageDataJson = JSON.stringify(allUsageData)` ✅ (JÁ FEITO NO CÓDIGO)
+- **No HTTP Request:** Usar `"data": "={{ $json._credits.allUsageDataJson }}"` ✅
+- **NÃO use `allUsageData` diretamente** - sempre use `allUsageDataJson`
 
 ---
 
