@@ -47,14 +47,25 @@ export async function handleN8NWebhook(req: Request, res: Response) {
       cleanedBody.timestamp = cleanedBody.timestamp.substring(1).trim();
     }
     
-    // Limpar data se for string começando com "="
-    if (cleanedBody.data && typeof cleanedBody.data === "string" && cleanedBody.data.startsWith("=")) {
-      const cleaned = cleanedBody.data.substring(1).trim();
-      try {
-        cleanedBody.data = cleaned === "[]" ? [] : JSON.parse(cleaned);
-      } catch (e) {
-        console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
-        cleanedBody.data = [];
+    // Limpar data se for string começando com "=" (expressão N8N)
+    if (cleanedBody.data && typeof cleanedBody.data === "string") {
+      if (cleanedBody.data.startsWith("=")) {
+        const cleaned = cleanedBody.data.substring(1).trim();
+        try {
+          // Se for string JSON válida, parsear
+          cleanedBody.data = cleaned === "[]" ? [] : JSON.parse(cleaned);
+        } catch (e) {
+          console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
+          cleanedBody.data = [];
+        }
+      } else {
+        // Se não começa com "=", pode ser JSON string direto
+        try {
+          cleanedBody.data = JSON.parse(cleanedBody.data);
+        } catch (e) {
+          // Se não for JSON válido, manter como está
+          console.warn(`[N8N Webhook] ⚠️ Data não é JSON válido: ${cleanedBody.data}`);
+        }
       }
     }
     

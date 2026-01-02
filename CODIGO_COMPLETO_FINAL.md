@@ -195,13 +195,17 @@ try {
   // Ignorar
 }
 
-// 7. Retornar resultado
+// 7. Converter array para JSON string ANTES de retornar
+const allUsageDataJson = JSON.stringify(allUsageData);
+
+// 8. Retornar resultado
 return {
   json: {
     ...inputData,
     _credits: {
       tenantId: tenantId,
-      allUsageData: allUsageData,
+      allUsageData: allUsageData, // Array original (para debug)
+      allUsageDataJson: allUsageDataJson, // STRING JSON - USE ESTE NO HTTP REQUEST
       timestamp: new Date().toISOString(),
       totalItems: allUsageData.length
     }
@@ -230,38 +234,24 @@ POST
 JSON
 ```
 
-### Body (JSON) - OPÇÃO 1 (RECOMENDADO):
+### Body (JSON) - ÚNICA OPÇÃO CORRETA:
 
 **Use "Specify Body" → "Using JSON" e cole:**
 
 ```json
 {
   "eventType": "usage_tracking_batch",
-  "data": {{ $json._credits.allUsageData }},
-  "timestamp": "{{ $json._credits.timestamp }}"
-}
-```
-
-**IMPORTANTE:** 
-- `data` deve ser **SEM aspas** (não `"data": "={{ ... }}"`)
-- Deve ser: `"data": {{ $json._credits.allUsageData }}`
-- O N8N vai converter automaticamente para JSON
-
-### Body (JSON) - OPÇÃO 2 (Se Opção 1 não funcionar):
-
-**Use "Specify Body" → "Using JSON" e cole:**
-
-```json
-{
-  "eventType": "usage_tracking_batch",
-  "data": "={{ JSON.stringify($json._credits.allUsageData) }}",
+  "data": "={{ $json._credits.allUsageDataJson }}",
   "timestamp": "={{ $json._credits.timestamp }}"
 }
 ```
 
-**O backend já trata strings que começam com "=", então vai funcionar.**
+**IMPORTANTE:** 
+- Use `allUsageDataJson` (que já é uma STRING JSON)
+- O backend vai remover o `={{` e fazer `JSON.parse` automaticamente
+- **NÃO use `allUsageData` diretamente** - isso vira `[object Object]`
 
-### Body (JSON) - OPÇÃO 3 (Se ainda não funcionar):
+### Body (JSON) - ALTERNATIVA (Se a opção acima não funcionar):
 
 **Use "Specify Body" → "Using JSON" e configure campo por campo:**
 
@@ -271,7 +261,7 @@ JSON
 
 2. **Campo 2:**
    - Name: `data`
-   - Value: `={{ $json._credits.allUsageData }}`
+   - Value: `={{ $json._credits.allUsageDataJson }}` ← **USE allUsageDataJson**
 
 3. **Campo 3:**
    - Name: `timestamp`
