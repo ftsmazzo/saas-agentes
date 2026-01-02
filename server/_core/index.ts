@@ -63,6 +63,24 @@ async function startServer() {
   });
   console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/:tenantId");
   
+  // Endpoint de teste para N8N (aceita qualquer método)
+  app.all("/api/webhooks/n8n/test", (req, res) => {
+    console.log(`[N8N Test] 🧪 TESTE RECEBIDO: ${req.method} ${req.originalUrl}`);
+    console.log(`[N8N Test] 📍 Params:`, req.params);
+    console.log(`[N8N Test] 🔗 Query:`, req.query);
+    console.log(`[N8N Test] 📦 Body:`, req.body);
+    console.log(`[N8N Test] 📋 Headers:`, req.headers);
+    res.status(200).json({ 
+      success: true, 
+      message: "Teste recebido com sucesso",
+      method: req.method,
+      url: req.originalUrl,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
+  });
+  console.log("✅ [Routes] Endpoint de teste N8N registrado: ALL /api/webhooks/n8n/test");
+  
   // Configure body parser with larger size limit for file uploads
   // NOTA: N8N webhook já tem seu próprio body parser acima
   app.use(express.json({ limit: "50mb" }));
