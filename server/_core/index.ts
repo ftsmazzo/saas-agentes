@@ -32,11 +32,14 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   
-  // Middleware de debug para TODAS as requisições de API
-  app.use("/api/*", (req, res, next) => {
-    console.log(`[API Request] 🔍 ${req.method} ${req.originalUrl}`);
-    console.log(`[API Request] 📍 Params:`, req.params);
-    console.log(`[API Request] 🔗 Query:`, req.query);
+  // Middleware de debug para TODAS as requisições (antes de qualquer coisa)
+  app.use((req, res, next) => {
+    if (req.originalUrl.startsWith("/api/")) {
+      console.log(`[ALL REQUESTS] 🔍 ${req.method} ${req.originalUrl}`);
+      console.log(`[ALL REQUESTS] 📍 Params:`, req.params);
+      console.log(`[ALL REQUESTS] 🔗 Query:`, req.query);
+      console.log(`[ALL REQUESTS] 📦 Body exists:`, !!req.body);
+    }
     next();
   });
   

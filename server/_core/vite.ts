@@ -91,15 +91,20 @@ export function serveStatic(app: Express) {
 }
 
 function serveFromPath(app: Express, distPath: string) {
-
-  // Servir arquivos estáticos com headers de cache apropriados
-  app.use(express.static(distPath, {
-    // Cache assets por 1 ano (eles têm hash no nome)
-    maxAge: "1y",
-    // Mas sempre validar index.html (sem cache)
-    etag: true,
-    lastModified: true,
-  }));
+  // CRÍTICO: express.static pode interceptar rotas de API se não configurado corretamente
+  // Vamos usar um middleware que verifica se é rota de API ANTES de servir estáticos
+  app.use((req, res, next) => {
+    // Se for rota de API, pular completamente o serveStatic
+    if (req.originalUrl.startsWith("/api/")) {
+      return next();
+    }
+    // Se não for API, tentar servir arquivo estático
+    express.static(distPath, {
+      maxAge: "1y",
+      etag: true,
+      lastModified: true,
+    })(req, res, next);
+  });
 
   // fall through to index.html if the file doesn't exist
   // IMPORTANTE: Sempre servir index.html sem cache para garantir atualizações
@@ -107,6 +112,7 @@ function serveFromPath(app: Express, distPath: string) {
   app.use("*", (req, res, next) => {
     // Se for rota de API, não processar aqui - deixar passar para as rotas de API
     if (req.originalUrl.startsWith("/api/")) {
+      console.log(`[Static] ⏭️ Pulando serveStatic para rota de API: ${req.originalUrl}`);
       return next();
     }
     
