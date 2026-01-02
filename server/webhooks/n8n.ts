@@ -38,7 +38,26 @@ export async function handleN8NWebhook(req: Request, res: Response) {
       timestamp: z.string().optional(),
     });
 
-    const payload = payloadSchema.parse(req.body);
+    // Limpar expressões do N8N que podem vir como strings (ex: "=2026-01-02...")
+    let cleanedBody = { ...req.body };
+    
+    // Limpar timestamp se for string começando com "="
+    if (cleanedBody.timestamp && typeof cleanedBody.timestamp === "string" && cleanedBody.timestamp.startsWith("=")) {
+      cleanedBody.timestamp = cleanedBody.timestamp.substring(1).trim();
+    }
+    
+    // Limpar data se for string começando com "="
+    if (cleanedBody.data && typeof cleanedBody.data === "string" && cleanedBody.data.startsWith("=")) {
+      const cleaned = cleanedBody.data.substring(1).trim();
+      try {
+        cleanedBody.data = cleaned === "[]" ? [] : JSON.parse(cleaned);
+      } catch (e) {
+        console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
+        cleanedBody.data = [];
+      }
+    }
+    
+    const payload = payloadSchema.parse(cleanedBody);
 
     // Processar evento baseado no tipo
     switch (payload.eventType) {
@@ -69,10 +88,38 @@ export async function handleN8NWebhook(req: Request, res: Response) {
 
       case "usage_tracking_batch":
         // Processar múltiplos usos em lote
-        if (Array.isArray(payload.data)) {
-          for (const usageData of payload.data) {
+        // Limpar expressões do N8N que podem vir como strings (ex: "=[]")
+        let dataArray = payload.data;
+        
+        // Se data é uma string que começa com "=", tentar parsear
+        if (typeof dataArray === "string") {
+          if (dataArray.startsWith("=")) {
+            // Remover o "=" e tentar parsear como JSON
+            const cleaned = dataArray.substring(1).trim();
+            try {
+              dataArray = cleaned === "[]" ? [] : JSON.parse(cleaned);
+            } catch (e) {
+              console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${dataArray}`);
+              dataArray = [];
+            }
+          } else {
+            // Tentar parsear como JSON
+            try {
+              dataArray = JSON.parse(dataArray);
+            } catch (e) {
+              console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${dataArray}`);
+              dataArray = [];
+            }
+          }
+        }
+        
+        if (Array.isArray(dataArray)) {
+          console.log(`[N8N Webhook] 📦 Processando ${dataArray.length} itens em lote`);
+          for (const usageData of dataArray) {
             await handleUsageTracking(tenantId, { data: usageData });
           }
+        } else {
+          console.warn(`[N8N Webhook] ⚠️ usage_tracking_batch espera um array, recebeu:`, typeof dataArray);
         }
         break;
 
