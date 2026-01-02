@@ -39,33 +39,40 @@ export async function handleN8NWebhook(req: Request, res: Response) {
       timestamp: z.string().optional(),
     });
 
-    // Limpar expressões do N8N que podem vir como strings (ex: "=2026-01-02...")
+    // Limpar expressões do N8N que podem vir como strings (ex: "=2026-01-02..." ou "==[...]")
     let cleanedBody = { ...req.body };
     
-    // Limpar timestamp se for string começando com "="
-    if (cleanedBody.timestamp && typeof cleanedBody.timestamp === "string" && cleanedBody.timestamp.startsWith("=")) {
-      cleanedBody.timestamp = cleanedBody.timestamp.substring(1).trim();
+    // Limpar timestamp se for string começando com "=" ou "=="
+    if (cleanedBody.timestamp && typeof cleanedBody.timestamp === "string") {
+      if (cleanedBody.timestamp.startsWith("==")) {
+        cleanedBody.timestamp = cleanedBody.timestamp.substring(2).trim();
+      } else if (cleanedBody.timestamp.startsWith("=")) {
+        cleanedBody.timestamp = cleanedBody.timestamp.substring(1).trim();
+      }
     }
     
-    // Limpar data se for string começando com "=" (expressão N8N)
+    // Limpar data se for string começando com "=" ou "==" (expressão N8N)
     if (cleanedBody.data && typeof cleanedBody.data === "string") {
-      if (cleanedBody.data.startsWith("=")) {
-        const cleaned = cleanedBody.data.substring(1).trim();
-        try {
-          // Se for string JSON válida, parsear
-          cleanedBody.data = cleaned === "[]" ? [] : JSON.parse(cleaned);
-        } catch (e) {
-          console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
+      let cleaned = cleanedBody.data;
+      
+      // Remover "==" ou "=" do início
+      if (cleaned.startsWith("==")) {
+        cleaned = cleaned.substring(2).trim();
+      } else if (cleaned.startsWith("=")) {
+        cleaned = cleaned.substring(1).trim();
+      }
+      
+      // Tentar parsear como JSON
+      try {
+        if (cleaned === "[]" || cleaned === "") {
           cleanedBody.data = [];
+        } else {
+          cleanedBody.data = JSON.parse(cleaned);
         }
-      } else {
-        // Se não começa com "=", pode ser JSON string direto
-        try {
-          cleanedBody.data = JSON.parse(cleanedBody.data);
-        } catch (e) {
-          // Se não for JSON válido, manter como está
-          console.warn(`[N8N Webhook] ⚠️ Data não é JSON válido: ${cleanedBody.data}`);
-        }
+      } catch (e) {
+        console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
+        console.warn(`[N8N Webhook] ⚠️ Tentativa de parse após limpeza: ${cleaned}`);
+        cleanedBody.data = [];
       }
     }
     
