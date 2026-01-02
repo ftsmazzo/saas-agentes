@@ -234,7 +234,7 @@ POST
 JSON
 ```
 
-### Body (JSON) - ÚNICA OPÇÃO CORRETA:
+### Body (JSON) - OPÇÃO 1 (RECOMENDADO - Usa allUsageDataJson):
 
 **Use "Specify Body" → "Using JSON" e cole:**
 
@@ -247,9 +247,27 @@ JSON
 ```
 
 **IMPORTANTE:** 
-- Use `allUsageDataJson` (que já é uma STRING JSON)
+- Use `allUsageDataJson` (que já é uma STRING JSON criada no Code node)
 - O backend vai remover o `={{` e fazer `JSON.parse` automaticamente
-- **NÃO use `allUsageData` diretamente** - isso vira `[object Object]`
+
+---
+
+### Body (JSON) - OPÇÃO 2 (Se Opção 1 não funcionar - JSON.stringify direto):
+
+**Use "Specify Body" → "Using JSON" e cole:**
+
+```json
+{
+  "eventType": "usage_tracking_batch",
+  "data": "={{ JSON.stringify($json._credits.allUsageData) }}",
+  "timestamp": "={{ $json._credits.timestamp }}"
+}
+```
+
+**IMPORTANTE:** 
+- Usa `JSON.stringify` DIRETO na expressão do N8N
+- Isso força a conversão para string JSON no momento do envio
+- **NÃO vai causar loop** porque não acessa outros nodes
 
 ### Body (JSON) - ALTERNATIVA (Se a opção acima não funcionar):
 
@@ -286,11 +304,15 @@ JSON
 
 ## 🧪 TESTE
 
-1. **Cole o código completo** no Code node
-2. **Configure o HTTP Request** com a Opção 1 primeiro
+1. **Cole o código completo** no Code node (já tem o `allUsageDataJson`)
+2. **Configure o HTTP Request** com a **OPÇÃO 2** primeiro (usa `JSON.stringify` direto)
 3. **Execute** e veja o output do HTTP Request
-4. **Se aparecer `[object Object]`**, tente Opção 2 ou 3
-5. **Verifique** se o backend recebeu corretamente
+4. **O campo `data` deve ser uma string JSON válida**, não `[object Object]`
+5. **Verifique** os logs do backend para confirmar que recebeu corretamente
+
+**Se ainda der problema:**
+- Tente Opção 1 (usa `allUsageDataJson` do Code node)
+- Ou Opção 3 (campo por campo com `JSON.stringify`)
 
 ---
 
