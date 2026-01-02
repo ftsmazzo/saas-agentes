@@ -92,18 +92,21 @@ export function serveStatic(app: Express) {
 
 function serveFromPath(app: Express, distPath: string) {
   // CRÍTICO: express.static pode interceptar rotas de API se não configurado corretamente
-  // Vamos usar um middleware que verifica se é rota de API ANTES de servir estáticos
+  // Vamos criar um middleware que só serve estáticos se NÃO for rota de API
+  const staticMiddleware = express.static(distPath, {
+    maxAge: "1y",
+    etag: true,
+    lastModified: true,
+  });
+  
   app.use((req, res, next) => {
     // Se for rota de API, pular completamente o serveStatic
     if (req.originalUrl.startsWith("/api/")) {
+      console.log(`[Static] ⏭️ Pulando serveStatic para rota de API: ${req.originalUrl}`);
       return next();
     }
     // Se não for API, tentar servir arquivo estático
-    express.static(distPath, {
-      maxAge: "1y",
-      etag: true,
-      lastModified: true,
-    })(req, res, next);
+    staticMiddleware(req, res, next);
   });
 
   // fall through to index.html if the file doesn't exist
@@ -112,7 +115,7 @@ function serveFromPath(app: Express, distPath: string) {
   app.use("*", (req, res, next) => {
     // Se for rota de API, não processar aqui - deixar passar para as rotas de API
     if (req.originalUrl.startsWith("/api/")) {
-      console.log(`[Static] ⏭️ Pulando serveStatic para rota de API: ${req.originalUrl}`);
+      console.log(`[Static] ⏭️ Pulando index.html para rota de API: ${req.originalUrl}`);
       return next();
     }
     
