@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { handleStripeWebhook } from "../webhooks/stripe";
+import { handleN8NWebhook } from "../webhooks/n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -31,8 +32,17 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   
+  // Middleware de debug para TODAS as requisições de API
+  app.use("/api/*", (req, res, next) => {
+    console.log(`[API Request] 🔍 ${req.method} ${req.originalUrl}`);
+    console.log(`[API Request] 📍 Params:`, req.params);
+    console.log(`[API Request] 🔗 Query:`, req.query);
+    next();
+  });
+  
   // Health check endpoint (para Docker/EasyPanel) - REGISTRAR PRIMEIRO
   app.get("/api/health", (req, res) => {
+    console.log(`[Health] ✅ Health check chamado`);
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
   });
   console.log("✅ [Routes] Health check registrado: GET /api/health");
@@ -43,8 +53,11 @@ async function startServer() {
   
   // N8N webhook - recebe dados do workflow
   // IMPORTANTE: Registrar ANTES do body parser global para garantir que seja processado
-  const { handleN8NWebhook } = await import("../webhooks/n8n");
-  app.post("/api/webhooks/n8n/:tenantId", express.json({ limit: "50mb" }), handleN8NWebhook);
+  app.post("/api/webhooks/n8n/:tenantId", express.json({ limit: "50mb" }), (req, res, next) => {
+    console.log(`[N8N Route] 🎯 ROTA CHAMADA: ${req.method} ${req.originalUrl}`);
+    console.log(`[N8N Route] 📍 Params:`, req.params);
+    handleN8NWebhook(req, res, next);
+  });
   console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/:tenantId");
   
   // Configure body parser with larger size limit for file uploads
