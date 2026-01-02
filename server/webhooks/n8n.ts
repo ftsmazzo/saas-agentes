@@ -10,7 +10,8 @@ import { calculateCost, recordUsageTransaction, UsageData } from "../credit-syst
 export async function handleN8NWebhook(req: Request, res: Response) {
   console.log(`[N8N Webhook] 🎯 HANDLER CHAMADO: ${req.method} ${req.originalUrl}`);
   console.log(`[N8N Webhook] 📍 Params:`, req.params);
-  console.log(`[N8N Webhook] 📦 Body:`, JSON.stringify(req.body, null, 2));
+  console.log(`[N8N Webhook] 📦 Body completo:`, JSON.stringify(req.body, null, 2));
+  console.log(`[N8N Webhook] 📦 Body.data (tipo: ${typeof req.body?.data}):`, req.body?.data);
   
   try {
     const tenantId = parseInt(req.params.tenantId);
