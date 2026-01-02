@@ -91,9 +91,14 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         // Limpar expressões do N8N que podem vir como strings (ex: "=[]")
         let dataArray = payload.data;
         
-        // Se data é uma string que começa com "=", tentar parsear
+        // Se data é uma string, tentar parsear
         if (typeof dataArray === "string") {
-          if (dataArray.startsWith("=")) {
+          // Tratar "[object Object]" - significa que o N8N converteu objeto para string
+          if (dataArray === "[object Object]" || dataArray === "=[object Object]") {
+            console.warn(`[N8N Webhook] ⚠️ Data recebido como "[object Object]" - tentando buscar do payload completo`);
+            // Tentar buscar do payload original se disponível
+            dataArray = [];
+          } else if (dataArray.startsWith("=")) {
             // Remover o "=" e tentar parsear como JSON
             const cleaned = dataArray.substring(1).trim();
             try {
