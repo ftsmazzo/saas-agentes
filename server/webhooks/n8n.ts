@@ -55,28 +55,62 @@ export async function handleN8NWebhook(req: Request, res: Response) {
     if (cleanedBody.data && typeof cleanedBody.data === "string") {
       let cleaned = cleanedBody.data;
       
+      console.log(`[N8N Webhook] 🔍 Data original (tipo: ${typeof cleaned}, length: ${cleaned.length}):`, cleaned.substring(0, 200));
+      
       // Remover "==" ou "=" do início
       if (cleaned.startsWith("==")) {
         cleaned = cleaned.substring(2).trim();
+        console.log(`[N8N Webhook] 🔧 Removido "==" do início`);
       } else if (cleaned.startsWith("=")) {
         cleaned = cleaned.substring(1).trim();
+        console.log(`[N8N Webhook] 🔧 Removido "=" do início`);
       }
+      
+      console.log(`[N8N Webhook] 🔍 Data após limpeza (length: ${cleaned.length}):`, cleaned.substring(0, 200));
       
       // Tentar parsear como JSON
       try {
         if (cleaned === "[]" || cleaned === "") {
           cleanedBody.data = [];
+          console.log(`[N8N Webhook] ✅ Data vazio, definido como array vazio`);
         } else {
-          cleanedBody.data = JSON.parse(cleaned);
+          // Verificar se começa com [ ou { para garantir que é JSON válido
+          const trimmed = cleaned.trim();
+          if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            cleanedBody.data = JSON.parse(trimmed);
+            console.log(`[N8N Webhook] ✅ Data parseado com sucesso (tipo: ${Array.isArray(cleanedBody.data) ? 'array' : 'object'})`);
+          } else {
+            console.warn(`[N8N Webhook] ⚠️ Data não começa com [ ou {, tentando parsear mesmo assim`);
+            cleanedBody.data = JSON.parse(trimmed);
+          }
         }
-      } catch (e) {
-        console.warn(`[N8N Webhook] ⚠️ Não foi possível parsear data: ${cleanedBody.data}`);
-        console.warn(`[N8N Webhook] ⚠️ Tentativa de parse após limpeza: ${cleaned}`);
+      } catch (e: any) {
+        console.error(`[N8N Webhook] ❌ ERRO ao parsear data:`, e.message);
+        console.error(`[N8N Webhook] ❌ Data original:`, cleanedBody.data);
+        console.error(`[N8N Webhook] ❌ Data após limpeza:`, cleaned);
+        console.error(`[N8N Webhook] ❌ Stack:`, e.stack);
+        // Definir como array vazio para não quebrar o schema
         cleanedBody.data = [];
       }
     }
     
-    const payload = payloadSchema.parse(cleanedBody);
+    console.log(`[N8N Webhook] 📦 Body após limpeza:`, JSON.stringify(cleanedBody, null, 2));
+    
+    // Validar payload com Zod
+    let payload;
+    try {
+      payload = payloadSchema.parse(cleanedBody);
+      console.log(`[N8N Webhook] ✅ Payload validado com sucesso`);
+    } catch (e: any) {
+      console.error(`[N8N Webhook] ❌ ERRO na validação Zod:`, e.message);
+      console.error(`[N8N Webhook] ❌ Erros:`, e.errors);
+      console.error(`[N8N Webhook] ❌ Body que falhou:`, JSON.stringify(cleanedBody, null, 2));
+      return res.status(400).json({ 
+        error: "JSON parameter needs to be valid JSON",
+        details: e.errors,
+        receivedBody: cleanedBody
+      });
+    }
 
     // Processar evento baseado no tipo
     switch (payload.eventType) {
