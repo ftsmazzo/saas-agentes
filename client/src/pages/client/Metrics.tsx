@@ -90,8 +90,7 @@ export default function MetricsPage() {
 
         {/* Seção de Créditos - Sempre mostra, mesmo se não tiver dados ainda */}
         <Card className="border-primary/20">
-          <Card className="border-primary/20">
-            <CardHeader>
+          <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Coins className="h-5 w-5 text-yellow-500" />
                 Créditos Disponíveis
