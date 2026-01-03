@@ -42,6 +42,37 @@ export async function handleN8NWebhook(req: Request, res: Response) {
     // Limpar expressões do N8N que podem vir como strings (ex: "=2026-01-02..." ou "==[...]")
     let cleanedBody = { ...req.body };
     
+    // Detectar se o N8N enviou campos individuais em vez do formato esperado
+    // Se tem "operations" ou "ImputTokens" mas não tem "eventType" ou "data", é formato alternativo
+    if ((cleanedBody.operations || cleanedBody.ImputTokens !== undefined) && 
+        !cleanedBody.eventType && !cleanedBody.data) {
+      console.log(`[N8N Webhook] 🔧 Detectado formato de campos individuais, convertendo...`);
+      
+      // Construir o objeto de uso
+      const usageItem: any = {
+        operation: cleanedBody.operations || cleanedBody.operation || "chat",
+        model: cleanedBody.model || "gpt-4.1-mini",
+        tokensInput: cleanedBody.ImputTokens || cleanedBody.tokensInput || cleanedBody.InputTokens || 0,
+        tokensOutput: cleanedBody.OutputTokens || cleanedBody.tokensOutput || 0,
+        totalTokens: cleanedBody.TotalTokens || cleanedBody.totalTokens || 0,
+        isEstimated: true,
+        metadata: {
+          textLength: cleanedBody.textLegength || cleanedBody.textLength || 0,
+          workflowId: cleanedBody.WorkFlowId || cleanedBody.workflowId || cleanedBody.idWorkflow,
+          executionId: cleanedBody.ExecutionId || cleanedBody.executionId,
+        }
+      };
+      
+      // Converter para o formato esperado
+      cleanedBody = {
+        eventType: "usage_tracking_batch",
+        data: [usageItem],
+        timestamp: cleanedBody.timestamp || new Date().toISOString()
+      };
+      
+      console.log(`[N8N Webhook] ✅ Convertido para formato padrão:`, JSON.stringify(cleanedBody, null, 2));
+    }
+    
     // Limpar timestamp se for string começando com "=" ou "=="
     if (cleanedBody.timestamp && typeof cleanedBody.timestamp === "string") {
       if (cleanedBody.timestamp.startsWith("==")) {
