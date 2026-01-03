@@ -13,12 +13,9 @@ export default function Home() {
   const [loadingCheckout, setLoadingCheckout] = useState<number | null>(null);
   const [checkoutModal, setCheckoutModal] = useState<{ open: boolean; planId: number | null }>({ open: false, planId: null });
   const [checkoutData, setCheckoutData] = useState({ email: "", companyName: "" });
-  const [testModal, setTestModal] = useState<{ open: boolean; planId: number | null }>({ open: false, planId: null });
-  const [testData, setTestData] = useState({ email: "", companyName: "" });
 
   const { data: plans, isLoading: plansLoading } = trpc.plans.list.useQuery();
   const createPublicCheckout = trpc.payment.createPublicCheckoutSession.useMutation();
-  const simulatePayment = trpc.test.simulatePayment.useMutation();
 
   // Removido redirecionamento automático - deixar usuário escolher
 
@@ -273,14 +270,6 @@ export default function Home() {
                         'Assinar Agora'
                       )}
                     </Button>
-                    <Button 
-                      className="w-full" 
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setTestModal({ open: true, planId: plan.id })}
-                    >
-                      🧪 Modo Teste (Sem Pagamento)
-                    </Button>
                   </CardFooter>
                 </Card>
               ))}
@@ -367,80 +356,6 @@ export default function Home() {
           </Button>
         </div>
       </section>
-
-      {/* Modal de Teste */}
-      {testModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>🧪 Modo Teste - Sem Pagamento</CardTitle>
-              <CardDescription>
-                Crie uma conta de teste sem precisar pagar. Perfeito para testar o sistema!
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="seu@email.com"
-                  value={testData.email}
-                  onChange={(e) => setTestData({ ...testData, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Nome da Empresa</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Minha Empresa"
-                  value={testData.companyName}
-                  onChange={(e) => setTestData({ ...testData, companyName: e.target.value })}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setTestModal({ open: false, planId: null })}
-                disabled={simulatePayment.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={async () => {
-                  if (!testData.email || !testData.companyName || !testModal.planId) {
-                    toast.error("Preencha todos os campos");
-                    return;
-                  }
-                  try {
-                    const result = await simulatePayment.mutateAsync({
-                      email: testData.email,
-                      companyName: testData.companyName,
-                      planId: testModal.planId,
-                    });
-                    toast.success(result.message);
-                    setTestModal({ open: false, planId: null });
-                    setTestData({ email: "", companyName: "" });
-                  } catch (error: any) {
-                    toast.error(`Erro: ${error.message}`);
-                  }
-                }}
-                disabled={simulatePayment.isPending}
-              >
-                {simulatePayment.isPending ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Criando...</>
-                ) : (
-                  "🚀 Criar Conta de Teste"
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
 
       {/* Modal de Checkout */}
       {checkoutModal.open && (
