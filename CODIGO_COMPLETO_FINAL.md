@@ -27,7 +27,7 @@ if (!tenantId) {
   };
 }
 
-// 2. Função para estimar tokens (ajustada para mensagens curtas)
+// 2. Função para estimar tokens (MAIS CONSERVADORA - 35% de margem)
 function estimateTokensFromText(text) {
   if (!text || typeof text !== 'string') return null;
   
@@ -38,15 +38,15 @@ function estimateTokensFromText(text) {
   let outputRatio;
   
   if (textLength <= 100) {
-    outputRatio = 12.0; // MUITO MAIS para mensagens muito curtas
+    outputRatio = 13.0; // AUMENTADO de 12.0 para 13.0
   } else if (textLength <= 150) {
-    outputRatio = 10.0; // MAIS para mensagens curtas
+    outputRatio = 11.0; // AUMENTADO de 10.0 para 11.0
   } else if (textLength <= 250) {
-    outputRatio = 8.5;
+    outputRatio = 9.5; // AUMENTADO de 8.5 para 9.5
   } else if (textLength <= 350) {
-    outputRatio = 7.5;
+    outputRatio = 8.5; // AUMENTADO de 7.5 para 8.5
   } else {
-    outputRatio = 6.5;
+    outputRatio = 7.5; // AUMENTADO de 6.5 para 7.5
   }
   
   // +15% se tiver markdown
@@ -61,9 +61,9 @@ function estimateTokensFromText(text) {
   
   const outputTokens = Math.ceil(textLength * outputRatio);
   
-  // ADICIONAR MARGEM EXTRA DE 25%
+  // ADICIONAR MARGEM EXTRA DE 35% (AUMENTADO de 25% para 35%)
   const totalEstimated = baseInputTokens + outputTokens;
-  const totalWithMargin = Math.ceil(totalEstimated * 1.25);
+  const totalWithMargin = Math.ceil(totalEstimated * 1.35);
   
   // Distribuir margem proporcionalmente
   const marginRatio = totalWithMargin / totalEstimated;
@@ -84,23 +84,29 @@ const usage = inputData.usage ||
               inputData.supervisorOutput?.usage ||
               null;
 
+// Pegar modelo real escolhido pelo usuário
+const selectedModel = inputData.model || 
+                      inputData.supervisorOutput?.model || 
+                      inputData.openaiModel ||
+                      'gpt-4.1-mini'; // Fallback
+
 if (usage && (usage.total_tokens || usage.prompt_tokens || usage.completion_tokens)) {
-  // Usar dados reais com margem extra
+  // Usar dados reais com margem extra (35% em vez de 25%)
   const realTotal = usage.total_tokens || 
                    (usage.prompt_tokens || 0) + (usage.completion_tokens || 0);
   
-  const totalWithMargin = Math.ceil(realTotal * 1.25);
+  const totalWithMargin = Math.ceil(realTotal * 1.35);
   
   allUsageData.push({
     operation: 'chat',
-    model: 'gpt-4.1-mini', // SEMPRE 4.1-mini
-    tokensInput: Math.ceil((usage.prompt_tokens || 0) * 1.25),
-    tokensOutput: Math.ceil((usage.completion_tokens || 0) * 1.25),
+    model: selectedModel, // ✅ USA O MODELO REAL ESCOLHIDO PELO USUÁRIO
+    tokensInput: Math.ceil((usage.prompt_tokens || 0) * 1.35),
+    tokensOutput: Math.ceil((usage.completion_tokens || 0) * 1.35),
     totalTokens: totalWithMargin,
     isEstimated: false,
     metadata: {
-      originalModel: inputData.model || inputData.supervisorOutput?.model || 'gpt-4.1-mini',
-      note: 'Dados reais com 25% margem'
+      originalModel: selectedModel,
+      note: 'Dados reais com 35% margem'
     }
   });
 } else {
@@ -117,15 +123,15 @@ if (usage && (usage.total_tokens || usage.prompt_tokens || usage.completion_toke
     if (estimation) {
       allUsageData.push({
         operation: 'chat',
-        model: 'gpt-4.1-mini', // SEMPRE 4.1-mini
+        model: selectedModel, // ✅ USA O MODELO REAL ESCOLHIDO PELO USUÁRIO
         tokensInput: estimation.tokensInput,
         tokensOutput: estimation.tokensOutput,
         totalTokens: estimation.totalTokens,
         isEstimated: true,
         metadata: {
           textLength: responseText.length,
-          formula: 'Baseada em dados reais + ajustada para mensagens curtas + 25% margem',
-          originalModel: inputData.model || inputData.supervisorOutput?.model || 'gpt-4.1-mini',
+          formula: 'Baseada em dados reais + ajustada para mensagens curtas + 35% margem',
+          originalModel: selectedModel,
           workflowId: inputData.workflowId || $workflow.id,
           nodeName: 'LangChain Supervisor',
           executionId: $execution.id
@@ -136,13 +142,13 @@ if (usage && (usage.total_tokens || usage.prompt_tokens || usage.completion_toke
     // Valor mínimo aumentado para mensagens curtas
     allUsageData.push({
       operation: 'chat',
-      model: 'gpt-4.1-mini',
-      tokensInput: 1875,
-      tokensOutput: 3000,
-      totalTokens: 4875,
+      model: selectedModel, // ✅ USA O MODELO REAL ESCOLHIDO PELO USUÁRIO
+      tokensInput: 2025, // Aumentado de 1875
+      tokensOutput: 4050, // Aumentado de 3000
+      totalTokens: 6075, // Aumentado de 4875
       isEstimated: true,
       metadata: {
-        note: 'Valor mínimo aumentado para mensagens curtas'
+        note: 'Valor mínimo aumentado para mensagens curtas (35% margem)'
       }
     });
   }
@@ -177,17 +183,17 @@ try {
   const imageContent = imageData.content || '';
   
   if (imageContent && !inputData.usage?.duration) {
-    const estimatedTokens = Math.ceil((imageContent.length / 3.5) * 1.25);
+    const estimatedTokens = Math.ceil((imageContent.length / 3.5) * 1.35); // Aumentado de 1.25 para 1.35
     
     allUsageData.push({
       operation: 'image',
-      model: 'gpt-4.1-mini',
+      model: selectedModel, // ✅ USA O MODELO REAL ESCOLHIDO PELO USUÁRIO
       tokensInput: Math.ceil(estimatedTokens * 0.7),
       tokensOutput: Math.ceil(estimatedTokens * 0.3),
       totalTokens: estimatedTokens,
       isEstimated: true,
       metadata: {
-        note: 'Estimativa de imagem com 25% margem'
+        note: 'Estimativa de imagem com 35% margem'
       }
     });
   }
