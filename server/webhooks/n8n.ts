@@ -150,6 +150,30 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         
         console.log(`[N8N Webhook] 🔍 Data recebido (tipo: ${typeof dataArray}):`, dataArray);
         
+        // Se data não é array, pode ser que o N8N enviou campos individuais
+        // Tentar construir o array a partir dos campos do payload
+        if (!Array.isArray(dataArray) && typeof dataArray === "object" && dataArray !== null) {
+          // Verificar se tem campos individuais (formato antigo/alternativo)
+          if (payload.operations || payload.model || payload.ImputTokens !== undefined) {
+            console.log(`[N8N Webhook] 🔧 Detectado formato de campos individuais, convertendo para array`);
+            const usageItem: any = {
+              operation: payload.operations || payload.operation || "chat",
+              model: payload.model || "gpt-4.1-mini",
+              tokensInput: payload.ImputTokens || payload.tokensInput || payload.InputTokens || 0,
+              tokensOutput: payload.OutputTokens || payload.tokensOutput || 0,
+              totalTokens: payload.TotalTokens || payload.totalTokens || 0,
+              isEstimated: true,
+              metadata: {
+                textLength: payload.textLegength || payload.textLength || 0,
+                workflowId: payload.WorkFlowId || payload.workflowId || payload.idWorkflow,
+                executionId: payload.ExecutionId || payload.executionId,
+              }
+            };
+            dataArray = [usageItem];
+            console.log(`[N8N Webhook] ✅ Convertido para array:`, dataArray);
+          }
+        }
+        
         // Se data é "[object Object]", tentar buscar do body completo
         if (typeof dataArray === "string" && (dataArray === "[object Object]" || dataArray === "=[object Object]")) {
           console.warn(`[N8N Webhook] ⚠️ Data recebido como "[object Object]" - tentando buscar do body completo`);
