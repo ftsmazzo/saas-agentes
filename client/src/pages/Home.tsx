@@ -236,18 +236,20 @@ export default function Home() {
                   </CardHeader>
                   
                   <CardContent className="space-y-3">
-                    <div className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">{plan.maxWorkflowExecutions?.toLocaleString()} execuções/mês</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">{plan.maxConversations?.toLocaleString()} conversas/mês</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">{plan.maxStorageGB}GB de armazenamento</span>
-                    </div>
+                    {plan.monthlyCredits && (
+                      <div className="flex items-start gap-2">
+                        <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm">
+                          <strong>{plan.monthlyCredits.toLocaleString('pt-BR')} créditos</strong> mensais incluídos
+                        </span>
+                      </div>
+                    )}
+                    {plan.description && plan.description.includes('clientes') && (
+                      <div className="flex items-start gap-2">
+                        <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm">{plan.description}</span>
+                      </div>
+                    )}
                     <div className="flex items-start gap-2">
                       <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <span className="text-sm">Suporte por email</span>
