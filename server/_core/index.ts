@@ -8,6 +8,7 @@ import { handleN8NWebhook } from "../webhooks/n8n";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { runMonthlyCreditsReset } from "../jobs/monthly-credits-reset";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -116,7 +117,56 @@ async function startServer() {
     console.log(`📦 Build version: ${process.env.GIT_SHA || 'dev'}`);
     console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
     console.log(`✅ SetupWizard REMOVIDO - Configurações no EasyPanel`);
+    
+    // Configurar job de reset mensal de créditos
+    setupMonthlyCreditsResetJob();
   });
+}
+
+/**
+ * Configura job de reset mensal de créditos
+ * Executa no primeiro dia de cada mês às 00:00
+ */
+function setupMonthlyCreditsResetJob() {
+  console.log(`[Monthly Credits Reset] ⏰ Job configurado para rodar no primeiro dia de cada mês às 00:00`);
+  
+  // Verificar se é o primeiro dia do mês e executar imediatamente se necessário
+  const now = new Date();
+  const isFirstDay = now.getDate() === 1;
+  const isMidnight = now.getHours() === 0 && now.getMinutes() < 5; // Executar se for meia-noite (com margem de 5 min)
+  
+  if (isFirstDay && isMidnight) {
+    console.log(`[Monthly Credits Reset] 🚀 Executando reset imediatamente (primeiro dia do mês)`);
+    runMonthlyCreditsReset().catch(console.error);
+  }
+  
+  // Agendar para o próximo primeiro dia do mês às 00:00
+  scheduleNextReset();
+}
+
+/**
+ * Agenda o próximo reset mensal
+ */
+function scheduleNextReset() {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0);
+  const timeUntilNext = nextMonth.getTime() - now.getTime();
+  
+  console.log(`[Monthly Credits Reset] ⏰ Próximo reset agendado para: ${nextMonth.toISOString()}`);
+  
+  setTimeout(() => {
+    console.log(`[Monthly Credits Reset] 🚀 Executando reset mensal agendado...`);
+    runMonthlyCreditsReset()
+      .then(() => {
+        // Agendar o próximo reset após executar
+        scheduleNextReset();
+      })
+      .catch((error) => {
+        console.error(`[Monthly Credits Reset] ❌ Erro no reset agendado:`, error);
+        // Tentar novamente em 1 hora se falhar
+        setTimeout(() => scheduleNextReset(), 60 * 60 * 1000);
+      });
+  }, timeUntilNext);
 }
 
 startServer().catch(console.error);
