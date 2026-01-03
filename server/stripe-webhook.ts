@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import * as db from './db';
 import { notifyOwner } from './_core/notification';
+import { getDb } from './db';
+import { tenantCredits } from '../drizzle/schema';
+import { eq, sql } from 'drizzle-orm';
 
 const stripe = new Stripe(process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-11-17.clover',
@@ -201,7 +204,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 /**
- * Fatura paga
+ * Fatura paga - Renovação mensal ou primeira assinatura
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log('[Stripe] Invoice paid:', invoice.id);
@@ -212,6 +215,64 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!tenant) {
     console.warn('[Stripe] No tenant found for customer:', invoice.customer);
     return;
+  }
+
+  // Atribuir créditos mensais quando fatura é paga (renovação mensal)
+  try {
+    const plan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+    if (plan?.monthlyCredits) {
+      console.log(`[Stripe] Atribuindo ${plan.monthlyCredits} créditos do plano ${plan.name} para tenant ${tenant.id}`);
+      
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      
+      // Buscar ou criar registro de créditos
+      const existingCredits = await database
+        .select()
+        .from(tenantCredits)
+        .where(eq(tenantCredits.tenantId, tenant.id))
+        .limit(1);
+      
+      if (existingCredits[0]) {
+        // Adicionar créditos mensais ao saldo atual
+        await database
+          .update(tenantCredits)
+          .set({
+            currentCredits: sql`${tenantCredits.currentCredits} + ${plan.monthlyCredits}`,
+            totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(tenantCredits.tenantId, tenant.id));
+        
+        console.log(`[Stripe] ✅ Créditos atualizados. Novo saldo: ${existingCredits[0].currentCredits + plan.monthlyCredits}`);
+      } else {
+        // Criar registro inicial
+        await database.insert(tenantCredits).values({
+          tenantId: tenant.id,
+          currentCredits: plan.monthlyCredits,
+          totalCreditsPurchased: plan.monthlyCredits,
+        });
+        
+        console.log(`[Stripe] ✅ Registro de créditos criado. Saldo inicial: ${plan.monthlyCredits}`);
+      }
+      
+      await db.createPlatformLog({
+        tenantId: tenant.id,
+        eventType: 'credits_assigned',
+        message: `${plan.monthlyCredits} créditos atribuídos do plano ${plan.name} (renovação mensal)`,
+        metadata: JSON.stringify({ planId: plan.id, monthlyCredits: plan.monthlyCredits, invoiceId: invoice.id }),
+      });
+    } else {
+      console.warn(`[Stripe] ⚠️ Plano não encontrado ou sem créditos mensais configurados para tenant ${tenant.id}`);
+    }
+  } catch (error: any) {
+    console.error(`[Stripe] Erro ao atribuir créditos:`, error);
+    await db.createPlatformLog({
+      tenantId: tenant.id,
+      eventType: 'credits_assignment_failed',
+      message: `Failed to assign credits on invoice payment: ${error.message}`,
+      metadata: JSON.stringify({ error: error.message, invoiceId: invoice.id }),
+    });
   }
 
   await db.createPlatformLog({

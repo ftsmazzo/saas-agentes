@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { getDb, createTenant, createPlatformLog } from "../db";
-import { tenants, activationTokens } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId } from "../db";
+import { tenants, activationTokens, tenantCredits } from "../../drizzle/schema";
+import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { createEvolutionInstance } from "../evolution-integration";
 import { cloneWorkflowForTenant } from "../n8n-integration";
@@ -198,7 +198,62 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   
   console.log(`[Provisioning] Activation token created: ${activationToken}`);
 
-  // 5. Enviar email de ativação
+  // 5. Atribuir créditos mensais do plano
+  try {
+    const plan = await getPlanByStripePriceId(session.price?.id as string || "");
+    if (plan?.monthlyCredits) {
+      console.log(`[Provisioning] Atribuindo ${plan.monthlyCredits} créditos do plano ${plan.name}`);
+      
+      // Buscar ou criar registro de créditos
+      const existingCredits = await db
+        .select()
+        .from(tenantCredits)
+        .where(eq(tenantCredits.tenantId, tenant.id))
+        .limit(1);
+      
+      if (existingCredits[0]) {
+        // Adicionar créditos mensais ao saldo atual
+        await db
+          .update(tenantCredits)
+          .set({
+            currentCredits: sql`${tenantCredits.currentCredits} + ${plan.monthlyCredits}`,
+            totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(tenantCredits.tenantId, tenant.id));
+        
+        console.log(`[Provisioning] ✅ Créditos atualizados. Novo saldo: ${existingCredits[0].currentCredits + plan.monthlyCredits}`);
+      } else {
+        // Criar registro inicial
+        await db.insert(tenantCredits).values({
+          tenantId: tenant.id,
+          currentCredits: plan.monthlyCredits,
+          totalCreditsPurchased: plan.monthlyCredits,
+        });
+        
+        console.log(`[Provisioning] ✅ Registro de créditos criado. Saldo inicial: ${plan.monthlyCredits}`);
+      }
+      
+      await createPlatformLog({
+        tenantId: tenant.id,
+        eventType: "credits_assigned",
+        message: `${plan.monthlyCredits} créditos atribuídos do plano ${plan.name}`,
+        metadata: JSON.stringify({ planId: plan.id, monthlyCredits: plan.monthlyCredits }),
+      });
+    } else {
+      console.warn(`[Provisioning] ⚠️ Plano não encontrado ou sem créditos mensais configurados`);
+    }
+  } catch (error: any) {
+    console.error(`[Provisioning] Erro ao atribuir créditos:`, error);
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "credits_assignment_failed",
+      message: `Failed to assign credits: ${error.message}`,
+      metadata: JSON.stringify({ error: error.message }),
+    });
+  }
+
+  // 6. Enviar email de ativação
   try {
     await sendActivationEmail(email, activationToken, companyName);
     console.log(`[Provisioning] Activation email sent to ${email}`);

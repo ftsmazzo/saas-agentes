@@ -294,6 +294,14 @@ export async function getPlanById(id: number): Promise<Plan | undefined> {
   return result[0];
 }
 
+export async function getPlanByStripePriceId(stripePriceId: string): Promise<Plan | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(plans).where(eq(plans.stripePriceId, stripePriceId)).limit(1);
+  return result[0];
+}
+
 // ========== AGENT CONFIG OPERATIONS ==========
 
 export async function createAgentConfig(config: InsertAgentConfig): Promise<AgentConfig> {
