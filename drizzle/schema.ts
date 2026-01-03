@@ -112,6 +112,16 @@ export const plans = pgTable("plans", {
   // Sistema de créditos
   monthlyCredits: integer("monthlyCredits").default(10000), // Créditos mensais incluídos
   
+  // Features por plano (sistema progressivo)
+  maxAgents: integer("maxAgents").default(1), // Número máximo de agentes
+  enableScheduling: boolean("enableScheduling").default(false), // Agendamento
+  enableFAQ: boolean("enableFAQ").default(false), // FAQ/Base de Conhecimento Simples
+  enableAdvancedAnalytics: boolean("enableAdvancedAnalytics").default(false), // Analytics Avançados
+  enableCustomAPI: boolean("enableCustomAPI").default(false), // API Personalizada
+  enableCustomWebhooks: boolean("enableCustomWebhooks").default(false), // Webhooks Personalizados
+  enablePrioritySupport: boolean("enablePrioritySupport").default(false), // Suporte Prioritário
+  enableRAG: boolean("enableRAG").default(false), // RAG (Base de Conhecimento Avançada)
+  
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
