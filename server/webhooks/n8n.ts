@@ -43,9 +43,9 @@ export async function handleN8NWebhook(req: Request, res: Response) {
     let cleanedBody = { ...req.body };
     
     // Detectar se o N8N enviou campos individuais em vez do formato esperado
-    // Se tem "operations" ou "ImputTokens" mas não tem "eventType" ou "data", é formato alternativo
-    if ((cleanedBody.operations || cleanedBody.ImputTokens !== undefined) && 
-        !cleanedBody.eventType && !cleanedBody.data) {
+    // Se tem "operations" ou "ImputTokens" mas não tem "data", é formato alternativo
+    // Pode ter "eventType" mas ainda não ter "data"
+    if ((cleanedBody.operations || cleanedBody.ImputTokens !== undefined) && !cleanedBody.data) {
       console.log(`[N8N Webhook] 🔧 Detectado formato de campos individuais, convertendo...`);
       
       // Construir o objeto de uso
@@ -63,12 +63,28 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         }
       };
       
-      // Converter para o formato esperado
+      // Manter eventType e timestamp se existirem, adicionar data
       cleanedBody = {
-        eventType: "usage_tracking_batch",
+        ...cleanedBody,
+        eventType: cleanedBody.eventType || "usage_tracking_batch",
         data: [usageItem],
         timestamp: cleanedBody.timestamp || new Date().toISOString()
       };
+      
+      // Remover campos individuais que não são mais necessários
+      delete cleanedBody.operations;
+      delete cleanedBody.operation;
+      delete cleanedBody.ImputTokens;
+      delete cleanedBody.InputTokens;
+      delete cleanedBody.OutputTokens;
+      delete cleanedBody.TotalTokens;
+      delete cleanedBody.textLegength;
+      delete cleanedBody.textLength;
+      delete cleanedBody.WorkFlowId;
+      delete cleanedBody.workflowId;
+      delete cleanedBody.idWorkflow;
+      delete cleanedBody.ExecutionId;
+      delete cleanedBody.executionId;
       
       console.log(`[N8N Webhook] ✅ Convertido para formato padrão:`, JSON.stringify(cleanedBody, null, 2));
     }
