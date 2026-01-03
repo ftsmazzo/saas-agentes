@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, Zap, CheckCircle, XCircle, Coins, TrendingUp, TrendingDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -87,8 +88,8 @@ export default function MetricsPage() {
           </p>
         </div>
 
-        {/* Seção de Créditos */}
-        {credits && (
+        {/* Seção de Créditos - Sempre mostra, mesmo se não tiver dados ainda */}
+        <Card className="border-primary/20">
           <Card className="border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -188,9 +189,35 @@ export default function MetricsPage() {
                   </div>
                 </div>
               )}
+              
+              {/* Mensagem de erro se houver */}
+              {creditsError && (
+                <Alert className="mt-4">
+                  <AlertDescription className="text-red-600">
+                    Erro ao carregar créditos: {creditsError.message}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {/* Mensagem de erro se houver */}
+              {creditsError && (
+                <Alert className="mt-4">
+                  <AlertDescription className="text-red-600">
+                    Erro ao carregar créditos: {creditsError.message}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {/* Mensagem se ainda não tiver créditos */}
+              {!isLoadingCredits && !credits && !creditsError && (
+                <Alert className="mt-4">
+                  <AlertDescription>
+                    Seus créditos serão exibidos aqui após a primeira utilização do agente.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
-        )}
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

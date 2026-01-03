@@ -1234,21 +1234,33 @@ export const appRouter = router({
 
     // Obter saldo de créditos (cliente)
     getMyCredits: protectedProcedure.query(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      let tenantId: number | null = null;
       
-      if (!userTenant) {
+      // Se for cliente, usar tenant direto
+      if (ctx.tenant) {
+        tenantId = ctx.tenant.id;
+      } else if (ctx.user) {
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+        if (userTenant) {
+          tenantId = userTenant.id;
+        }
+      }
+      
+      if (!tenantId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
       }
 
-      const credits = await getTenantCredits(userTenant.id);
-      const plan = userTenant.currentPlanId ? await db.getPlanById(userTenant.currentPlanId) : null;
+      const credits = await getTenantCredits(tenantId);
+      const tenant = await db.getTenantById(tenantId);
+      const plan = tenant?.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
 
       return {
-        currentCredits: credits.currentCredits,
-        totalCreditsPurchased: credits.totalCreditsPurchased,
-        totalCreditsUsed: credits.totalCreditsUsed,
-        totalCreditsBonus: credits.totalCreditsBonus,
+        currentCredits: credits.currentCredits || 0,
+        totalCreditsPurchased: credits.totalCreditsPurchased || 0,
+        totalCreditsUsed: credits.totalCreditsUsed || 0,
+        totalCreditsBonus: credits.totalCreditsBonus || 0,
         monthlyCredits: plan?.monthlyCredits || 0,
         lastResetDate: credits.lastResetDate,
       };
