@@ -356,3 +356,67 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
     }),
   });
 }
+
+/**
+ * Processa compra de créditos extras
+ */
+async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const tenantId = session.metadata?.tenantId;
+  const creditsAmount = session.metadata?.creditsAmount;
+
+  if (!tenantId || !creditsAmount) {
+    throw new Error("Missing tenantId or creditsAmount in session metadata");
+  }
+
+  const creditsToAdd = parseInt(creditsAmount);
+  if (isNaN(creditsToAdd) || creditsToAdd <= 0) {
+    throw new Error("Invalid creditsAmount");
+  }
+
+  console.log(`[Extra Credits] Adicionando ${creditsToAdd} créditos extras para tenant ${tenantId}`);
+
+  // Buscar ou criar registro de créditos
+  const existingCredits = await db
+    .select()
+    .from(tenantCredits)
+    .where(eq(tenantCredits.tenantId, parseInt(tenantId)))
+    .limit(1);
+
+  if (existingCredits[0]) {
+    // Adicionar créditos extras ao saldo atual
+    await db
+      .update(tenantCredits)
+      .set({
+        currentCredits: sql`${tenantCredits.currentCredits} + ${creditsToAdd}`,
+        totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${creditsToAdd}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenantCredits.tenantId, parseInt(tenantId)));
+
+    console.log(`[Extra Credits] ✅ Créditos atualizados. Novo saldo: ${existingCredits[0].currentCredits + creditsToAdd}`);
+  } else {
+    // Criar registro inicial
+    await db.insert(tenantCredits).values({
+      tenantId: parseInt(tenantId),
+      currentCredits: creditsToAdd,
+      totalCreditsPurchased: creditsToAdd,
+    });
+
+    console.log(`[Extra Credits] ✅ Registro de créditos criado. Saldo inicial: ${creditsToAdd}`);
+  }
+
+  // Criar log
+  await createPlatformLog({
+    tenantId: parseInt(tenantId),
+    eventType: "extra_credits_purchased",
+    message: `${creditsToAdd} créditos extras comprados`,
+    metadata: JSON.stringify({
+      sessionId: session.id,
+      creditsAmount: creditsToAdd,
+      amountPaid: session.amount_total ? (session.amount_total / 100).toFixed(2) : '0.00',
+    }),
+  });
+}
