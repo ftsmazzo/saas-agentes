@@ -513,6 +513,15 @@ export default function AgentConfigUnifiedPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          ) : (
+            <TabsContent value="scheduling" className="space-y-6">
+              <Alert>
+                <AlertDescription>
+                  Agendamento não está disponível no seu plano atual. Faça upgrade para o plano Pro ou Enterprise para acessar esta funcionalidade.
+                </AlertDescription>
+              </Alert>
+            </TabsContent>
+          )}
 
           {/* Aba RAG - Só mostra se o plano permitir */}
           {hasRAG ? (
