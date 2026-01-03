@@ -1115,6 +1115,48 @@ export const appRouter = router({
 
     // ========== SISTEMA DE CRÉDITOS ==========
 
+    // Obter créditos estimados por modelo (para exibição no seletor)
+    getModelCredits: publicProcedure
+      .input(z.object({ 
+        model: z.string(),
+        exampleTokensInput: z.number().optional().default(1500),
+        exampleTokensOutput: z.number().optional().default(2000),
+      }))
+      .query(async ({ input }) => {
+        const { estimateCreditsForModel } = await import("./credit-system");
+        const credits = await estimateCreditsForModel(
+          input.model,
+          input.exampleTokensInput,
+          input.exampleTokensOutput
+        );
+        return { model: input.model, credits };
+      }),
+
+    // Obter créditos estimados para todos os modelos
+    getAllModelsCredits: publicProcedure.query(async () => {
+      const { estimateCreditsForModel } = await import("./credit-system");
+      const models = [
+        "gpt-4o",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+        "gpt-4o-mini",
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5.2",
+        "gpt-4-turbo",
+        "gpt-3.5-turbo",
+      ];
+      
+      const credits = await Promise.all(
+        models.map(async (model) => ({
+          model,
+          credits: await estimateCreditsForModel(model, 1500, 2000),
+        }))
+      );
+      
+      return credits;
+    }),
+
     // Obter saldo de créditos (cliente)
     getMyCredits: protectedProcedure.query(async ({ ctx }) => {
       const tenants = await db.getAllTenants();

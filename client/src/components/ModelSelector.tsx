@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -9,13 +9,14 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Zap, DollarSign, Brain } from "lucide-react";
+import { Sparkles, Zap, Coins, Brain } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 export interface ModelOption {
   value: string;
   label: string;
   description: string;
-  cost: string; // Custo por 1M tokens
+  creditsPerMessage?: number; // Créditos estimados por mensagem (será carregado do backend)
   speed: "fast" | "medium" | "slow";
   power: "high" | "medium" | "low";
   recommended?: boolean;
@@ -26,7 +27,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-4o",
     label: "GPT-4o",
     description: "Modelo mais poderoso e preciso, ideal para tarefas complexas",
-    cost: "R$ 0,15 / 1M tokens",
     speed: "fast",
     power: "high",
     recommended: true,
@@ -35,7 +35,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-4.1",
     label: "GPT-4.1",
     description: "Versão aprimorada do GPT-4o com melhorias de performance",
-    cost: "R$ 0,20 / 1M tokens",
     speed: "fast",
     power: "high",
     recommended: true,
@@ -44,7 +43,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-4.1-mini",
     label: "GPT-4.1 Mini",
     description: "Versão compacta do GPT-4.1, balanceada e eficiente",
-    cost: "R$ 0,015 / 1M tokens",
     speed: "fast",
     power: "medium",
     recommended: true,
@@ -53,7 +51,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-4o-mini",
     label: "GPT-4o Mini",
     description: "Balanceado entre custo e qualidade, recomendado para uso geral",
-    cost: "R$ 0,01 / 1M tokens",
     speed: "fast",
     power: "medium",
   },
@@ -61,7 +58,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-5",
     label: "GPT-5",
     description: "Modelo de última geração com capacidades avançadas",
-    cost: "R$ 0,25 / 1M tokens",
     speed: "fast",
     power: "high",
     recommended: true,
@@ -70,7 +66,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-5-mini",
     label: "GPT-5 Mini",
     description: "Versão compacta do GPT-5, ideal para uso em escala",
-    cost: "R$ 0,02 / 1M tokens",
     speed: "fast",
     power: "medium",
   },
@@ -78,7 +73,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-5.2",
     label: "GPT-5.2",
     description: "Versão mais recente do GPT-5 com melhorias significativas",
-    cost: "R$ 0,30 / 1M tokens",
     speed: "fast",
     power: "high",
     recommended: true,
@@ -87,7 +81,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-4-turbo",
     label: "GPT-4 Turbo",
     description: "Versão anterior do GPT-4, ainda muito capaz",
-    cost: "R$ 0,10 / 1M tokens",
     speed: "medium",
     power: "high",
   },
@@ -95,7 +88,6 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     value: "gpt-3.5-turbo",
     label: "GPT-3.5 Turbo",
     description: "Mais econômico, adequado para tarefas simples",
-    cost: "R$ 0,005 / 1M tokens",
     speed: "fast",
     power: "low",
   },
@@ -109,6 +101,20 @@ interface ModelSelectorProps {
 
 export default function ModelSelector({ value, onChange, disabled }: ModelSelectorProps) {
   const selectedModel = AVAILABLE_MODELS.find((m) => m.value === value) || AVAILABLE_MODELS[1]; // Default: gpt-4o-mini
+  
+  // Buscar créditos estimados para todos os modelos
+  const { data: modelsCredits, isLoading: isLoadingCredits } = trpc.metrics.getAllModelsCredits.useQuery();
+  
+  // Atualizar modelos com créditos
+  const modelsWithCredits = AVAILABLE_MODELS.map(model => {
+    const creditsData = modelsCredits?.find(m => m.model === model.value);
+    return {
+      ...model,
+      creditsPerMessage: creditsData?.credits || 0,
+    };
+  });
+  
+  const selectedModelWithCredits = modelsWithCredits.find((m) => m.value === value) || modelsWithCredits[1];
 
   const getSpeedIcon = (speed: string) => {
     switch (speed) {
@@ -141,14 +147,23 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
             <SelectValue placeholder="Selecione um modelo" />
           </SelectTrigger>
           <SelectContent>
-            {AVAILABLE_MODELS.map((model) => (
+            {modelsWithCredits.map((model) => (
               <SelectItem key={model.value} value={model.value}>
-                <div className="flex items-center gap-2">
-                  <span>{model.label}</span>
-                  {model.recommended && (
-                    <Badge variant="secondary" className="text-xs">
-                      Recomendado
-                    </Badge>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <span>{model.label}</span>
+                    {model.recommended && (
+                      <Badge variant="secondary" className="text-xs">
+                        Recomendado
+                      </Badge>
+                    )}
+                  </div>
+                  {isLoadingCredits ? (
+                    <span className="text-xs text-muted-foreground ml-auto">...</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      ~{model.creditsPerMessage || 0} créditos/msg
+                    </span>
                   )}
                 </div>
               </SelectItem>
@@ -192,10 +207,16 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
               </div>
             </div>
             <div className="flex items-center gap-2 col-span-2">
-              <DollarSign className="h-3 w-3 text-green-500" />
+              <Coins className="h-3 w-3 text-yellow-500" />
               <div>
-                <p className="text-xs text-muted-foreground">Custo estimado</p>
-                <p className="text-sm font-medium">{selectedModel.cost}</p>
+                <p className="text-xs text-muted-foreground">Créditos por mensagem</p>
+                {isLoadingCredits ? (
+                  <p className="text-sm font-medium">Carregando...</p>
+                ) : (
+                  <p className="text-sm font-medium">
+                    ~{selectedModelWithCredits.creditsPerMessage || 0} créditos
+                  </p>
+                )}
               </div>
             </div>
           </div>

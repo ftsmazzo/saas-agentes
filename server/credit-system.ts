@@ -352,3 +352,24 @@ export async function getTenantCredits(tenantId: number) {
   };
 }
 
+/**
+ * Calcula créditos estimados para um modelo baseado em exemplo de tokens
+ * Útil para mostrar ao usuário quanto custa cada modelo
+ */
+export async function estimateCreditsForModel(
+  model: string,
+  exampleTokensInput: number = 1500,
+  exampleTokensOutput: number = 2000
+): Promise<number> {
+  const usageData: UsageData = {
+    operation: 'chat',
+    model,
+    tokensInput: exampleTokensInput,
+    tokensOutput: exampleTokensOutput,
+    totalTokens: exampleTokensInput + exampleTokensOutput,
+  };
+
+  const costCalculation = await calculateCost(usageData);
+  return costCalculation.creditsUsed;
+}
+
