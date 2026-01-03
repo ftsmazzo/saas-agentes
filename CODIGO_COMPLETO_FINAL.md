@@ -252,9 +252,30 @@ JSON
 
 ---
 
-### Body (JSON) - OPÇÃO 2 (Se Opção 1 não funcionar - JSON.stringify direto):
+### Body (JSON) - OPÇÃO 2 (RECOMENDADO - JSON.stringify direto):
 
-**Use "Specify Body" → "Using JSON" e cole:**
+**⚠️ ATENÇÃO: NÃO use aspas duplas ao redor da expressão!**
+
+**No HTTP Request node:**
+1. **Body Content Type:** `JSON`
+2. **Specify Body:** `Using JSON`
+3. **Cole EXATAMENTE isto (copie e cole, sem modificar):**
+
+```json
+{
+  "eventType": "usage_tracking_batch",
+  "data": ={{ JSON.stringify($json._credits.allUsageData) }},
+  "timestamp": ={{ $json._credits.timestamp }}
+}
+```
+
+**IMPORTANTE:** 
+- **NÃO coloque aspas** ao redor das expressões `={{ ... }}`
+- O N8N vai processar as expressões e converter para JSON
+- `JSON.stringify` converte o array para string JSON válida
+- **NÃO vai causar loop** porque não acessa outros nodes
+
+**Se o N8N reclamar, tente com aspas nas expressões:**
 
 ```json
 {
@@ -263,11 +284,6 @@ JSON
   "timestamp": "={{ $json._credits.timestamp }}"
 }
 ```
-
-**IMPORTANTE:** 
-- Usa `JSON.stringify` DIRETO na expressão do N8N
-- Isso força a conversão para string JSON no momento do envio
-- **NÃO vai causar loop** porque não acessa outros nodes
 
 ### Body (JSON) - ALTERNATIVA (Se a opção acima não funcionar):
 
