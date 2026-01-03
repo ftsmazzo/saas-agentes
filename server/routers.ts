@@ -958,6 +958,16 @@ export const appRouter = router({
           });
         }
 
+        // Validar limite de agentes do plano
+        const { validateAgentCreation } = await import("./plan-validation");
+        const agentValidation = await validateAgentCreation(tenant.id);
+        if (!agentValidation.allowed) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: agentValidation.reason || 'Limite de agentes atingido',
+          });
+        }
+
         // Verificar se já existe configuração
         const existingConfig = await db.getAgentConfig(tenant.id);
         if (existingConfig) {
@@ -1028,10 +1038,11 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         let tenantId: number | null = null;
+        let tenant: db.Tenant | null = null;
         
         // Se for cliente, usar tenant direto
         if (ctx.tenant) {
-          await db.updateAgentConfig(ctx.tenant.id, input);
+          tenant = ctx.tenant;
           tenantId = ctx.tenant.id;
         } else if (ctx.user) {
           // Se for admin, buscar tenant pelo ownerId (compatibilidade)
@@ -1042,11 +1053,48 @@ export const appRouter = router({
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
           }
 
-          await db.updateAgentConfig(userTenant.id, input);
+          tenant = userTenant;
           tenantId = userTenant.id;
         } else {
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
         }
+
+        // Validar modelo se fornecido
+        if (input.openaiModel && tenantId) {
+          const { validateModelForTenant } = await import("./plan-validation");
+          const validation = await validateModelForTenant(tenantId, input.openaiModel);
+          if (!validation.allowed) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: validation.reason || 'Modelo não permitido para seu plano',
+            });
+          }
+        }
+
+        // Validar features se fornecidas
+        if (input.ragConfig && tenantId) {
+          const { validateFeatureForTenant } = await import("./plan-validation");
+          const validation = await validateFeatureForTenant(tenantId, 'enableRAG');
+          if (!validation.allowed) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: validation.reason || 'RAG não está disponível no seu plano',
+            });
+          }
+        }
+
+        if (input.schedulingConfig && tenantId) {
+          const { validateFeatureForTenant } = await import("./plan-validation");
+          const validation = await validateFeatureForTenant(tenantId, 'enableScheduling');
+          if (!validation.allowed) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: validation.reason || 'Agendamento não está disponível no seu plano',
+            });
+          }
+        }
+        
+        await db.updateAgentConfig(tenantId, input);
 
         // Sincronizar configuração com N8N em background (não bloqueia)
         if (tenantId) {
@@ -1155,6 +1203,33 @@ export const appRouter = router({
       );
       
       return credits;
+    }),
+
+    // Obter modelos permitidos para o plano do usuário
+    getAllowedModels: protectedProcedure.query(async ({ ctx }) => {
+      let tenantId: number | null = null;
+      
+      if (ctx.tenant) {
+        tenantId = ctx.tenant.id;
+      } else if (ctx.user) {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+        if (userTenant) {
+          tenantId = userTenant.id;
+        }
+      }
+
+      if (!tenantId) {
+        // Se não tiver tenant, retorna apenas modelos básicos
+        const { getAllowedModelsForPlan } = await import("./plan-validation");
+        return getAllowedModelsForPlan(1);
+      }
+
+      const tenant = await db.getTenantById(tenantId);
+      const planId = tenant?.currentPlanId || 1;
+      
+      const { getAllowedModelsForPlan } = await import("./plan-validation");
+      return getAllowedModelsForPlan(planId);
     }),
 
     // Obter saldo de créditos (cliente)

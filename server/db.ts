@@ -456,6 +456,13 @@ export async function getAgentConfig(tenantId: number): Promise<AgentConfig | un
   return result[0];
 }
 
+export async function getAllAgentConfigs(): Promise<AgentConfig[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(agentConfigs);
+}
+
 // ========== CONVERSATIONS AND MESSAGES OPERATIONS ==========
 
 export async function getConversationsByTenantId(

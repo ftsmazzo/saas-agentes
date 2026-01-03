@@ -70,7 +70,14 @@ const AVAILABLE_TOOLS = [
 
 export default function AgentConfigUnifiedPage() {
   const { data: config, isLoading } = trpc.agent.getConfig.useQuery();
+  const { data: subscriptionInfo } = trpc.payment.getSubscriptionInfo.useQuery();
   const utils = trpc.useUtils();
+  
+  // Obter informações do plano
+  const plan = subscriptionInfo?.plan;
+  const hasScheduling = plan?.enableScheduling ?? false;
+  const hasRAG = plan?.enableRAG ?? false;
+  const hasFAQ = plan?.enableFAQ ?? false;
   
   const [showAssistant, setShowAssistant] = useState(false);
   const [assistantComplete, setAssistantComplete] = useState(false);
@@ -270,8 +277,12 @@ export default function AgentConfigUnifiedPage() {
           <TabsList>
             <TabsTrigger value="basic">Básico</TabsTrigger>
             <TabsTrigger value="tools">Tools/Especialistas</TabsTrigger>
-            <TabsTrigger value="scheduling">Agendamento</TabsTrigger>
-            <TabsTrigger value="rag">RAG</TabsTrigger>
+            {hasScheduling && (
+              <TabsTrigger value="scheduling">Agendamento</TabsTrigger>
+            )}
+            {hasRAG && (
+              <TabsTrigger value="rag">RAG</TabsTrigger>
+            )}
             <TabsTrigger value="features">Funcionalidades</TabsTrigger>
           </TabsList>
 
@@ -394,18 +405,19 @@ export default function AgentConfigUnifiedPage() {
             </Card>
           </TabsContent>
 
-          {/* Aba Agendamento */}
-          <TabsContent value="scheduling" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Configuração de Agendamento
-                </CardTitle>
-                <CardDescription>
-                  Configure os dados de agendamento que o agente usará
-                </CardDescription>
-              </CardHeader>
+          {/* Aba Agendamento - Só mostra se o plano permitir */}
+          {hasScheduling ? (
+            <TabsContent value="scheduling" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Configuração de Agendamento
+                  </CardTitle>
+                  <CardDescription>
+                    Configure os dados de agendamento que o agente usará
+                  </CardDescription>
+                </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -502,19 +514,20 @@ export default function AgentConfigUnifiedPage() {
             </Card>
           </TabsContent>
 
-          {/* Aba RAG */}
-          <TabsContent value="rag" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Base de Conhecimento (RAG)
-                </CardTitle>
-                <CardDescription>
-                  Configure e visualize sua base de conhecimento
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          {/* Aba RAG - Só mostra se o plano permitir */}
+          {hasRAG ? (
+            <TabsContent value="rag" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Base de Conhecimento (RAG)
+                  </CardTitle>
+                  <CardDescription>
+                    Configure e visualize sua base de conhecimento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Ativar RAG</Label>
@@ -586,6 +599,15 @@ export default function AgentConfigUnifiedPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          ) : (
+            <TabsContent value="rag" className="space-y-6">
+              <Alert>
+                <AlertDescription>
+                  RAG (Base de Conhecimento Avançada) não está disponível no seu plano atual. Faça upgrade para o plano Enterprise para acessar esta funcionalidade.
+                </AlertDescription>
+              </Alert>
+            </TabsContent>
+          )}
 
           {/* Aba Funcionalidades */}
           <TabsContent value="features" className="space-y-6">

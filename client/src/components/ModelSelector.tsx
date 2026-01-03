@@ -100,13 +100,22 @@ interface ModelSelectorProps {
 }
 
 export default function ModelSelector({ value, onChange, disabled }: ModelSelectorProps) {
-  const selectedModel = AVAILABLE_MODELS.find((m) => m.value === value) || AVAILABLE_MODELS[1]; // Default: gpt-4o-mini
+  // Buscar modelos permitidos para o plano do usuário
+  const { data: allowedModels, isLoading: isLoadingAllowed } = trpc.metrics.getAllowedModels.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   
   // Buscar créditos estimados para todos os modelos
   const { data: modelsCredits, isLoading: isLoadingCredits } = trpc.metrics.getAllModelsCredits.useQuery();
   
+  // Filtrar modelos disponíveis baseado no plano
+  const availableModels = allowedModels 
+    ? AVAILABLE_MODELS.filter(model => allowedModels.includes(model.value))
+    : AVAILABLE_MODELS; // Fallback: mostrar todos se não conseguir buscar
+  
   // Atualizar modelos com créditos
-  const modelsWithCredits = AVAILABLE_MODELS.map(model => {
+  const modelsWithCredits = availableModels.map(model => {
     const creditsData = modelsCredits?.find(m => m.model === model.value);
     return {
       ...model,
@@ -114,7 +123,8 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
     };
   });
   
-  const selectedModelWithCredits = modelsWithCredits.find((m) => m.value === value) || modelsWithCredits[1];
+  const selectedModel = modelsWithCredits.find((m) => m.value === value) || modelsWithCredits[0] || AVAILABLE_MODELS[3]; // Default: gpt-4o-mini
+  const selectedModelWithCredits = selectedModel;
 
   const getSpeedIcon = (speed: string) => {
     switch (speed) {
@@ -142,12 +152,21 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="model">Modelo de IA</Label>
-        <Select value={value || "gpt-4o-mini"} onValueChange={onChange} disabled={disabled}>
+        <Select 
+          value={value || modelsWithCredits[0]?.value || "gpt-4o-mini"} 
+          onValueChange={onChange} 
+          disabled={disabled || isLoadingAllowed}
+        >
           <SelectTrigger id="model" className="w-full">
-            <SelectValue placeholder="Selecione um modelo" />
+            <SelectValue placeholder={isLoadingAllowed ? "Carregando..." : "Selecione um modelo"} />
           </SelectTrigger>
           <SelectContent>
-            {modelsWithCredits.map((model) => (
+            {isLoadingAllowed ? (
+              <SelectItem value="loading" disabled>Carregando modelos...</SelectItem>
+            ) : modelsWithCredits.length === 0 ? (
+              <SelectItem value="none" disabled>Nenhum modelo disponível</SelectItem>
+            ) : (
+              modelsWithCredits.map((model) => (
               <SelectItem key={model.value} value={model.value}>
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-2">
@@ -167,7 +186,8 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
                   )}
                 </div>
               </SelectItem>
-            ))}
+              ))
+            )}
           </SelectContent>
         </Select>
       </div>
