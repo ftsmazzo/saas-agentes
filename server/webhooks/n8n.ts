@@ -55,7 +55,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
     if (cleanedBody.data && typeof cleanedBody.data === "string") {
       let cleaned = cleanedBody.data;
       
-      console.log(`[N8N Webhook] 🔍 Data original (tipo: ${typeof cleaned}, length: ${cleaned.length}):`, cleaned.substring(0, 200));
+      console.log(`[N8N Webhook] 🔍 Data original (tipo: ${typeof cleaned}, length: ${cleaned.length}):`, cleaned.substring(0, 500));
       
       // Remover "==" ou "=" do início
       if (cleaned.startsWith("==")) {
@@ -66,7 +66,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         console.log(`[N8N Webhook] 🔧 Removido "=" do início`);
       }
       
-      console.log(`[N8N Webhook] 🔍 Data após limpeza (length: ${cleaned.length}):`, cleaned.substring(0, 200));
+      console.log(`[N8N Webhook] 🔍 Data após limpeza (length: ${cleaned.length}):`, cleaned.substring(0, 500));
       
       // Tentar parsear como JSON
       try {
@@ -78,10 +78,15 @@ export async function handleN8NWebhook(req: Request, res: Response) {
           const trimmed = cleaned.trim();
           if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
             cleanedBody.data = JSON.parse(trimmed);
-            console.log(`[N8N Webhook] ✅ Data parseado com sucesso (tipo: ${Array.isArray(cleanedBody.data) ? 'array' : 'object'})`);
+            console.log(`[N8N Webhook] ✅ Data parseado com sucesso (tipo: ${Array.isArray(cleanedBody.data) ? 'array' : 'object'}, length: ${Array.isArray(cleanedBody.data) ? cleanedBody.data.length : 'N/A'})`);
           } else {
-            console.warn(`[N8N Webhook] ⚠️ Data não começa com [ ou {, tentando parsear mesmo assim`);
-            cleanedBody.data = JSON.parse(trimmed);
+            // Se não começa com [ ou {, pode ser que o N8N não processou a expressão
+            // Tentar buscar do body original ou retornar erro mais claro
+            console.error(`[N8N Webhook] ❌ Data não é JSON válido - não começa com [ ou {`);
+            console.error(`[N8N Webhook] ❌ Isso geralmente significa que o N8N não processou a expressão {{ }}`);
+            console.error(`[N8N Webhook] ❌ Verifique se está usando ={{ JSON.stringify(...) }} no HTTP Request`);
+            // Definir como array vazio para não quebrar o schema
+            cleanedBody.data = [];
           }
         }
       } catch (e: any) {

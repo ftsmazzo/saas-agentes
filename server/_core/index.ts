@@ -59,6 +59,8 @@ async function startServer() {
   app.post("/api/webhooks/n8n/:tenantId", express.json({ limit: "50mb" }), (req, res, next) => {
     console.log(`[N8N Route] 🎯 ROTA CHAMADA: ${req.method} ${req.originalUrl}`);
     console.log(`[N8N Route] 📍 Params:`, req.params);
+    console.log(`[N8N Route] 📦 Body recebido:`, JSON.stringify(req.body, null, 2));
+    console.log(`[N8N Route] 📦 Body.data (tipo: ${typeof req.body?.data}):`, req.body?.data);
     handleN8NWebhook(req, res, next);
   });
   console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/:tenantId");
