@@ -1179,6 +1179,84 @@ export const appRouter = router({
       };
     }),
 
+    // Comprar créditos extras
+    purchaseExtraCredits: protectedProcedure
+      .input(z.object({
+        creditsAmount: z.number().int().min(1000, "Mínimo de 1.000 créditos").max(100000, "Máximo de 100.000 créditos"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        // Buscar preço de créditos extras
+        const { getCreditConfig } = await import("./credit-system");
+        const pricePer1000Str = await getCreditConfig('extraCreditsPricePer1000');
+        const pricePer1000 = pricePer1000Str ? parseFloat(pricePer1000Str) : 0.050; // Padrão: R$ 0,050 por 1.000
+        
+        // Calcular preço total (em centavos)
+        const priceInReais = (input.creditsAmount / 1000) * pricePer1000;
+        const priceInCents = Math.round(priceInReais * 100);
+
+        // Criar checkout session no Stripe
+        try {
+          const session = await stripe.checkout.sessions.create({
+            customer: userTenant.stripeCustomerId || undefined,
+            payment_method_types: ['card'],
+            line_items: [
+              {
+                price_data: {
+                  currency: 'brl',
+                  product_data: {
+                    name: `${input.creditsAmount.toLocaleString('pt-BR')} Créditos Extras`,
+                    description: `Compra de ${input.creditsAmount.toLocaleString('pt-BR')} créditos extras para uso imediato`,
+                  },
+                  unit_amount: priceInCents,
+                },
+                quantity: 1,
+              },
+            ],
+            mode: 'payment',
+            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/credits?success=true`,
+            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/credits?canceled=true`,
+            metadata: {
+              tenantId: userTenant.id.toString(),
+              type: 'extra_credits',
+              creditsAmount: input.creditsAmount.toString(),
+            },
+          });
+
+          // Criar log
+          await db.createPlatformLog({
+            tenantId: userTenant.id,
+            eventType: 'payment_initiated',
+            severity: 'info',
+            message: `Checkout criado para compra de ${input.creditsAmount} créditos extras`,
+            metadata: JSON.stringify({
+              sessionId: session.id,
+              creditsAmount: input.creditsAmount,
+              priceInReais,
+            }),
+          });
+
+          return {
+            sessionId: session.id,
+            url: session.url,
+            creditsAmount: input.creditsAmount,
+            priceInReais,
+          };
+        } catch (error: any) {
+          console.error('[Stripe] Erro ao criar checkout para créditos extras:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao criar checkout: ${error.message}`,
+          });
+        }
+      }),
+
     // Obter saldo de créditos de um tenant (admin)
     getTenantCredits: adminProcedure
       .input(z.object({ tenantId: z.number() }))
