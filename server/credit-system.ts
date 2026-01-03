@@ -162,7 +162,8 @@ export async function recordUsageTransaction(
   if (!db) throw new Error("Database not available");
 
   // 1. Criar transação detalhada
-  await db.insert(usageTransactions).values({
+  console.log(`[CreditSystem] 💾 Gravando transação no banco para tenant ${tenantId}...`);
+  const transactionResult = await db.insert(usageTransactions).values({
     tenantId,
     operation: usageData.operation,
     model: usageData.model,
@@ -172,7 +173,9 @@ export async function recordUsageTransaction(
     costUSD: costCalculation.costUSD.toString(),
     creditsUsed: costCalculation.creditsUsed,
     metadata: usageData.metadata ? JSON.stringify(usageData.metadata) : null,
-  });
+  }).returning();
+  
+  console.log(`[CreditSystem] ✅ Transação gravada com ID: ${transactionResult[0]?.id || 'N/A'}`);
 
   // 2. Atualizar saldo de créditos do tenant
   // Buscar ou criar registro de créditos
@@ -184,21 +187,28 @@ export async function recordUsageTransaction(
 
   if (existingCredits[0]) {
     // Atualizar saldo existente
-    await db
+    console.log(`[CreditSystem] 💾 Atualizando créditos existentes para tenant ${tenantId}...`);
+    const updateResult = await db
       .update(tenantCredits)
       .set({
         currentCredits: sql`${tenantCredits.currentCredits} - ${costCalculation.creditsUsed}`,
         totalCreditsUsed: sql`${tenantCredits.totalCreditsUsed} + ${costCalculation.creditsUsed}`,
         updatedAt: new Date(),
       })
-      .where(eq(tenantCredits.tenantId, tenantId));
+      .where(eq(tenantCredits.tenantId, tenantId))
+      .returning();
+    
+    console.log(`[CreditSystem] ✅ Créditos atualizados. Novo saldo: ${updateResult[0]?.currentCredits || 'N/A'}`);
   } else {
     // Criar registro inicial (assumindo que créditos já foram adicionados via plano)
-    await db.insert(tenantCredits).values({
+    console.log(`[CreditSystem] 💾 Criando registro de créditos para tenant ${tenantId}...`);
+    const insertResult = await db.insert(tenantCredits).values({
       tenantId,
       currentCredits: -costCalculation.creditsUsed, // Negativo pois está deduzindo
       totalCreditsUsed: costCalculation.creditsUsed,
-    });
+    }).returning();
+    
+    console.log(`[CreditSystem] ✅ Registro de créditos criado. Saldo inicial: ${insertResult[0]?.currentCredits || 'N/A'}`);
   }
 
   // 3. Atualizar métricas agregadas do mês atual
