@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -22,16 +23,35 @@ import { toast } from "sonner";
 import CircularProgress from "@/components/CircularProgress";
 
 export default function SubscriptionPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: subscriptionInfo, isLoading: isLoadingSubscription, error: subscriptionError } = trpc.payment.getSubscriptionInfo.useQuery(undefined, {
     retry: 1,
     refetchOnWindowFocus: false,
   });
-  const { data: credits, isLoading: isLoadingCredits } = trpc.metrics.getMyCredits.useQuery(undefined, {
+  const { data: credits, isLoading: isLoadingCredits, refetch: refetchCredits } = trpc.metrics.getMyCredits.useQuery(undefined, {
     retry: 1,
     refetchOnWindowFocus: false,
   });
   const { data: allPlans } = trpc.plans.list.useQuery();
   const utils = trpc.useUtils();
+
+  // Tratar parâmetros de URL após retorno do Stripe
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+    
+    if (success === 'true') {
+      toast.success('Compra realizada com sucesso! Seus créditos foram adicionados.');
+      // Recarregar dados de créditos
+      refetchCredits();
+      // Limpar parâmetro da URL
+      setSearchParams({}, { replace: true });
+    } else if (canceled === 'true') {
+      toast.info('Compra cancelada.');
+      // Limpar parâmetro da URL
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, refetchCredits, setSearchParams]);
 
   const [creditsAmount, setCreditsAmount] = useState(5000);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
