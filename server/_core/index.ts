@@ -152,9 +152,36 @@ function scheduleNextReset() {
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0);
   const timeUntilNext = nextMonth.getTime() - now.getTime();
   
-  console.log(`[Monthly Credits Reset] ⏰ Próximo reset agendado para: ${nextMonth.toISOString()}`);
+  // Validar timeout (máximo 32 bits signed = ~24 dias)
+  const MAX_TIMEOUT = 2147483647; // 32-bit signed integer max
+  const MIN_TIMEOUT = 1000; // Mínimo 1 segundo
   
-  setTimeout(() => {
+  if (timeUntilNext > MAX_TIMEOUT) {
+    console.error(`[Monthly Credits Reset] ❌ Timeout muito grande (${timeUntilNext}ms). Usando máximo permitido.`);
+    // Se for muito grande, agendar para 24 dias (quase um mês)
+    const fallbackTime = 24 * 24 * 60 * 60 * 1000; // 24 dias em ms
+    setTimeout(() => {
+      console.log(`[Monthly Credits Reset] 🚀 Reagendando reset...`);
+      scheduleNextReset();
+    }, fallbackTime);
+    return;
+  }
+  
+  if (timeUntilNext < MIN_TIMEOUT) {
+    console.warn(`[Monthly Credits Reset] ⚠️ Timeout muito pequeno (${timeUntilNext}ms). Executando imediatamente.`);
+    runMonthlyCreditsReset()
+      .then(() => scheduleNextReset())
+      .catch((error) => {
+        console.error(`[Monthly Credits Reset] ❌ Erro no reset:`, error);
+        // Tentar novamente em 1 hora se falhar
+        setTimeout(() => scheduleNextReset(), 60 * 60 * 1000);
+      });
+    return;
+  }
+  
+  console.log(`[Monthly Credits Reset] ⏰ Próximo reset agendado para: ${nextMonth.toISOString()} (em ${Math.round(timeUntilNext / 1000 / 60 / 60)} horas)`);
+  
+  const timeoutId = setTimeout(() => {
     console.log(`[Monthly Credits Reset] 🚀 Executando reset mensal agendado...`);
     runMonthlyCreditsReset()
       .then(() => {
@@ -167,6 +194,9 @@ function scheduleNextReset() {
         setTimeout(() => scheduleNextReset(), 60 * 60 * 1000);
       });
   }, timeUntilNext);
+  
+  // Armazenar timeoutId para poder cancelar se necessário
+  (global as any).monthlyResetTimeoutId = timeoutId;
 }
 
 startServer().catch(console.error);

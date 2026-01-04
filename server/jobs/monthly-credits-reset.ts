@@ -98,19 +98,25 @@ export async function resetMonthlyCredits(): Promise<{
 
         tenantsProcessed++;
 
-        // Criar log de plataforma
-        const { createPlatformLog } = await import("../db");
-        await createPlatformLog({
-          tenantId: tenant.id,
-          eventType: "credits_monthly_reset",
-          severity: "info",
-          message: `Créditos resetados para ${monthlyCredits} (reset mensal)`,
-          metadata: JSON.stringify({
-            planId: tenant.currentPlanId,
-            monthlyCredits,
-            resetDate: now.toISOString(),
-          }),
-        });
+        // Criar log de plataforma (usando eventType existente)
+        try {
+          const { createPlatformLog } = await import("../db");
+          await createPlatformLog({
+            tenantId: tenant.id,
+            eventType: "config_updated", // Usar eventType existente
+            severity: "info",
+            message: `Créditos resetados para ${monthlyCredits} (reset mensal)`,
+            metadata: JSON.stringify({
+              planId: tenant.currentPlanId,
+              monthlyCredits,
+              resetDate: now.toISOString(),
+              resetType: "monthly",
+            }),
+          });
+        } catch (logError: any) {
+          // Não falhar o reset se o log falhar
+          console.warn(`[Monthly Credits Reset] ⚠️ Erro ao criar log (não bloqueia):`, logError.message);
+        }
       } catch (error: any) {
         const errorMsg = `Tenant ${tenant.id}: ${error.message}`;
         console.error(`[Monthly Credits Reset] ❌ Erro ao processar tenant ${tenant.id}:`, error);
