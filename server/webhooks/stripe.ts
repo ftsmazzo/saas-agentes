@@ -72,11 +72,16 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     // Verificar se é compra de créditos extras
     if (session.metadata?.type === 'extra_credits') {
+      console.log("[Stripe Webhook] 🎯 Processando compra de créditos extras", {
+        sessionId: session.id,
+        tenantId: session.metadata?.tenantId,
+        creditsAmount: session.metadata?.creditsAmount,
+      });
       try {
         await handleExtraCreditsPurchase(session);
-        console.log("[Stripe Webhook] Extra credits purchased successfully");
+        console.log("[Stripe Webhook] ✅ Créditos extras processados com sucesso");
       } catch (error: any) {
-        console.error("[Stripe Webhook] Failed to process extra credits purchase:", error);
+        console.error("[Stripe Webhook] ❌ Erro ao processar compra de créditos extras:", error);
         await createPlatformLog({
           eventType: "extra_credits_failed",
           message: `Failed to process extra credits purchase: ${error.message}`,
