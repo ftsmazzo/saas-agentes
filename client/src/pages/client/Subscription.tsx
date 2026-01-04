@@ -113,9 +113,20 @@ export default function SubscriptionPage() {
   const currentPlan = subscriptionInfo?.plan;
   const monthlyCredits = credits?.monthlyCredits || 0;
   const currentCredits = credits?.currentCredits || 0;
-  const creditsUsed = monthlyCredits > 0 ? monthlyCredits - currentCredits : 0;
+  
+  // Calcular créditos disponíveis (saldo atual)
+  const creditsAvailable = currentCredits;
+  
+  // Calcular uso deste mês
+  // Se currentCredits <= monthlyCredits, usou (monthlyCredits - currentCredits)
+  // Se currentCredits > monthlyCredits, não usou nada do plano mensal ainda (comprou extras)
+  const creditsUsedThisMonth = currentCredits <= monthlyCredits 
+    ? monthlyCredits - currentCredits 
+    : 0;
+  
+  // Percentual de uso (baseado no uso do plano mensal)
   const creditsPercentage = monthlyCredits > 0 
-    ? Math.min((creditsUsed / monthlyCredits) * 100, 100) 
+    ? Math.min((creditsUsedThisMonth / monthlyCredits) * 100, 100) 
     : 0;
 
   // Filtrar planos disponíveis para upgrade (apenas planos superiores ao atual)
@@ -239,7 +250,7 @@ export default function SubscriptionPage() {
                   >
                     <div className="text-center">
                       <div className="text-3xl font-bold text-primary">
-                        {currentCredits.toLocaleString('pt-BR')}
+                        {creditsAvailable.toLocaleString('pt-BR')}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         disponíveis
@@ -253,7 +264,7 @@ export default function SubscriptionPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Usados este mês</span>
                     <span className="font-semibold text-orange-600">
-                      {creditsUsed.toLocaleString('pt-BR')} / {monthlyCredits.toLocaleString('pt-BR')}
+                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {monthlyCredits.toLocaleString('pt-BR')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
