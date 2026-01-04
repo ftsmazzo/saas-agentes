@@ -142,9 +142,13 @@ export default function SubscriptionPage() {
   // Uso deste mês (vem do backend, calculado somando transações do mês)
   const creditsUsedThisMonth = credits?.creditsUsedThisMonth || 0;
   
-  // Percentual de uso (baseado no uso do plano mensal)
-  const creditsPercentage = monthlyCredits > 0 
-    ? Math.min((creditsUsedThisMonth / monthlyCredits) * 100, 100) 
+  // Total de créditos disponíveis no início do mês (mensais + comprados)
+  // Se currentCredits + creditsUsedThisMonth > monthlyCredits, há créditos extras comprados
+  const totalCreditsAvailable = Math.max(monthlyCredits, currentCredits + creditsUsedThisMonth);
+  
+  // Percentual de uso (baseado no total de créditos disponíveis: mensais + comprados)
+  const creditsPercentage = totalCreditsAvailable > 0 
+    ? Math.min((creditsUsedThisMonth / totalCreditsAvailable) * 100, 100) 
     : 0;
 
   // Filtrar planos disponíveis para upgrade (apenas planos superiores ao atual)
@@ -282,7 +286,7 @@ export default function SubscriptionPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Usados este mês</span>
                     <span className="font-semibold text-orange-600">
-                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {monthlyCredits.toLocaleString('pt-BR')}
+                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {totalCreditsAvailable.toLocaleString('pt-BR')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">

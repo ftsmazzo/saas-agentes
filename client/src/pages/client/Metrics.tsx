@@ -58,9 +58,13 @@ export default function MetricsPage() {
   // Uso deste mês (vem do backend, calculado somando transações do mês)
   const creditsUsedThisMonth = credits?.creditsUsedThisMonth || 0;
   
-  // Percentual de uso (baseado no uso do plano mensal)
-  const usagePercentage = monthlyCredits > 0 
-    ? Math.min((creditsUsedThisMonth / monthlyCredits) * 100, 100) 
+  // Total de créditos disponíveis no início do mês (mensais + comprados)
+  // Se currentCredits + creditsUsedThisMonth > monthlyCredits, há créditos extras comprados
+  const totalCreditsAvailable = Math.max(monthlyCredits, currentCredits + creditsUsedThisMonth);
+  
+  // Percentual de uso (baseado no total de créditos disponíveis: mensais + comprados)
+  const usagePercentage = totalCreditsAvailable > 0 
+    ? Math.min((creditsUsedThisMonth / totalCreditsAvailable) * 100, 100) 
     : 0;
 
   return (
@@ -108,12 +112,12 @@ export default function MetricsPage() {
               </div>
 
               {/* Barra de Progresso */}
-              {monthlyCredits > 0 && (
+              {totalCreditsAvailable > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">Uso Mensal</span>
                     <span className="text-muted-foreground">
-                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {monthlyCredits.toLocaleString('pt-BR')} créditos
+                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {totalCreditsAvailable.toLocaleString('pt-BR')} créditos
                       ({usagePercentage.toFixed(1)}%)
                     </span>
                   </div>
@@ -121,7 +125,7 @@ export default function MetricsPage() {
                   {usagePercentage > 80 && (
                     <p className="text-xs text-orange-600 flex items-center gap-1">
                       <TrendingUp className="h-3 w-3" />
-                      Você está usando mais de 80% dos seus créditos mensais
+                      Você está usando mais de 80% dos seus créditos disponíveis
                     </p>
                   )}
                 </div>
