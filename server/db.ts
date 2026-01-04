@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, ne, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, ne, inArray, sql, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { 
@@ -504,6 +504,34 @@ export async function getConversationsByTenantId(
   );
 
   return result;
+}
+
+/**
+ * Conta total de conversas e mensagens de um tenant (otimizado)
+ */
+export async function getTenantConversationStats(tenantId: number): Promise<{
+  totalConversations: number;
+  totalMessages: number;
+}> {
+  const db = await getDb();
+  if (!db) return { totalConversations: 0, totalMessages: 0 };
+
+  // Contar conversas
+  const conversationsCount = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(eq(conversations.tenantId, tenantId));
+
+  // Contar mensagens
+  const messagesCount = await db
+    .select({ count: count() })
+    .from(chatMessages)
+    .where(eq(chatMessages.tenantId, tenantId));
+
+  return {
+    totalConversations: conversationsCount[0]?.count || 0,
+    totalMessages: messagesCount[0]?.count || 0,
+  };
 }
 
 export async function getMessagesByConversationIds(

@@ -1139,25 +1139,32 @@ export const appRouter = router({
         };
       }),
 
-    // Métricas do próprio tenant (para cliente)
+    // Métricas simplificadas do próprio tenant (para cliente) - otimizado
     getMyMetrics: protectedProcedure.query(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      let tenantId: number | null = null;
       
-      if (!userTenant) {
+      // Se for cliente, usar tenant direto
+      if (ctx.tenant) {
+        tenantId = ctx.tenant.id;
+      } else if (ctx.user) {
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+        if (userTenant) {
+          tenantId = userTenant.id;
+        }
+      }
+      
+      if (!tenantId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
       }
 
-      const currentMonth = await db.getCurrentMonthUsage(userTenant.id);
-      
-      let workflowStats = null;
-      if (userTenant.n8nWorkflowId) {
-        workflowStats = await getWorkflowExecutionStats(userTenant.n8nWorkflowId);
-      }
+      // Buscar apenas contagens otimizadas (sem workflow stats que é lento)
+      const stats = await db.getTenantConversationStats(tenantId);
 
       return {
-        currentMonth,
-        workflowStats,
+        totalConversations: stats.totalConversations,
+        totalMessages: stats.totalMessages,
       };
     }),
 
