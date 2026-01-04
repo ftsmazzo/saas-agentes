@@ -323,16 +323,22 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
 
   if (existingCredits[0]) {
     // Adicionar créditos extras ao saldo atual
-    await db
+    const oldCredits = existingCredits[0].currentCredits || 0;
+    console.log(`[Extra Credits] 💾 Atualizando créditos para tenant ${tenantId}...`);
+    console.log(`[Extra Credits] 📊 Saldo anterior: ${oldCredits}, Créditos a adicionar: ${creditsToAdd}`);
+    
+    const updateResult = await db
       .update(tenantCredits)
       .set({
         currentCredits: sql`${tenantCredits.currentCredits} + ${creditsToAdd}`,
         totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${creditsToAdd}`,
         updatedAt: new Date(),
       })
-      .where(eq(tenantCredits.tenantId, parseInt(tenantId)));
+      .where(eq(tenantCredits.tenantId, parseInt(tenantId)))
+      .returning();
 
-    console.log(`[Extra Credits] ✅ Créditos atualizados. Novo saldo: ${existingCredits[0].currentCredits + creditsToAdd}`);
+    const newCredits = updateResult[0]?.currentCredits || 0;
+    console.log(`[Extra Credits] ✅ Créditos atualizados. Novo saldo: ${newCredits} (era ${oldCredits}, adicionou ${creditsToAdd})`);
   } else {
     // Criar registro inicial
     await db.insert(tenantCredits).values({

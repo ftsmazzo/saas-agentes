@@ -1337,13 +1337,16 @@ export const appRouter = router({
 
         // Criar checkout session no Stripe
         try {
-        const session = await stripe.checkout.sessions.create({
-          // Se já tem customer no Stripe, usa customer. Senão, usa customer_email
-          ...(tenant.stripeCustomerId 
-            ? { customer: tenant.stripeCustomerId }
-            : { customer_email: tenant.email }
-          ),
-          payment_method_types: ['card'],
+          // Usar origin do header para URL de redirecionamento (funciona em dev e produção)
+          const origin = ctx.req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+          
+          const session = await stripe.checkout.sessions.create({
+            // Se já tem customer no Stripe, usa customer. Senão, usa customer_email
+            ...(tenant.stripeCustomerId 
+              ? { customer: tenant.stripeCustomerId }
+              : { customer_email: tenant.email }
+            ),
+            payment_method_types: ['card'],
             line_items: [
               {
                 price_data: {
@@ -1358,8 +1361,8 @@ export const appRouter = router({
               },
             ],
             mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/subscription?success=true`,
-            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/subscription?canceled=true`,
+            success_url: `${origin}/client/subscription?success=true`,
+            cancel_url: `${origin}/client/subscription?canceled=true`,
             metadata: {
               tenantId: tenantId.toString(),
               type: 'extra_credits',
