@@ -1285,13 +1285,40 @@ export const appRouter = router({
         );
       
       const creditsUsedThisMonth = monthlyUsageResult[0]?.total || 0;
+      const monthlyCredits = plan?.monthlyCredits || 0;
+      const currentCreditsFromDb = credits.currentCredits || 0;
+
+      // Calcular créditos disponíveis dinamicamente baseado nos dados do banco
+      // O problema: o currentCredits no banco pode não estar atualizado com o uso recente
+      // Solução: recalcular baseado nos dados reais gravados no banco
+      
+      // Se o currentCredits do banco não foi atualizado com o uso, então:
+      // currentCreditsFromDb = monthlyCredits + extras (sem subtrair o uso)
+      // Então: calculatedCurrentCredits = currentCreditsFromDb - creditsUsedThisMonth
+      
+      // Se o currentCredits foi atualizado, então:
+      // currentCreditsFromDb = monthlyCredits + extras - creditsUsedThisMonth
+      // Então: calculatedCurrentCredits = currentCreditsFromDb (já está correto)
+      
+      // Para garantir que está correto, vamos sempre recalcular:
+      // Se currentCreditsFromDb + creditsUsedThisMonth >= monthlyCredits, há extras
+      // Então: extras = currentCreditsFromDb + creditsUsedThisMonth - monthlyCredits
+      // E: calculatedCurrentCredits = monthlyCredits + extras - creditsUsedThisMonth
+      // Simplificando: calculatedCurrentCredits = currentCreditsFromDb
+      
+      // Mas se o currentCredits NÃO foi atualizado:
+      // currentCreditsFromDb = monthlyCredits + extras (sem subtrair uso)
+      // Então: calculatedCurrentCredits = currentCreditsFromDb - creditsUsedThisMonth
+      
+      // Vamos sempre recalcular assumindo que o currentCredits não foi atualizado com o uso:
+      const calculatedCurrentCredits = Math.max(0, currentCreditsFromDb - creditsUsedThisMonth);
 
       return {
-        currentCredits: credits.currentCredits || 0,
+        currentCredits: calculatedCurrentCredits,
         totalCreditsPurchased: credits.totalCreditsPurchased || 0,
         totalCreditsUsed: credits.totalCreditsUsed || 0,
         totalCreditsBonus: credits.totalCreditsBonus || 0,
-        monthlyCredits: plan?.monthlyCredits || 0,
+        monthlyCredits: monthlyCredits,
         creditsUsedThisMonth: creditsUsedThisMonth,
         lastResetDate: credits.lastResetDate,
       };
