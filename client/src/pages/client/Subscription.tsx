@@ -30,7 +30,8 @@ export default function SubscriptionPage() {
   });
   const { data: credits, isLoading: isLoadingCredits, refetch: refetchCredits } = trpc.metrics.getMyCredits.useQuery(undefined, {
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // Atualizar quando voltar à janela
+    refetchInterval: 30000, // Refetch a cada 30 segundos
   });
   const { data: allPlans } = trpc.plans.list.useQuery();
   const utils = trpc.useUtils();

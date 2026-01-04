@@ -203,6 +203,27 @@ export async function recordUsageTransaction(
     
     const newCredits = updateResult[0]?.currentCredits || 0;
     console.log(`[CreditSystem] ✅ Créditos atualizados. Novo saldo: ${newCredits} (era ${oldCredits}, deduziu ${costCalculation.creditsUsed})`);
+    
+    // Verificar se a atualização funcionou corretamente
+    if (updateResult.length === 0) {
+      console.error(`[CreditSystem] ❌ ATENÇÃO: Update não retornou nenhum registro!`);
+    } else if (Math.abs(newCredits - (oldCredits - costCalculation.creditsUsed)) > 0.01) {
+      console.warn(`[CreditSystem] ⚠️ ATENÇÃO: Novo saldo (${newCredits}) não corresponde ao esperado (${oldCredits - costCalculation.creditsUsed})`);
+    }
+    
+    // Buscar novamente para confirmar
+    const verifyCredits = await db
+      .select()
+      .from(tenantCredits)
+      .where(eq(tenantCredits.tenantId, tenantId))
+      .limit(1);
+    
+    if (verifyCredits[0]) {
+      console.log(`[CreditSystem] 🔍 Verificação: Saldo no banco após update: ${verifyCredits[0].currentCredits}`);
+      if (verifyCredits[0].currentCredits !== newCredits) {
+        console.error(`[CreditSystem] ❌ ERRO CRÍTICO: Saldo retornado (${newCredits}) diferente do saldo no banco (${verifyCredits[0].currentCredits})!`);
+      }
+    }
   } else {
     // Criar registro inicial (assumindo que créditos já foram adicionados via plano)
     console.log(`[CreditSystem] 💾 Criando registro de créditos para tenant ${tenantId}...`);

@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 
 export default function MetricsPage() {
   const { data: metrics, isLoading } = trpc.metrics.getMyMetrics.useQuery();
-  const { data: credits, isLoading: isLoadingCredits, error: creditsError } = trpc.metrics.getMyCredits.useQuery(undefined, {
+  const { data: credits, isLoading: isLoadingCredits, error: creditsError, refetch: refetchCredits } = trpc.metrics.getMyCredits.useQuery(undefined, {
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // Atualizar quando voltar à janela
+    refetchInterval: 30000, // Refetch a cada 30 segundos
   });
   const { data: usageTransactions, isLoading: isLoadingTransactions } = trpc.metrics.getMyUsageTransactions.useQuery({
     limit: 10,
