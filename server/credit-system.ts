@@ -187,7 +187,10 @@ export async function recordUsageTransaction(
 
   if (existingCredits[0]) {
     // Atualizar saldo existente
+    const oldCredits = existingCredits[0].currentCredits || 0;
     console.log(`[CreditSystem] 💾 Atualizando créditos existentes para tenant ${tenantId}...`);
+    console.log(`[CreditSystem] 📊 Saldo anterior: ${oldCredits}, Créditos a deduzir: ${costCalculation.creditsUsed}`);
+    
     const updateResult = await db
       .update(tenantCredits)
       .set({
@@ -198,7 +201,8 @@ export async function recordUsageTransaction(
       .where(eq(tenantCredits.tenantId, tenantId))
       .returning();
     
-    console.log(`[CreditSystem] ✅ Créditos atualizados. Novo saldo: ${updateResult[0]?.currentCredits || 'N/A'}`);
+    const newCredits = updateResult[0]?.currentCredits || 0;
+    console.log(`[CreditSystem] ✅ Créditos atualizados. Novo saldo: ${newCredits} (era ${oldCredits}, deduziu ${costCalculation.creditsUsed})`);
   } else {
     // Criar registro inicial (assumindo que créditos já foram adicionados via plano)
     console.log(`[CreditSystem] 💾 Criando registro de créditos para tenant ${tenantId}...`);
