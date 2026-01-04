@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import CircularProgress from "@/components/CircularProgress";
 
 export default function SubscriptionPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setLocation] = useLocation();
   const { data: subscriptionInfo, isLoading: isLoadingSubscription, error: subscriptionError } = trpc.payment.getSubscriptionInfo.useQuery(undefined, {
     retry: 1,
     refetchOnWindowFocus: false,
@@ -37,6 +37,7 @@ export default function SubscriptionPage() {
 
   // Tratar parâmetros de URL após retorno do Stripe
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get('success');
     const canceled = searchParams.get('canceled');
     
@@ -45,13 +46,13 @@ export default function SubscriptionPage() {
       // Recarregar dados de créditos
       refetchCredits();
       // Limpar parâmetro da URL
-      setSearchParams({}, { replace: true });
+      setLocation('/client/subscription', { replace: true });
     } else if (canceled === 'true') {
       toast.info('Compra cancelada.');
       // Limpar parâmetro da URL
-      setSearchParams({}, { replace: true });
+      setLocation('/client/subscription', { replace: true });
     }
-  }, [searchParams, refetchCredits, setSearchParams]);
+  }, [refetchCredits, setLocation]);
 
   const [creditsAmount, setCreditsAmount] = useState(5000);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
