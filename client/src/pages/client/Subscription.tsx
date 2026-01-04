@@ -436,13 +436,13 @@ export default function SubscriptionPage() {
                     placeholder="5000"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Mínimo: 1.000 créditos. Preço: R$ 0,050 por 1.000 créditos
+                    Mínimo: 1.000 créditos. Preço: R$ 60,00 por 1.000 créditos (R$ 0,06 por crédito)
                   </p>
                   <div className="p-3 bg-muted rounded-lg">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Total a pagar:</span>
                       <span className="text-lg font-bold">
-                        R$ {((creditsAmount / 1000) * 0.050).toFixed(2)}
+                        R$ {((creditsAmount / 1000) * 60.00).toFixed(2)}
                       </span>
                     </div>
                   </div>
