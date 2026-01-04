@@ -50,16 +50,20 @@ export default function MetricsPage() {
   const monthlyCredits = credits?.monthlyCredits || 0;
   const currentCredits = credits?.currentCredits || 0;
   const totalUsed = credits?.totalCreditsUsed || 0;
-  const totalPurchased = credits?.totalCreditsPurchased || 0;
   
-  // Calcular uso deste mês (considerando que pode ter comprado créditos extras)
+  // Calcular créditos disponíveis (saldo atual)
   // Se currentCredits > monthlyCredits, significa que comprou extras
-  // Uso mensal = monthlyCredits - (currentCredits - extras comprados)
-  // Simplificando: se currentCredits <= monthlyCredits, usou (monthlyCredits - currentCredits)
-  // Se currentCredits > monthlyCredits, não usou nada do plano mensal ainda
+  // Créditos disponíveis = currentCredits (saldo atual)
+  const creditsAvailable = currentCredits;
+  
+  // Calcular uso deste mês
+  // Se currentCredits <= monthlyCredits, usou (monthlyCredits - currentCredits)
+  // Se currentCredits > monthlyCredits, não usou nada do plano mensal ainda (comprou extras)
   const creditsUsedThisMonth = currentCredits <= monthlyCredits 
     ? monthlyCredits - currentCredits 
     : 0;
+  
+  // Percentual de uso (baseado no uso do plano mensal)
   const usagePercentage = monthlyCredits > 0 
     ? Math.min((creditsUsedThisMonth / monthlyCredits) * 100, 100) 
     : 0;
@@ -86,31 +90,25 @@ export default function MetricsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Saldo Atual */}
+              {/* Saldo Atual - Alinhado e proporcional */}
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Créditos Disponíveis</span>
-                    <Badge variant="outline" className="text-lg font-bold">
-                      {currentCredits.toLocaleString('pt-BR')}
-                    </Badge>
-                  </div>
+                <div className="flex flex-col items-center justify-center p-4 rounded-lg border bg-muted/30">
+                  <span className="text-xs font-medium text-muted-foreground mb-2">Créditos Disponíveis</span>
+                  <Badge variant="outline" className="text-2xl font-bold px-4 py-2">
+                    {creditsAvailable.toLocaleString('pt-BR')}
+                  </Badge>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Créditos Mensais</span>
-                    <span className="text-sm font-semibold">
-                      {monthlyCredits.toLocaleString('pt-BR')}
-                    </span>
-                  </div>
+                <div className="flex flex-col items-center justify-center p-4 rounded-lg border bg-muted/30">
+                  <span className="text-xs font-medium text-muted-foreground mb-2">Créditos Mensais</span>
+                  <span className="text-2xl font-bold">
+                    {monthlyCredits.toLocaleString('pt-BR')}
+                  </span>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Total Utilizado</span>
-                    <span className="text-sm font-semibold text-orange-600">
-                      {totalUsed.toLocaleString('pt-BR')}
-                    </span>
-                  </div>
+                <div className="flex flex-col items-center justify-center p-4 rounded-lg border bg-muted/30">
+                  <span className="text-xs font-medium text-muted-foreground mb-2">Utilizados Este Mês</span>
+                  <span className="text-2xl font-bold text-orange-600">
+                    {creditsUsedThisMonth.toLocaleString('pt-BR')}
+                  </span>
                 </div>
               </div>
 
