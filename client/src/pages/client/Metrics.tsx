@@ -51,17 +51,11 @@ export default function MetricsPage() {
   const currentCredits = credits?.currentCredits || 0;
   const totalUsed = credits?.totalCreditsUsed || 0;
   
-  // Calcular créditos disponíveis (saldo atual)
-  // Se currentCredits > monthlyCredits, significa que comprou extras
-  // Créditos disponíveis = currentCredits (saldo atual)
+  // Créditos disponíveis (saldo atual)
   const creditsAvailable = currentCredits;
   
-  // Calcular uso deste mês
-  // Se currentCredits <= monthlyCredits, usou (monthlyCredits - currentCredits)
-  // Se currentCredits > monthlyCredits, não usou nada do plano mensal ainda (comprou extras)
-  const creditsUsedThisMonth = currentCredits <= monthlyCredits 
-    ? monthlyCredits - currentCredits 
-    : 0;
+  // Uso deste mês (vem do backend, calculado somando transações do mês)
+  const creditsUsedThisMonth = credits?.creditsUsedThisMonth || 0;
   
   // Percentual de uso (baseado no uso do plano mensal)
   const usagePercentage = monthlyCredits > 0 

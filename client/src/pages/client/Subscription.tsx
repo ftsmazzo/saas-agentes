@@ -114,15 +114,11 @@ export default function SubscriptionPage() {
   const monthlyCredits = credits?.monthlyCredits || 0;
   const currentCredits = credits?.currentCredits || 0;
   
-  // Calcular créditos disponíveis (saldo atual)
+  // Créditos disponíveis (saldo atual)
   const creditsAvailable = currentCredits;
   
-  // Calcular uso deste mês
-  // Se currentCredits <= monthlyCredits, usou (monthlyCredits - currentCredits)
-  // Se currentCredits > monthlyCredits, não usou nada do plano mensal ainda (comprou extras)
-  const creditsUsedThisMonth = currentCredits <= monthlyCredits 
-    ? monthlyCredits - currentCredits 
-    : 0;
+  // Uso deste mês (vem do backend, calculado somando transações do mês)
+  const creditsUsedThisMonth = credits?.creditsUsedThisMonth || 0;
   
   // Percentual de uso (baseado no uso do plano mensal)
   const creditsPercentage = monthlyCredits > 0 

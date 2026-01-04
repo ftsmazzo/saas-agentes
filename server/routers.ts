@@ -17,7 +17,7 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import { getTenantCredits } from "./credit-system";
 import { usageTransactions, tenantCredits } from "../drizzle/schema";
-import { desc, and, gte, lte, eq } from "drizzle-orm";
+import { desc, and, gte, lte, eq, sql } from "drizzle-orm";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
 if (stripeApiKey === 'sk_test_dummy') {
@@ -1263,12 +1263,36 @@ export const appRouter = router({
       const tenant = await db.getTenantById(tenantId);
       const plan = tenant?.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
 
+      // Calcular uso mensal somando transações do mês atual
+      const dbInstance = await db.getDb();
+      if (!dbInstance) throw new Error("Database not available");
+      
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      
+      const monthlyUsageResult = await dbInstance
+        .select({
+          total: sql<number>`COALESCE(SUM(${usageTransactions.creditsUsed}), 0)::int`,
+        })
+        .from(usageTransactions)
+        .where(
+          and(
+            eq(usageTransactions.tenantId, tenantId),
+            gte(usageTransactions.createdAt, startOfMonth),
+            lte(usageTransactions.createdAt, endOfMonth)
+          )
+        );
+      
+      const creditsUsedThisMonth = monthlyUsageResult[0]?.total || 0;
+
       return {
         currentCredits: credits.currentCredits || 0,
         totalCreditsPurchased: credits.totalCreditsPurchased || 0,
         totalCreditsUsed: credits.totalCreditsUsed || 0,
         totalCreditsBonus: credits.totalCreditsBonus || 0,
         monthlyCredits: plan?.monthlyCredits || 0,
+        creditsUsedThisMonth: creditsUsedThisMonth,
         lastResetDate: credits.lastResetDate,
       };
     }),
