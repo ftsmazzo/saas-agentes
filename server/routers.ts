@@ -1327,9 +1327,9 @@ export const appRouter = router({
         // Buscar preço de créditos extras
         const { getCreditConfig } = await import("./credit-system");
         const pricePer1000Str = await getCreditConfig('extraCreditsPricePer1000');
-        // Preço padrão: R$ 0,10 por 1.000 créditos (mais caro que créditos do plano)
-        // Isso garante mínimo de R$ 0,50 para 5.000 créditos (mínimo do Stripe)
-        const pricePer1000 = pricePer1000Str ? parseFloat(pricePer1000Str) : 0.10;
+        // Preço padrão: R$ 60,00 por 1.000 créditos (R$ 0,06 por crédito)
+        // 1.000 créditos = R$ 60,00
+        const pricePer1000 = pricePer1000Str ? parseFloat(pricePer1000Str) : 60.00;
         
         // Calcular preço total (em centavos)
         const priceInReais = (input.creditsAmount / 1000) * pricePer1000;

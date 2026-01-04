@@ -1,12 +1,11 @@
 -- ============================================
 -- ATUALIZAR PREÇO DE CRÉDITOS EXTRAS
--- Ajuste: R$ 0,10 por 1.000 créditos
--- (Garante mínimo de R$ 0,50 para 5.000 créditos - mínimo do Stripe)
+-- Ajuste: R$ 60,00 por 1.000 créditos (R$ 0,06 por crédito)
 -- ============================================
 
 -- Atualizar preço de créditos extras
 INSERT INTO "creditConfig" ("configKey", "configValue", "description", "updatedAt")
-VALUES ('extraCreditsPricePer1000', '0.10', 'Preço em R$ por 1.000 créditos extras (mínimo R$ 0,50 para 5.000 créditos)', NOW())
+VALUES ('extraCreditsPricePer1000', '60.00', 'Preço em R$ por 1.000 créditos extras (R$ 0,06 por crédito)', NOW())
 ON CONFLICT ("configKey") 
 DO UPDATE SET 
   "configValue" = EXCLUDED."configValue",
@@ -24,8 +23,9 @@ WHERE "configKey" = 'extraCreditsPricePer1000';
 
 -- ============================================
 -- NOTA: 
--- - 1.000 créditos = R$ 0,10
--- - 5.000 créditos = R$ 0,50 (mínimo do Stripe)
--- - 10.000 créditos = R$ 1,00
+-- - 1 crédito = R$ 0,06
+-- - 1.000 créditos = R$ 60,00
+-- - 5.000 créditos = R$ 300,00
+-- - 10.000 créditos = R$ 600,00
 -- ============================================
 
