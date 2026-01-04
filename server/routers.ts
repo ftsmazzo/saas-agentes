@@ -1279,10 +1279,24 @@ export const appRouter = router({
         creditsAmount: z.number().int().min(1000, "Mínimo de 1.000 créditos").max(100000, "Máximo de 100.000 créditos"),
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        let tenantId: number | null = null;
+        let tenant: db.Tenant | null = null;
         
-        if (!userTenant) {
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+          tenantId = ctx.tenant.id;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          const tenants = await db.getAllTenants();
+          const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+          if (userTenant) {
+            tenant = userTenant;
+            tenantId = userTenant.id;
+          }
+        }
+        
+        if (!tenant || !tenantId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
         }
 
@@ -1298,7 +1312,7 @@ export const appRouter = router({
         // Criar checkout session no Stripe
         try {
           const session = await stripe.checkout.sessions.create({
-            customer: userTenant.stripeCustomerId || undefined,
+            customer: tenant.stripeCustomerId || undefined,
             payment_method_types: ['card'],
             line_items: [
               {
@@ -1314,10 +1328,10 @@ export const appRouter = router({
               },
             ],
             mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/credits?success=true`,
-            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/credits?canceled=true`,
+            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/subscription?success=true`,
+            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/subscription?canceled=true`,
             metadata: {
-              tenantId: userTenant.id.toString(),
+              tenantId: tenantId.toString(),
               type: 'extra_credits',
               creditsAmount: input.creditsAmount.toString(),
             },
@@ -1325,7 +1339,7 @@ export const appRouter = router({
 
           // Criar log
           await db.createPlatformLog({
-            tenantId: userTenant.id,
+            tenantId: tenantId,
             eventType: 'payment_initiated',
             severity: 'info',
             message: `Checkout criado para compra de ${input.creditsAmount} créditos extras`,
@@ -1627,11 +1641,24 @@ export const appRouter = router({
         planId: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Buscar o tenant do usuário
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        let tenantId: number | null = null;
+        let tenant: db.Tenant | null = null;
         
-        if (!userTenant) {
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+          tenantId = ctx.tenant.id;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          const tenants = await db.getAllTenants();
+          const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+          if (userTenant) {
+            tenant = userTenant;
+            tenantId = userTenant.id;
+          }
+        }
+        
+        if (!tenant || !tenantId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
         }
 
@@ -1645,13 +1672,14 @@ export const appRouter = router({
         const origin = ctx.req.headers.origin || 'http://localhost:3000';
         
         const session = await stripe.checkout.sessions.create({
-          customer_email: userTenant.email,
-          client_reference_id: userTenant.id.toString(),
+          customer_email: tenant.email,
+          customer: tenant.stripeCustomerId || undefined,
+          client_reference_id: tenantId.toString(),
           metadata: {
-            tenant_id: userTenant.id.toString(),
-            user_id: ctx.user.id.toString(),
-            customer_email: userTenant.email,
-            customer_name: userTenant.companyName,
+            tenant_id: tenantId.toString(),
+            user_id: ctx.user?.id?.toString() || '',
+            customer_email: tenant.email,
+            customer_name: tenant.companyName,
           },
           line_items: [
             {
@@ -1670,10 +1698,24 @@ export const appRouter = router({
 
     // Criar portal do cliente para gerenciar assinatura
     createCustomerPortal: protectedProcedure.mutation(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      let tenantId: number | null = null;
+      let tenant: db.Tenant | null = null;
       
-      if (!userTenant || !userTenant.stripeCustomerId) {
+      // Se for cliente, usar tenant direto
+      if (ctx.tenant) {
+        tenant = ctx.tenant;
+        tenantId = ctx.tenant.id;
+      } else if (ctx.user) {
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+        if (userTenant) {
+          tenant = userTenant;
+          tenantId = userTenant.id;
+        }
+      }
+      
+      if (!tenant || !tenantId || !tenant.stripeCustomerId) {
         throw new TRPCError({ 
           code: 'NOT_FOUND', 
           message: 'Nenhuma assinatura ativa encontrada' 
@@ -1683,7 +1725,7 @@ export const appRouter = router({
       const origin = ctx.req.headers.origin || 'http://localhost:3000';
 
       const portalSession = await stripe.billingPortal.sessions.create({
-        customer: userTenant.stripeCustomerId,
+        customer: tenant.stripeCustomerId,
         return_url: `${origin}/client/subscription`,
       });
 
@@ -1692,20 +1734,34 @@ export const appRouter = router({
 
     // Obter informações da assinatura atual
     getSubscriptionInfo: protectedProcedure.query(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      let tenantId: number | null = null;
+      let tenant: db.Tenant | null = null;
       
-      if (!userTenant) {
+      // Se for cliente, usar tenant direto
+      if (ctx.tenant) {
+        tenant = ctx.tenant;
+        tenantId = ctx.tenant.id;
+      } else if (ctx.user) {
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+        if (userTenant) {
+          tenant = userTenant;
+          tenantId = userTenant.id;
+        }
+      }
+      
+      if (!tenant || !tenantId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
       }
 
-      if (!userTenant.stripeSubscriptionId) {
+      if (!tenant.stripeSubscriptionId) {
         return { hasSubscription: false };
       }
 
       try {
-        const subscription = await stripe.subscriptions.retrieve(userTenant.stripeSubscriptionId);
-        const plan = await db.getPlanById(userTenant.currentPlanId || 1);
+        const subscription = await stripe.subscriptions.retrieve(tenant.stripeSubscriptionId);
+        const plan = await db.getPlanById(tenant.currentPlanId || 1);
 
         return {
           hasSubscription: true,
