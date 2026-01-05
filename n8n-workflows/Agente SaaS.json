@@ -1702,7 +1702,7 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "session_id": "={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}",
+            "session_id": "={{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}",
             "message": "={\"type\": \"human\", \"content\": \"{{ $('Info2').item.json.mensagem }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}"
           },
           "matchingColumns": [
