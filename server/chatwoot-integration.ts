@@ -805,6 +805,56 @@ export async function deleteChatwootAgentBotByName(botName: string): Promise<boo
 // ========== MENSAGENS E INTERAÇÕES ==========
 
 /**
+ * Faz upload de um arquivo para o Chatwoot
+ * @param file - Buffer do arquivo
+ * @param fileName - Nome do arquivo
+ * @param contentType - Tipo MIME do arquivo
+ * @returns URL do arquivo no Chatwoot
+ */
+export async function uploadFileToChatwoot(
+  file: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<{ file_url: string; file_type: string; file_name: string }> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    // Criar FormData para upload usando form-data
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('file', file, {
+      filename: fileName,
+      contentType: contentType
+    });
+    
+    // Usar axios diretamente com form-data
+    const response = await axios.post(
+      `${process.env.CHATWOOT_URL}/api/v1/accounts/${accountId}/uploads`,
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+          'api_access_token': process.env.CHATWOOT_API_TOKEN || ''
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      }
+    );
+    
+    const uploadData = response.data.data || response.data.payload || response.data;
+    
+    return {
+      file_url: uploadData.file_url || uploadData.url || uploadData.data?.file_url,
+      file_type: contentType,
+      file_name: fileName
+    };
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao fazer upload de arquivo:", error.response?.data || error.message);
+    throw new Error(`Falha ao fazer upload: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
  * Envia uma mensagem em uma conversa do Chatwoot
  */
 export async function sendChatwootMessage(

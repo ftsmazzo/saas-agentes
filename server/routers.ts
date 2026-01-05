@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished, updateModelInWorkflow } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot, sendChatwootMessage, updateConversationStatus, getConversationDetails, getConversationContact } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot, sendChatwootMessage, updateConversationStatus, getConversationDetails, getConversationContact, uploadFileToChatwoot } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
@@ -3126,6 +3126,44 @@ PROMPT MELHORADO:`;
         );
 
         return message;
+      }),
+
+    /**
+     * Faz upload de um arquivo para o Chatwoot
+     */
+    uploadFile: protectedProcedure
+      .input(z.object({
+        file: z.string(), // base64 do arquivo
+        fileName: z.string(),
+        contentType: z.string()
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Se for cliente, usar tenant direto
+        let userTenant: db.Tenant | null = null;
+        
+        if (ctx.tenant) {
+          userTenant = ctx.tenant;
+        } else if (ctx.user) {
+          const tenants = await db.getAllTenants();
+          userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        }
+        
+        if (!userTenant || !userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        // Converter base64 para Buffer
+        const base64Data = input.file.replace(/^data:.*,/, ''); // Remove data URL prefix se houver
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+
+        // Fazer upload para o Chatwoot
+        const uploadResult = await uploadFileToChatwoot(
+          fileBuffer,
+          input.fileName,
+          input.contentType
+        );
+
+        return uploadResult;
       }),
 
     /**

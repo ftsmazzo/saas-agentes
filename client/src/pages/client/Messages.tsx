@@ -91,6 +91,9 @@ export default function MessagesPage() {
   const [messageInput, setMessageInput] = useState("");
   const [showSystemMessages, setShowSystemMessages] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<Array<{ file: File; preview?: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations, isLoading: isLoadingConversations, refetch: refetchConversations } = 
@@ -219,14 +222,108 @@ export default function MessagesPage() {
                   selectedConversation?.meta?.sender || 
                   selectedConversation?.contact;
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversationId) return;
-    
-    sendMessageMutation.mutate({
-      conversationId: selectedConversationId,
-      content: messageInput.trim(),
-      messageType: 'outgoing',
+  const uploadFileMutation = trpc.chatwoot.uploadFile.useMutation();
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Validar tamanho (máximo 10MB por arquivo)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const validFiles = files.filter(file => {
+      if (file.size > maxSize) {
+        toast.error(`Arquivo ${file.name} excede o limite de 10MB`);
+        return false;
+      }
+      return true;
     });
+
+    if (validFiles.length === 0) return;
+
+    // Adicionar previews para imagens
+    const filesWithPreviews = await Promise.all(
+      validFiles.map(async (file) => {
+        if (file.type.startsWith('image/')) {
+          const preview = URL.createObjectURL(file);
+          return { file, preview };
+        }
+        return { file };
+      })
+    );
+
+    setSelectedFiles(prev => [...prev, ...filesWithPreviews]);
+    
+    // Limpar input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => {
+      const newFiles = prev.filter((_, i) => i !== index);
+      // Revogar URL de preview se houver
+      if (prev[index].preview) {
+        URL.revokeObjectURL(prev[index].preview!);
+      }
+      return newFiles;
+    });
+  };
+
+  const handleSendMessage = async () => {
+    if ((!messageInput.trim() && selectedFiles.length === 0) || !selectedConversationId) return;
+
+    setIsUploading(true);
+    
+    try {
+      // Fazer upload de todos os arquivos
+      const attachments = await Promise.all(
+        selectedFiles.map(async ({ file }) => {
+          // Converter arquivo para base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          // Fazer upload para o Chatwoot
+          const uploadResult = await uploadFileMutation.mutateAsync({
+            file: base64,
+            fileName: file.name,
+            contentType: file.type
+          });
+
+          return uploadResult;
+        })
+      );
+
+      // Enviar mensagem com anexos
+      await sendMessageMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        content: messageInput.trim() || '', // Pode ser vazio se houver apenas anexos
+        messageType: 'outgoing',
+        attachments: attachments.length > 0 ? attachments : undefined
+      });
+
+      // Limpar estado
+      setMessageInput("");
+      setSelectedFiles([]);
+      // Revogar URLs de preview
+      selectedFiles.forEach(({ preview }) => {
+        if (preview) URL.revokeObjectURL(preview);
+      });
+      
+      refetchMessages();
+      refetchConversations();
+    } catch (error: any) {
+      toast.error(`Erro ao enviar mensagem: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleStatusChange = (status: 'open' | 'resolved' | 'pending') => {
@@ -619,9 +716,70 @@ export default function MessagesPage() {
                   )}
                 </ScrollArea>
 
+                {/* Preview de Arquivos Selecionados */}
+                {selectedFiles.length > 0 && (
+                  <div className="border-t p-2 bg-muted/50">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedFiles.map(({ file, preview }, index) => (
+                        <div key={index} className="relative group">
+                          {preview ? (
+                            <div className="relative">
+                              <img
+                                src={preview}
+                                alt={file.name}
+                                className="h-20 w-20 object-cover rounded border"
+                              />
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                onClick={() => removeFile(index)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="relative h-20 w-20 bg-muted rounded border flex items-center justify-center">
+                              <FileText className="h-8 w-8 text-muted-foreground" />
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                onClick={() => removeFile(index)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                              <span className="absolute bottom-0 left-0 right-0 text-xs truncate px-1 bg-black/50 text-white rounded-b">
+                                {file.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Input de Mensagem */}
                 <div className="border-t p-4">
                   <div className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading || sendMessageMutation.isPending}
+                      title="Anexar arquivo"
+                    >
+                      <Image className="h-4 w-4" />
+                    </Button>
                     <Textarea
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
@@ -633,14 +791,14 @@ export default function MessagesPage() {
                       }}
                       placeholder="Digite sua mensagem..."
                       className="min-h-[60px] resize-none"
-                      disabled={sendMessageMutation.isPending}
+                      disabled={isUploading || sendMessageMutation.isPending}
                     />
                     <Button
                       onClick={handleSendMessage}
-                      disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                      disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading || sendMessageMutation.isPending}
                       size="lg"
                     >
-                      {sendMessageMutation.isPending ? (
+                      {(isUploading || sendMessageMutation.isPending) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="h-4 w-4" />
