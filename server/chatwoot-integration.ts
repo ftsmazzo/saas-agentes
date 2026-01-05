@@ -1,4 +1,5 @@
 import axios from "axios";
+import FormData from "form-data";
 
 const chatwootApi = axios.create({
   baseURL: `${process.env.CHATWOOT_URL}/api/v1`,
@@ -820,7 +821,6 @@ export async function uploadFileToChatwoot(
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     
     // Criar FormData para upload usando form-data
-    const FormData = require('form-data');
     const formData = new FormData();
     formData.append('file', file, {
       filename: fileName,
