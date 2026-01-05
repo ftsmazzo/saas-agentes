@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +20,8 @@ import {
   Image,
   FileText,
   Download,
-  Filter,
-  Bell,
-  Tag,
-  X
+  X,
+  MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -42,6 +39,7 @@ type Conversation = {
       name: string;
       email?: string;
       phone_number?: string;
+      thumbnail?: string;
     };
   };
   contact?: {
@@ -49,6 +47,7 @@ type Conversation = {
     name: string;
     email?: string;
     phone_number?: string;
+    thumbnail?: string;
   };
 };
 
@@ -89,19 +88,18 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'resolved' | 'pending'>('all');
   const [messageInput, setMessageInput] = useState("");
-  const [showSystemMessages, setShowSystemMessages] = useState(false);
-  const [messageSearchQuery, setMessageSearchQuery] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<Array<{ file: File; preview?: string }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: authData } = trpc.auth.me.useQuery();
   const currentUser = authData?.type === 'client' ? authData.tenant : null;
 
   const { data: conversations, isLoading: isLoadingConversations, refetch: refetchConversations } = 
     trpc.chatwoot.getMyConversations.useQuery(undefined, {
-      refetchInterval: 30000, // Atualizar a cada 30 segundos
+      refetchInterval: 30000,
     });
 
   const { data: conversationDetails } = trpc.chatwoot.getConversationDetails.useQuery(
@@ -114,13 +112,15 @@ export default function MessagesPage() {
       { conversationId: selectedConversationId! },
       { 
         enabled: !!selectedConversationId,
-        refetchInterval: 5000, // Atualizar mensagens a cada 5 segundos
+        refetchInterval: 5000,
       }
     );
 
   const sendMessageMutation = trpc.chatwoot.sendMessage.useMutation({
     onSuccess: () => {
       setMessageInput("");
+      setSelectedFiles([]);
+      selectedFiles.forEach(({ preview }) => { if (preview) URL.revokeObjectURL(preview); });
       refetchMessages();
       refetchConversations();
       toast.success("Mensagem enviada!");
@@ -130,109 +130,62 @@ export default function MessagesPage() {
     },
   });
 
+  const uploadFileMutation = trpc.chatwoot.uploadFile.useMutation();
   const updateStatusMutation = trpc.chatwoot.updateConversationStatus.useMutation({
     onSuccess: () => {
       refetchConversations();
-      if (selectedConversationId) {
-        // Refetch conversation details
-      }
       toast.success("Status atualizado!");
-    },
-    onError: (error) => {
-      toast.error(`Erro ao atualizar status: ${error.message}`);
     },
   });
 
   const checkInboxMutation = trpc.chatwoot.checkAndUpdateInboxId.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success(data.message);
-        refetchConversations();
-      } else {
-        toast.warning(data.message);
-      }
-    },
-    onError: (error) => {
-      toast.error(`Erro ao verificar inbox: ${error.message}`);
+    onSuccess: () => {
+      refetchConversations();
+      toast.success("Inbox verificado e atualizado!");
     },
   });
 
-  // Scroll para última mensagem quando novas mensagens chegarem
+  // Auto-scroll para última mensagem
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current && messages) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
-  // Selecionar primeira conversa automaticamente (apenas se não houver seleção)
+  // Selecionar primeira conversa automaticamente
   useEffect(() => {
-    if (conversations && conversations.length > 0 && !selectedConversationId) {
-      // Filtrar conversas válidas (não Evolution)
-      const validConversations = conversations.filter((conv: Conversation) => {
-        const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
-        const nameLower = contactName.toLowerCase();
-        return nameLower !== 'evolution' && !nameLower.includes('evolution');
+    if (!selectedConversationId && conversations && conversations.length > 0) {
+      const firstValidConversation = conversations.find((c: Conversation) => {
+        const contactName = c.meta?.sender?.name || c.contact?.name || '';
+        return contactName.toLowerCase() !== 'evolution';
       });
-      
-      if (validConversations.length > 0) {
-        setSelectedConversationId(validConversations[0].id);
+      if (firstValidConversation) {
+        setSelectedConversationId(firstValidConversation.id);
       }
     }
   }, [conversations, selectedConversationId]);
-  
-  // Garantir que a conversa selecionada ainda existe após refetch
+
+  // Re-selecionar conversa se a atual foi filtrada
   useEffect(() => {
     if (selectedConversationId && conversations) {
-      const conversationExists = conversations.some((c: Conversation) => c.id === selectedConversationId);
-      if (!conversationExists) {
-        // Se a conversa selecionada não existe mais, selecionar a primeira válida
-        const validConversations = conversations.filter((conv: Conversation) => {
-          const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
-          const nameLower = contactName.toLowerCase();
-          return nameLower !== 'evolution' && !nameLower.includes('evolution');
+      const exists = conversations.some((c: Conversation) => c.id === selectedConversationId);
+      if (!exists && conversations.length > 0) {
+        const firstValid = conversations.find((c: Conversation) => {
+          const contactName = c.meta?.sender?.name || c.contact?.name || '';
+          return contactName.toLowerCase() !== 'evolution';
         });
-        
-        if (validConversations.length > 0) {
-          setSelectedConversationId(validConversations[0].id);
-        } else {
-          setSelectedConversationId(null);
+        if (firstValid) {
+          setSelectedConversationId(firstValid.id);
         }
       }
     }
   }, [conversations, selectedConversationId]);
 
-  const filteredConversations = conversations?.filter((conv: Conversation) => {
-    // Filtrar conversas do Evolution
-    const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
-    const nameLower = contactName.toLowerCase();
-    if (nameLower === 'evolution' || nameLower.includes('evolution')) {
-      return false;
-    }
-    
-    // Filtrar por busca
-    const matchesSearch = !searchQuery || 
-      contactName.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Filtrar por status
-    const matchesStatus = statusFilter === 'all' || conv.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  }) || [];
-
-  const selectedConversation = conversations?.find(
-    (c: Conversation) => c.id === selectedConversationId
-  );
-
-  const contact = conversationDetails?.contact || 
-                  selectedConversation?.meta?.sender || 
-                  selectedConversation?.contact;
-
-  const uploadFileMutation = trpc.chatwoot.uploadFile.useMutation();
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Validar tamanho (máximo 10MB por arquivo)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     const validFiles = files.filter(file => {
       if (file.size > maxSize) {
         toast.error(`Arquivo ${file.name} excede o limite de 10MB`);
@@ -243,7 +196,6 @@ export default function MessagesPage() {
 
     if (validFiles.length === 0) return;
 
-    // Adicionar previews para imagens
     const filesWithPreviews = await Promise.all(
       validFiles.map(async (file) => {
         if (file.type.startsWith('image/')) {
@@ -256,7 +208,6 @@ export default function MessagesPage() {
 
     setSelectedFiles(prev => [...prev, ...filesWithPreviews]);
     
-    // Limpar input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -265,7 +216,6 @@ export default function MessagesPage() {
   const removeFile = (index: number) => {
     setSelectedFiles(prev => {
       const newFiles = prev.filter((_, i) => i !== index);
-      // Revogar URL de preview se houver
       if (prev[index].preview) {
         URL.revokeObjectURL(prev[index].preview!);
       }
@@ -277,49 +227,36 @@ export default function MessagesPage() {
     if ((!messageInput.trim() && selectedFiles.length === 0) || !selectedConversationId) return;
 
     setIsUploading(true);
-    
+
     try {
-      // Fazer upload de todos os arquivos
       const attachments = await Promise.all(
         selectedFiles.map(async ({ file }) => {
-          // Converter arquivo para base64
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result);
-            };
+            reader.onload = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
 
-          // Fazer upload para o Chatwoot
           const uploadResult = await uploadFileMutation.mutateAsync({
             file: base64,
             fileName: file.name,
             contentType: file.type
           });
-
           return uploadResult;
         })
       );
 
-      // Enviar mensagem com anexos
       await sendMessageMutation.mutateAsync({
         conversationId: selectedConversationId,
-        content: messageInput.trim() || '', // Pode ser vazio se houver apenas anexos
+        content: messageInput.trim() || '',
         messageType: 'outgoing',
         attachments: attachments.length > 0 ? attachments : undefined
       });
 
-      // Limpar estado
       setMessageInput("");
       setSelectedFiles([]);
-      // Revogar URLs de preview
-      selectedFiles.forEach(({ preview }) => {
-        if (preview) URL.revokeObjectURL(preview);
-      });
-      
+      selectedFiles.forEach(({ preview }) => { if (preview) URL.revokeObjectURL(preview); });
       refetchMessages();
       refetchConversations();
     } catch (error: any) {
@@ -329,94 +266,62 @@ export default function MessagesPage() {
     }
   };
 
-  const handleStatusChange = (status: 'open' | 'resolved' | 'pending') => {
-    if (!selectedConversationId) return;
-    updateStatusMutation.mutate({
-      conversationId: selectedConversationId,
-      status,
-    });
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'open':
-        return <Badge variant="default" className="bg-green-600">Aberta</Badge>;
+        return <Badge variant="default" className="bg-green-500">Aberta</Badge>;
       case 'resolved':
         return <Badge variant="secondary">Resolvida</Badge>;
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-100">Pendente</Badge>;
+        return <Badge variant="outline" className="bg-yellow-500">Pendente</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return null;
     }
   };
 
-  const formatMessageTime = (dateString: string | null | undefined) => {
+  const filteredConversations = conversations?.filter((conv: Conversation) => {
+    const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
+    const nameLower = contactName.toLowerCase();
+    
+    if (nameLower === 'evolution' || nameLower.includes('evolution')) {
+      return false;
+    }
+    
+    if (statusFilter !== 'all' && conv.status !== statusFilter) {
+      return false;
+    }
+    
+    if (searchQuery.trim()) {
+      return contactName.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    
+    return true;
+  }) || [];
+
+  const selectedConversation = conversations?.find(
+    (c: Conversation) => c.id === selectedConversationId
+  );
+
+  const contact = conversationDetails?.contact || 
+                  selectedConversation?.meta?.sender || 
+                  selectedConversation?.contact;
+
+  const formatMessageTime = (dateString: string) => {
     try {
-      if (!dateString) {
+      if (!dateString) return 'Agora';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime()) || date.getTime() < 1000000000) {
+        const timestamp = parseInt(dateString);
+        if (!isNaN(timestamp) && timestamp > 1000000000) {
+          const validDate = new Date(timestamp * 1000);
+          if (!isNaN(validDate.getTime())) {
+            return formatDistanceToNow(validDate, { addSuffix: true, locale: ptBR });
+          }
+        }
         return 'Agora';
       }
-      
-      // Tentar parsear como timestamp primeiro (em milissegundos ou segundos)
-      let date: Date;
-      const numValue = Number(dateString);
-      
-      if (!isNaN(numValue)) {
-        // Se for número, pode ser timestamp
-        if (numValue < 10000000000) {
-          // Timestamp em segundos, converter para milissegundos
-          date = new Date(numValue * 1000);
-        } else {
-          // Timestamp em milissegundos
-          date = new Date(numValue);
-        }
-      } else {
-        // Tentar parsear como string ISO
-        date = new Date(dateString);
-      }
-      
-      // Verificar se a data é válida e não é epoch (1970)
-      const timestamp = date.getTime();
-      if (isNaN(timestamp) || timestamp < 946684800000) { // 2000-01-01 em ms
-        console.warn('[Messages] Data inválida ou muito antiga:', dateString, 'timestamp:', timestamp);
-        return 'Data inválida';
-      }
-      
-      // Verificar se a data não é muito antiga (mais de 1 ano)
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      
-      if (date < oneYearAgo) {
-        // Se for muito antiga, mostrar data formatada
-        return new Intl.DateTimeFormat('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).format(date);
-      }
-      
-      // Para datas recentes, usar formatDistanceToNow
-      const distance = formatDistanceToNow(date, {
-        addSuffix: true,
-        locale: ptBR,
-      });
-      
-      // Se retornar algo como "mais de X anos", usar formatação de data
-      const yearsMatch = distance.match(/(\d+)\s+anos?/);
-      if (yearsMatch && parseInt(yearsMatch[1]) > 1) {
-        return new Intl.DateTimeFormat('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).format(date);
-      }
-      
-      return distance;
+      return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
     } catch (error) {
-      console.error('[Messages] Erro ao formatar data:', dateString, error);
       return 'Agora';
     }
   };
@@ -433,19 +338,18 @@ export default function MessagesPage() {
 
   return (
     <ClientLayout>
-      <div className="h-[calc(100vh-4rem)] flex flex-col">
-        <div className="border-b p-4">
-          <h1 className="text-2xl font-bold">Mensagens</h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie suas conversas do WhatsApp
-          </p>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="h-16 border-b bg-background flex items-center px-6 flex-shrink-0">
+          <h1 className="text-xl font-semibold">Mensagens</h1>
         </div>
 
+        {/* Main Content - 3 Column Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar - Lista de Conversas */}
-          <div className="w-80 border-r flex flex-col flex-shrink-0">
-            {/* Filtros e Busca */}
-            <div className="p-4 border-b space-y-3">
+          {/* Left Sidebar - Conversations List (Fixed Width) */}
+          <div className="w-80 border-r bg-background flex flex-col flex-shrink-0">
+            {/* Search and Filters */}
+            <div className="p-4 border-b space-y-3 bg-background">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -456,11 +360,12 @@ export default function MessagesPage() {
                 />
               </div>
               
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2">
                 <Button
                   variant={statusFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('all')}
+                  className="flex-1"
                 >
                   Todas
                 </Button>
@@ -468,6 +373,7 @@ export default function MessagesPage() {
                   variant={statusFilter === 'open' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('open')}
+                  className="flex-1"
                 >
                   Abertas
                 </Button>
@@ -475,37 +381,35 @@ export default function MessagesPage() {
                   variant={statusFilter === 'resolved' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('resolved')}
+                  className="flex-1"
                 >
                   Resolvidas
                 </Button>
               </div>
             </div>
 
-            {/* Lista de Conversas */}
+            {/* Conversations List */}
             <ScrollArea className="flex-1">
               {filteredConversations.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground space-y-4">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhuma conversa encontrada</p>
+                  <p className="text-sm">Nenhuma conversa encontrada</p>
                   {!isLoadingConversations && (
-                    <div className="space-y-2">
-                      <p className="text-xs">Se você tem conversas no Chatwoot mas não aparecem aqui,</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => checkInboxMutation.mutate()}
-                        disabled={checkInboxMutation.isPending}
-                      >
-                        {checkInboxMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                            Verificando...
-                          </>
-                        ) : (
-                          "Verificar e Atualizar Inbox"
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => checkInboxMutation.mutate()}
+                      disabled={checkInboxMutation.isPending}
+                    >
+                      {checkInboxMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          Verificando...
+                        </>
+                      ) : (
+                        "Verificar Inbox"
+                      )}
+                    </Button>
                   )}
                 </div>
               ) : (
@@ -515,6 +419,8 @@ export default function MessagesPage() {
                     const contactName = conversation.meta?.sender?.name || 
                                        conversation.contact?.name || 
                                        'Contato';
+                    const contactThumbnail = conversation.meta?.sender?.thumbnail || 
+                                            conversation.contact?.thumbnail;
                     const lastActivity = conversation.last_activity_at || 
                                         conversation.updated_at || 
                                         '';
@@ -523,14 +429,30 @@ export default function MessagesPage() {
                       <div
                         key={conversation.id}
                         onClick={() => setSelectedConversationId(conversation.id)}
-                        className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
-                          isSelected ? 'bg-muted border-l-4 border-l-primary' : ''
+                        className={`p-4 cursor-pointer transition-colors ${
+                          isSelected 
+                            ? 'bg-primary/10 border-l-4 border-l-primary' 
+                            : 'hover:bg-muted/50'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-3">
+                          {/* Avatar */}
+                          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            {contactThumbnail ? (
+                              <img 
+                                src={contactThumbnail} 
+                                alt={contactName}
+                                className="h-12 w-12 rounded-full object-cover"
+                              />
+                            ) : (
+                              <User className="h-6 w-6 text-primary" />
+                            )}
+                          </div>
+                          
+                          {/* Content */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold truncate">{contactName}</p>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="font-semibold text-sm truncate">{contactName}</p>
                               {getStatusBadge(conversation.status)}
                             </div>
                             {lastActivity && (
@@ -548,37 +470,28 @@ export default function MessagesPage() {
             </ScrollArea>
           </div>
 
-          {/* Área Principal - Mensagens */}
-          <div className="flex-1 flex flex-col">
+          {/* Center - Messages Area */}
+          <div className="flex-1 flex flex-col min-w-0">
             {selectedConversationId ? (
               <>
-                {/* Cabeçalho da Conversa */}
-                <div className="border-b p-4 flex items-center justify-between">
+                {/* Conversation Header */}
+                <div className="h-16 border-b bg-background flex items-center justify-between px-6 flex-shrink-0">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       {contact?.thumbnail ? (
                         <img 
                           src={contact.thumbnail} 
                           alt={contact?.name || 'Contato'}
                           className="h-10 w-10 rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
                         />
-                      ) : null}
-                      <div className={`h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center ${contact?.thumbnail ? 'hidden' : ''}`}>
+                      ) : (
                         <User className="h-5 w-5 text-primary" />
-                      </div>
+                      )}
                     </div>
                     <div>
-                      <h2 className="font-semibold text-base">
-                        {contact?.name || 'Contato'}
-                      </h2>
+                      <h2 className="font-semibold text-sm">{contact?.name || 'Contato'}</h2>
                       {contact?.phone_number && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {contact.phone_number}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{contact.phone_number}</p>
                       )}
                     </div>
                   </div>
@@ -588,8 +501,10 @@ export default function MessagesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange('resolved')}
-                        disabled={updateStatusMutation.isPending}
+                        onClick={() => updateStatusMutation.mutate({ 
+                          conversationId: selectedConversationId, 
+                          status: 'resolved' 
+                        })}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         Resolver
@@ -598,8 +513,10 @@ export default function MessagesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange('open')}
-                        disabled={updateStatusMutation.isPending}
+                        onClick={() => updateStatusMutation.mutate({ 
+                          conversationId: selectedConversationId, 
+                          status: 'open' 
+                        })}
                       >
                         <Circle className="h-4 w-4 mr-2" />
                         Reabrir
@@ -608,230 +525,158 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
-                {/* Busca de Mensagens */}
-                <div className="border-b p-2">
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar nas mensagens..."
-                        value={messageSearchQuery}
-                        onChange={(e) => setMessageSearchQuery(e.target.value)}
-                        className="pl-8 h-8 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* Messages */}
+                <ScrollArea className="flex-1" ref={messagesContainerRef}>
+                  <div className="p-6 space-y-4">
+                    {isLoadingMessages ? (
+                      <div className="flex items-center justify-center h-64">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : messages && messages.length > 0 ? (
+                      messages.map((message: Message) => {
+                        const isOutgoing = message.message_type === 'outgoing';
+                        
+                        // Detectar anexos
+                        let attachments: Array<{ file_url: string; file_type: string; file_name?: string }> = [];
+                        if (message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0) {
+                          attachments = message.attachments.map(att => ({
+                            file_url: att.file_url || att.url || att.data_url || '',
+                            file_type: att.file_type || att.type || 'application/octet-stream',
+                            file_name: att.file_name || att.name
+                          }));
+                        } else if (message.content_attributes?.items && Array.isArray(message.content_attributes.items)) {
+                          attachments = message.content_attributes.items.map(item => ({
+                            file_url: item.url || '',
+                            file_type: item.file_type || 'application/octet-stream',
+                            file_name: item.file_name
+                          }));
+                        }
+                        
+                        const hasAttachments = attachments.length > 0;
 
-                {/* Área de Mensagens */}
-                <ScrollArea className="flex-1 p-4">
-                  {isLoadingMessages ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    </div>
-                  ) : messages && messages.length > 0 ? (
-                    <div className="space-y-4">
-                      {messages
-                        .filter((message: Message) => {
-                          // Filtrar por busca de mensagens
-                          if (messageSearchQuery) {
-                            const searchLower = messageSearchQuery.toLowerCase();
-                            const contentMatch = message.content?.toLowerCase().includes(searchLower);
-                            const senderMatch = message.sender?.name?.toLowerCase().includes(searchLower);
-                            if (!contentMatch && !senderMatch) return false;
-                          }
-                          return true;
-                        })
-                        .map((message: Message) => {
-                          const isOutgoing = message.message_type === 'outgoing';
-                          
-                          // Detectar anexos em diferentes formatos do Chatwoot
-                          let attachments: Array<{
-                            id?: number;
-                            file_type?: string;
-                            file_url?: string;
-                            file_name?: string;
-                          }> = [];
-                          
-                          // Formato 1: attachments direto
-                          if (message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0) {
-                            attachments = message.attachments.map(att => ({
-                              id: att.id,
-                              file_type: att.file_type || att.type,
-                              file_url: att.file_url || att.url || att.data_url,
-                              file_name: att.file_name || att.name
-                            }));
-                          }
-                          
-                          // Formato 2: content_attributes.items (formato alternativo)
-                          if (attachments.length === 0 && message.content_attributes?.items && Array.isArray(message.content_attributes.items)) {
-                            attachments = message.content_attributes.items.map((item: any) => ({
-                              file_type: item.type || item.file_type,
-                              file_url: item.url || item.file_url,
-                              file_name: item.name || item.file_name
-                            }));
-                          }
-                          
-                          // Formato 3: content_type é image/audio/file mas sem attachments explícitos
-                          if (attachments.length === 0 && (message.content_type === 'image' || message.content_type === 'audio' || message.content_type === 'file')) {
-                            // Tentar usar content como URL se for uma URL válida
-                            if (message.content && (message.content.startsWith('http://') || message.content.startsWith('https://'))) {
-                              attachments = [{
-                                file_url: message.content,
-                                file_type: message.content_type === 'image' ? 'image/jpeg' : 
-                                          message.content_type === 'audio' ? 'audio/mpeg' : 'application/octet-stream',
-                                file_name: message.content.split('/').pop() || 'arquivo'
-                              }];
-                            }
-                          }
-                          
-                          const hasAttachments = attachments.length > 0;
-                          const contentType = message.content_type || 'text';
-                          
-                          // Log para debug de mensagens com anexos
-                          if (hasAttachments) {
-                            console.log('[Messages] Mensagem com anexos:', {
-                              id: message.id,
-                              attachments: attachments,
-                              content: message.content,
-                              contentType: message.content_type,
-                              contentAttributes: message.content_attributes
-                            });
-                          }
-                          
-                          return (
-                            <div
-                              key={message.id}
-                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div
-                                className={`max-w-[75%] rounded-lg p-3 ${
-                                  isOutgoing
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
-                                }`}
-                              >
-                                {/* Anexos (imagens, arquivos) */}
-                                {hasAttachments && (
-                                  <div className="space-y-2 mb-2">
-                                    {attachments.map((attachment, idx) => {
-                                      const fileUrl = attachment.file_url || '';
-                                      const fileType = attachment.file_type || '';
-                                      const fileName = attachment.file_name || 'Arquivo';
-                                      const attachmentId = attachment.id || message.id * 1000 + idx; // ID único para key
-                                      
-                                      return (
-                                        <div key={attachmentId} className="space-y-1">
-                                          {fileType.startsWith('image/') || message.content_type === 'image' ? (
-                                            <div className="rounded overflow-hidden bg-black/5">
-                                              <img
-                                                src={fileUrl}
-                                                alt={fileName}
-                                                className="max-w-full h-auto max-h-64 object-contain"
-                                                onError={(e) => {
-                                                  console.error('[Messages] Erro ao carregar imagem:', fileUrl);
-                                                  // Se falhar, tentar mostrar como link
-                                                  e.currentTarget.style.display = 'none';
-                                                }}
-                                              />
-                                            </div>
-                                          ) : fileType.startsWith('audio/') || message.content_type === 'audio' ? (
-                                            <div className="p-2 bg-black/10 rounded">
-                                              <audio controls className="w-full">
-                                                <source src={fileUrl} type={fileType} />
-                                                Seu navegador não suporta áudio.
-                                              </audio>
-                                            </div>
-                                          ) : (
-                                            <a
-                                              href={fileUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors"
-                                            >
-                                              <FileText className="h-4 w-4" />
-                                              <span className="text-xs truncate">
-                                                {fileName}
-                                              </span>
-                                              <Download className="h-3 w-3 ml-auto" />
-                                            </a>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                
-                                {/* Conteúdo da mensagem */}
-                                {message.content && (
-                                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                )}
-                                
-                                {/* Timestamp */}
-                                <p className={`text-xs mt-1 ${
-                                  isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                                }`}>
-                                  {formatMessageTime(message.created_at)}
-                                </p>
-                              </div>
+                        return (
+                          <div
+                            key={message.id}
+                            className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-[75%] rounded-lg p-3 ${
+                              isOutgoing
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted'
+                            }`}>
+                              {/* Anexos */}
+                              {hasAttachments && (
+                                <div className="space-y-2 mb-2">
+                                  {attachments.map((attachment, idx) => {
+                                    const fileUrl = attachment.file_url || '';
+                                    const fileType = attachment.file_type || '';
+                                    const fileName = attachment.file_name || 'Arquivo';
+                                    
+                                    return (
+                                      <div key={idx} className="space-y-1">
+                                        {fileType.startsWith('image/') || message.content_type === 'image' ? (
+                                          <div className="rounded overflow-hidden bg-black/5">
+                                            <img
+                                              src={fileUrl}
+                                              alt={fileName}
+                                              className="max-w-full h-auto max-h-64 object-contain"
+                                              onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                              }}
+                                            />
+                                          </div>
+                                        ) : fileType.startsWith('audio/') || message.content_type === 'audio' ? (
+                                          <div className="p-2 bg-black/10 rounded">
+                                            <audio controls className="w-full">
+                                              <source src={fileUrl} type={fileType} />
+                                            </audio>
+                                          </div>
+                                        ) : (
+                                          <a
+                                            href={fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors"
+                                          >
+                                            <FileText className="h-4 w-4" />
+                                            <span className="text-xs truncate">{fileName}</span>
+                                            <Download className="h-3 w-3 ml-auto" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              
+                              {/* Content */}
+                              {message.content && (
+                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                              )}
+                              
+                              {/* Timestamp */}
+                              <p className={`text-xs mt-1 ${
+                                isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                              }`}>
+                                {formatMessageTime(message.created_at)}
+                              </p>
                             </div>
-                          );
-                        })}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <p>Nenhuma mensagem ainda</p>
-                    </div>
-                  )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex items-center justify-center h-64 text-muted-foreground">
+                        <p>Nenhuma mensagem ainda</p>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </ScrollArea>
 
-                {/* Preview de Arquivos Selecionados */}
+                {/* File Preview */}
                 {selectedFiles.length > 0 && (
-                  <div className="border-t p-2 bg-muted/50">
-                    <div className="flex flex-wrap gap-2">
-                      {selectedFiles.map(({ file, preview }, index) => (
-                        <div key={index} className="relative group">
-                          {preview ? (
-                            <div className="relative">
-                              <img
-                                src={preview}
-                                alt={file.name}
-                                className="h-20 w-20 object-cover rounded border"
-                              />
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                                onClick={() => removeFile(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="relative h-20 w-20 bg-muted rounded border flex items-center justify-center">
-                              <FileText className="h-8 w-8 text-muted-foreground" />
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                                onClick={() => removeFile(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                              <span className="absolute bottom-0 left-0 right-0 text-xs truncate px-1 bg-black/50 text-white rounded-b">
-                                {file.name}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                  <div className="border-t p-2 bg-muted/50 flex gap-2 overflow-x-auto">
+                    {selectedFiles.map(({ file, preview }, index) => (
+                      <div key={index} className="relative flex-shrink-0">
+                        {preview ? (
+                          <div className="relative">
+                            <img
+                              src={preview}
+                              alt={file.name}
+                              className="h-20 w-20 object-cover rounded border"
+                            />
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                              onClick={() => removeFile(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="relative h-20 w-20 bg-muted rounded border flex items-center justify-center">
+                            <FileText className="h-8 w-8 text-muted-foreground" />
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                              onClick={() => removeFile(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            <span className="absolute bottom-0 left-0 right-0 text-xs truncate px-1 bg-black/50 text-white rounded-b">
+                              {file.name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {/* Input de Mensagem */}
-                <div className="border-t p-4 bg-background">
+                {/* Message Input */}
+                <div className="border-t p-4 bg-background flex-shrink-0">
                   <div className="flex gap-2 items-end">
                     <input
                       ref={fileInputRef}
@@ -846,10 +691,9 @@ export default function MessagesPage() {
                       size="icon"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading || sendMessageMutation.isPending}
-                      title="Anexar arquivo"
-                      className="flex-shrink-0 h-[60px] w-[60px]"
+                      className="h-12 w-12 flex-shrink-0"
                     >
-                      <Image className="h-4 w-4" />
+                      <Image className="h-5 w-5" />
                     </Button>
                     <Textarea
                       value={messageInput}
@@ -861,19 +705,18 @@ export default function MessagesPage() {
                         }
                       }}
                       placeholder="Digite sua mensagem..."
-                      className="min-h-[60px] resize-none flex-1"
+                      className="min-h-[48px] max-h-32 resize-none flex-1"
                       disabled={isUploading || sendMessageMutation.isPending}
                     />
                     <Button
                       onClick={handleSendMessage}
                       disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading || sendMessageMutation.isPending}
-                      size="lg"
-                      className="flex-shrink-0 h-[60px] w-[60px]"
+                      className="h-12 w-12 flex-shrink-0"
                     >
                       {(isUploading || sendMessageMutation.isPending) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
-                        <Send className="h-4 w-4" />
+                        <Send className="h-5 w-5" />
                       )}
                     </Button>
                   </div>
@@ -893,4 +736,3 @@ export default function MessagesPage() {
     </ClientLayout>
   );
 }
-
