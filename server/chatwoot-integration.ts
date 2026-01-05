@@ -1048,6 +1048,66 @@ export async function getConversationContact(conversationId: number): Promise<an
 }
 
 /**
+ * Lista todos os agentes (users) de uma conta Chatwoot
+ */
+export async function listChatwootAgents(): Promise<Array<{ id: number; name: string; email: string; role: string }>> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const response = await chatwootApi.get(`/accounts/${accountId}/agents`);
+    
+    // A API pode retornar em diferentes formatos
+    let agents: any[] = [];
+    
+    if (Array.isArray(response.data)) {
+      agents = response.data;
+    } else if (response.data?.payload && Array.isArray(response.data.payload)) {
+      agents = response.data.payload;
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      agents = response.data.data;
+    } else if (response.data?.agents && Array.isArray(response.data.agents)) {
+      agents = response.data.agents;
+    }
+    
+    if (!Array.isArray(agents)) {
+      console.warn("[Chatwoot] Resposta de agentes não é um array:", JSON.stringify(response.data).substring(0, 200));
+      return [];
+    }
+    
+    // Mapear para formato padronizado
+    return agents.map((agent: any) => ({
+      id: agent.id || agent.user_id,
+      name: agent.name || agent.user?.name || '',
+      email: agent.email || agent.user?.email || '',
+      role: agent.role || agent.user?.role || 'agent'
+    }));
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao listar agentes:", error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca um agente pelo email ou nome
+ */
+export async function findChatwootAgentByEmailOrName(emailOrName: string): Promise<{ id: number; name: string; email: string; role: string } | null> {
+  try {
+    const agents = await listChatwootAgents();
+    const searchLower = emailOrName.toLowerCase();
+    
+    const found = agents.find(agent => 
+      agent.email.toLowerCase() === searchLower || 
+      agent.name.toLowerCase().includes(searchLower) ||
+      searchLower.includes(agent.name.toLowerCase())
+    );
+    
+    return found || null;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar agente:", error.response?.data || error.message);
+    return null;
+  }
+}
+
+/**
  * Cria um agente (user) no Chatwoot para um tenant
  * Isso permite que as mensagens enviadas pelo tenant apareçam com o nome correto
  */

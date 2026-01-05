@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished, updateModelInWorkflow } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot, sendChatwootMessage, updateConversationStatus, getConversationDetails, getConversationContact, uploadFileToChatwoot, createChatwootAgent } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot, sendChatwootMessage, updateConversationStatus, getConversationDetails, getConversationContact, uploadFileToChatwoot, createChatwootAgent, listChatwootAgents, findChatwootAgentByEmailOrName } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
@@ -3132,6 +3132,27 @@ PROMPT MELHORADO:`;
         );
 
         return message;
+      }),
+
+    /**
+     * Lista todos os agentes do Chatwoot (útil para descobrir IDs)
+     */
+    listAgents: protectedProcedure.query(async ({ ctx }) => {
+      const agents = await listChatwootAgents();
+      return agents;
+    }),
+
+    /**
+     * Busca um agente pelo email ou nome (útil para descobrir ID)
+     */
+    findAgent: protectedProcedure
+      .input(z.object({ emailOrName: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const agent = await findChatwootAgentByEmailOrName(input.emailOrName);
+        if (!agent) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Agente não encontrado' });
+        }
+        return agent;
       }),
 
     /**
