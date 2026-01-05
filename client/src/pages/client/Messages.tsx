@@ -145,12 +145,29 @@ export default function MessagesPage() {
     },
   });
 
-  // Auto-scroll para última mensagem
+  // Auto-scroll para última mensagem apenas quando necessário
   useEffect(() => {
-    if (messagesEndRef.current && messages) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current && messages && messages.length > 0) {
+      // Usar setTimeout para garantir que o DOM foi atualizado
+      const timeoutId = setTimeout(() => {
+        if (messagesEndRef.current) {
+          // Verificar se já está próximo do final antes de fazer scroll
+          const container = messagesContainerRef.current;
+          if (container) {
+            const scrollElement = container.querySelector('[data-radix-scroll-area-viewport]') || container;
+            const isNearBottom = scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight < 200;
+            
+            // Só fazer scroll se estiver próximo do final (usuário estava vendo as últimas mensagens)
+            if (isNearBottom || messages.length === 1) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+          }
+        }
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [messages]);
+  }, [messages?.length]); // Só quando o número de mensagens muda
 
   // Selecionar primeira conversa automaticamente
   useEffect(() => {
@@ -389,7 +406,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Conversations List */}
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               {filteredConversations.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground space-y-4">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -471,7 +488,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Center - Messages Area */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
             {selectedConversationId ? (
               <>
                 {/* Conversation Header */}
@@ -526,7 +543,7 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Messages */}
-                <ScrollArea className="flex-1" ref={messagesContainerRef}>
+                <ScrollArea className="flex-1 min-h-0" ref={messagesContainerRef}>
                   <div className="p-6 space-y-4">
                     {isLoadingMessages ? (
                       <div className="flex items-center justify-center h-64">
