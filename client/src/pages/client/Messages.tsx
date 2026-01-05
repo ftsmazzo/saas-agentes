@@ -54,19 +54,29 @@ type Conversation = {
 
 type Message = {
   id: number;
-  content: string;
+  content?: string;
   message_type: 'incoming' | 'outgoing';
   created_at: string;
   content_type?: 'text' | 'input_text' | 'image' | 'audio' | 'file';
   attachments?: Array<{
-    id: number;
-    file_type: string;
-    file_url: string;
+    id?: number;
+    file_type?: string;
+    file_url?: string;
     file_name?: string;
+    data_url?: string;
+    url?: string;
+    type?: string;
+    name?: string;
   }>;
   content_attributes?: {
     origin?: string;
     via?: string;
+    items?: Array<{
+      type?: string;
+      url?: string;
+      file_type?: string;
+      file_name?: string;
+    }>;
   };
   sender?: {
     id: number;
@@ -467,16 +477,58 @@ export default function MessagesPage() {
                         })
                         .map((message: Message) => {
                           const isOutgoing = message.message_type === 'outgoing';
-                          const hasAttachments = message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0;
+                          
+                          // Detectar anexos em diferentes formatos do Chatwoot
+                          let attachments: Array<{
+                            id?: number;
+                            file_type?: string;
+                            file_url?: string;
+                            file_name?: string;
+                          }> = [];
+                          
+                          // Formato 1: attachments direto
+                          if (message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0) {
+                            attachments = message.attachments.map(att => ({
+                              id: att.id,
+                              file_type: att.file_type || att.type,
+                              file_url: att.file_url || att.url || att.data_url,
+                              file_name: att.file_name || att.name
+                            }));
+                          }
+                          
+                          // Formato 2: content_attributes.items (formato alternativo)
+                          if (attachments.length === 0 && message.content_attributes?.items && Array.isArray(message.content_attributes.items)) {
+                            attachments = message.content_attributes.items.map((item: any) => ({
+                              file_type: item.type || item.file_type,
+                              file_url: item.url || item.file_url,
+                              file_name: item.name || item.file_name
+                            }));
+                          }
+                          
+                          // Formato 3: content_type é image/audio/file mas sem attachments explícitos
+                          if (attachments.length === 0 && (message.content_type === 'image' || message.content_type === 'audio' || message.content_type === 'file')) {
+                            // Tentar usar content como URL se for uma URL válida
+                            if (message.content && (message.content.startsWith('http://') || message.content.startsWith('https://'))) {
+                              attachments = [{
+                                file_url: message.content,
+                                file_type: message.content_type === 'image' ? 'image/jpeg' : 
+                                          message.content_type === 'audio' ? 'audio/mpeg' : 'application/octet-stream',
+                                file_name: message.content.split('/').pop() || 'arquivo'
+                              }];
+                            }
+                          }
+                          
+                          const hasAttachments = attachments.length > 0;
                           const contentType = message.content_type || 'text';
                           
                           // Log para debug de mensagens com anexos
                           if (hasAttachments) {
                             console.log('[Messages] Mensagem com anexos:', {
                               id: message.id,
-                              attachments: message.attachments,
+                              attachments: attachments,
                               content: message.content,
-                              contentType: message.content_type
+                              contentType: message.content_type,
+                              contentAttributes: message.content_attributes
                             });
                           }
                           
@@ -495,32 +547,51 @@ export default function MessagesPage() {
                                 {/* Anexos (imagens, arquivos) */}
                                 {hasAttachments && (
                                   <div className="space-y-2 mb-2">
-                                    {message.attachments!.map((attachment) => (
-                                      <div key={attachment.id} className="space-y-1">
-                                        {attachment.file_type?.startsWith('image/') ? (
-                                          <div className="rounded overflow-hidden">
-                                            <img
-                                              src={attachment.file_url}
-                                              alt={attachment.file_name || 'Imagem'}
-                                              className="max-w-full h-auto max-h-64 object-contain"
-                                            />
-                                          </div>
-                                        ) : (
-                                          <a
-                                            href={attachment.file_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors"
-                                          >
-                                            <FileText className="h-4 w-4" />
-                                            <span className="text-xs truncate">
-                                              {attachment.file_name || 'Arquivo'}
-                                            </span>
-                                            <Download className="h-3 w-3 ml-auto" />
-                                          </a>
-                                        )}
-                                      </div>
-                                    ))}
+                                    {attachments.map((attachment, idx) => {
+                                      const fileUrl = attachment.file_url || '';
+                                      const fileType = attachment.file_type || '';
+                                      const fileName = attachment.file_name || 'Arquivo';
+                                      const attachmentId = attachment.id || message.id * 1000 + idx; // ID único para key
+                                      
+                                      return (
+                                        <div key={attachmentId} className="space-y-1">
+                                          {fileType.startsWith('image/') || message.content_type === 'image' ? (
+                                            <div className="rounded overflow-hidden bg-black/5">
+                                              <img
+                                                src={fileUrl}
+                                                alt={fileName}
+                                                className="max-w-full h-auto max-h-64 object-contain"
+                                                onError={(e) => {
+                                                  console.error('[Messages] Erro ao carregar imagem:', fileUrl);
+                                                  // Se falhar, tentar mostrar como link
+                                                  e.currentTarget.style.display = 'none';
+                                                }}
+                                              />
+                                            </div>
+                                          ) : fileType.startsWith('audio/') || message.content_type === 'audio' ? (
+                                            <div className="p-2 bg-black/10 rounded">
+                                              <audio controls className="w-full">
+                                                <source src={fileUrl} type={fileType} />
+                                                Seu navegador não suporta áudio.
+                                              </audio>
+                                            </div>
+                                          ) : (
+                                            <a
+                                              href={fileUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors"
+                                            >
+                                              <FileText className="h-4 w-4" />
+                                              <span className="text-xs truncate">
+                                                {fileName}
+                                              </span>
+                                              <Download className="h-3 w-3 ml-auto" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 
