@@ -349,18 +349,34 @@ export default function MessagesPage() {
 
   const formatMessageTime = (dateString: string) => {
     try {
+      if (!dateString) {
+        return 'Data não disponível';
+      }
+      
       const date = new Date(dateString);
       
-      // Verificar se a data é válida
-      if (isNaN(date.getTime())) {
+      // Verificar se a data é válida e não é epoch (1970)
+      if (isNaN(date.getTime()) || date.getTime() < 1000000000) {
+        // Se for timestamp muito pequeno ou inválido, tentar parsear como timestamp
+        const timestamp = parseInt(dateString);
+        if (!isNaN(timestamp) && timestamp > 1000000000) {
+          const validDate = new Date(timestamp * 1000); // Se for timestamp em segundos
+          if (!isNaN(validDate.getTime())) {
+            return formatDistanceToNow(validDate, {
+              addSuffix: true,
+              locale: ptBR,
+            });
+          }
+        }
         return 'Data inválida';
       }
       
-      // Verificar se a data não é muito antiga (mais de 1 ano)
+      // Verificar se a data não é muito antiga (antes de 2000 ou mais de 1 ano)
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const year2000 = new Date('2000-01-01');
       
-      if (date < oneYearAgo) {
+      if (date < year2000 || date < oneYearAgo) {
         // Se for muito antiga, mostrar data formatada
         return new Intl.DateTimeFormat('pt-BR', {
           day: '2-digit',
@@ -378,7 +394,8 @@ export default function MessagesPage() {
       });
       
       // Se retornar algo como "mais de X anos", usar formatação de data
-      if (distance.includes('anos') && parseInt(distance) > 1) {
+      const yearsMatch = distance.match(/(\d+)\s+anos?/);
+      if (yearsMatch && parseInt(yearsMatch[1]) > 1) {
         return new Intl.DateTimeFormat('pt-BR', {
           day: '2-digit',
           month: '2-digit',

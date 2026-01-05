@@ -3088,13 +3088,18 @@ PROMPT MELHORADO:`;
     sendMessage: protectedProcedure
       .input(z.object({
         conversationId: z.number(),
-        content: z.string().min(1, 'Mensagem não pode estar vazia'),
+        content: z.string().default(''),
         messageType: z.enum(['outgoing', 'incoming']).default('outgoing'),
         attachments: z.array(z.object({
           file_url: z.string(),
           file_type: z.string(),
           file_name: z.string().optional()
         })).optional()
+      }).refine((data) => {
+        // Deve ter conteúdo OU anexos
+        return data.content.trim().length > 0 || (data.attachments && data.attachments.length > 0);
+      }, {
+        message: 'Mensagem deve ter conteúdo ou anexos'
       }))
       .mutation(async ({ input, ctx }) => {
         // Se for cliente, usar tenant direto
