@@ -133,15 +133,8 @@ async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boo
     }
   }
 
-  // 3.5. Desconectar Agent Bot do inbox (se houver)
-  if (tenant.chatwootInboxId) {
-    try {
-      await disconnectAgentBotFromInbox(tenant.chatwootInboxId);
-      console.log(`[Delete] ✅ Agent Bot desconectado do inbox ${tenant.chatwootInboxId}`);
-    } catch (error: any) {
-      console.warn(`[Delete] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
-    }
-  }
+  // 3.5. Desconectar Agent Bot do inbox (já feito no loop acima para cada agent)
+  // Esta parte já está coberta no loop de agents acima
 
   // 3.6. Deletar Agent Bot do Chatwoot
   const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
@@ -1168,9 +1161,11 @@ export const appRouter = router({
         const currentMonth = await db.getCurrentMonthUsage(input.tenantId);
         const tenant = await db.getTenantById(input.tenantId);
         
+        // Buscar agente para estatísticas do workflow
+        const agent = await getTenantAgent(tenant.id);
         let workflowStats = null;
-        if (tenant?.n8nWorkflowId) {
-          workflowStats = await getWorkflowExecutionStats(tenant.n8nWorkflowId);
+        if (agent?.n8nWorkflowId) {
+          workflowStats = await getWorkflowExecutionStats(agent.n8nWorkflowId);
         }
 
         return {
@@ -1904,7 +1899,16 @@ export const appRouter = router({
       });
     }
 
-    if (!tenant.evolutionInstanceName) {
+    // Buscar agente do tenant
+    const agent = await getTenantAgent(tenant.id);
+    if (!agent) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Agente não encontrado. Crie um agente primeiro.',
+      });
+    }
+
+    if (!agent.evolutionInstanceName) {
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message: 'Instância Evolution não provisionada',
@@ -1913,34 +1917,34 @@ export const appRouter = router({
 
     try {
       // Verificar status primeiro
-      const status = await getConnectionStatus(tenant.evolutionInstanceName);
+      const status = await getConnectionStatus(agent.evolutionInstanceName);
       
       // Se já estiver conectado, não precisa de QR Code
       if (status === "open") {
         return {
           qrCode: null,
           status,
-          instanceName: tenant.evolutionInstanceName,
+          instanceName: agent.evolutionInstanceName,
         };
       }
       
       // Só gerar QR Code se não estiver conectado
-      const qrCodeBase64 = await generateQRCode(tenant.evolutionInstanceName);
+      const qrCodeBase64 = await generateQRCode(agent.evolutionInstanceName);
       
       return {
         qrCode: qrCodeBase64,
         status,
-        instanceName: tenant.evolutionInstanceName,
+        instanceName: agent.evolutionInstanceName,
       };
     } catch (error: any) {
       // Se der erro ao gerar QR Code mas a instância estiver conectada, retornar status
       try {
-        const status = await getConnectionStatus(tenant.evolutionInstanceName);
+        const status = await getConnectionStatus(agent.evolutionInstanceName);
         if (status === "open") {
           return {
             qrCode: null,
             status,
-            instanceName: tenant.evolutionInstanceName,
+            instanceName: agent.evolutionInstanceName,
           };
         }
       } catch {
@@ -1966,12 +1970,18 @@ export const appRouter = router({
       tenant = await db.getTenantByUserId(ctx.user.id);
     }
     
-    if (!tenant || !tenant.evolutionInstanceName) {
+    if (!tenant) {
       return { status: 'not_provisioned' };
     }
 
-    const status = await getConnectionStatus(tenant.evolutionInstanceName);
-    return { status, instanceName: tenant.evolutionInstanceName };
+    // Buscar agente do tenant
+    const agent = await getTenantAgent(tenant.id);
+    if (!agent || !agent.evolutionInstanceName) {
+      return { status: 'not_provisioned' };
+    }
+
+    const status = await getConnectionStatus(agent.evolutionInstanceName);
+    return { status, instanceName: agent.evolutionInstanceName };
   }),
 
     /**
@@ -1993,7 +2003,16 @@ export const appRouter = router({
       });
     }
 
-    if (!tenant.evolutionInstanceName) {
+    // Buscar agente do tenant
+    const agent = await getTenantAgent(tenant.id);
+    if (!agent) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Agente não encontrado. Crie um agente primeiro.',
+      });
+    }
+
+    if (!agent.evolutionInstanceName) {
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message: 'Instância Evolution não provisionada',
@@ -2001,7 +2020,7 @@ export const appRouter = router({
     }
 
     try {
-      await logoutInstance(tenant.evolutionInstanceName);
+      await logoutInstance(agent.evolutionInstanceName);
       return { success: true, message: 'WhatsApp desconectado com sucesso' };
     } catch (error: any) {
       throw new TRPCError({
@@ -2031,7 +2050,16 @@ export const appRouter = router({
         });
       }
 
-      if (!tenant.n8nWorkflowId) {
+      // Buscar agente do tenant
+      const agent = await getTenantAgent(tenant.id);
+      if (!agent) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Agente não encontrado. Crie um agente primeiro.',
+        });
+      }
+
+      if (!agent.n8nWorkflowId) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'Workflow N8N não provisionado',
@@ -2039,12 +2067,12 @@ export const appRouter = router({
       }
 
       // Verificar se o workflow está publicado (N8N 2.1.4+)
-      const isPublished = await isWorkflowPublished(tenant.n8nWorkflowId);
+      const isPublished = await isWorkflowPublished(agent.n8nWorkflowId);
       if (!isPublished) {
-        console.log(`[Client] ⚠️ Workflow ${tenant.n8nWorkflowId} não está publicado. Tentando publicar...`);
+        console.log(`[Client] ⚠️ Workflow ${agent.n8nWorkflowId} não está publicado. Tentando publicar...`);
         try {
-          await activateWorkflow(tenant.n8nWorkflowId);
-          console.log(`[Client] ✅ Workflow ${tenant.n8nWorkflowId} publicado com sucesso`);
+          await activateWorkflow(agent.n8nWorkflowId);
+          console.log(`[Client] ✅ Workflow ${agent.n8nWorkflowId} publicado com sucesso`);
         } catch (error: any) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
@@ -2109,7 +2137,7 @@ export const appRouter = router({
 
         // Criar/atualizar Agent Bot no Chatwoot e conectar ao inbox
         let agentBotCreated = false;
-        if (tenant.chatwootInboxId) {
+        if (agent.chatwootInboxId) {
           try {
             const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
             const agentBot = await createOrUpdateChatwootAgentBot(
@@ -2138,8 +2166,8 @@ export const appRouter = router({
             
             // Agora tentar conectar o bot ao inbox (não crítico se falhar)
             try {
-              await connectAgentBotToInbox(tenant.chatwootInboxId, agentBot.id);
-              console.log(`[Client] ✅ Agent Bot conectado ao inbox ${tenant.chatwootInboxId}`);
+              await connectAgentBotToInbox(agent.chatwootInboxId, agentBot.id);
+              console.log(`[Client] ✅ Agent Bot conectado ao inbox ${agent.chatwootInboxId}`);
               agentBotCreated = true;
             } catch (connectError: any) {
               console.warn(`[Client] ⚠️ Erro ao conectar Agent Bot ao inbox (não crítico):`, connectError.message);
@@ -2222,10 +2250,13 @@ export const appRouter = router({
       // Agente está ativado se tiver Agent Bot ID
       const isActivated = !!tenant.chatwootAgentBotId;
       
+      // Buscar agente para retornar inboxId
+      const agent = await getTenantAgent(tenant.id);
+      
       return {
         isActivated,
         agentBotId: tenant.chatwootAgentBotId || null,
-        inboxId: tenant.chatwootInboxId || null,
+        inboxId: agent?.chatwootInboxId || null,
       };
     }),
 
@@ -2265,12 +2296,15 @@ export const appRouter = router({
 
       const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
 
+      // Buscar agente do tenant
+      const agent = await getTenantAgent(tenant.id);
+
       try {
         // 1. Desconectar Agent Bot do inbox (se houver inbox)
-        if (tenant.chatwootInboxId) {
+        if (agent?.chatwootInboxId) {
           try {
-            await disconnectAgentBotFromInbox(tenant.chatwootInboxId);
-            console.log(`[Client] ✅ Agent Bot desconectado do inbox ${tenant.chatwootInboxId}`);
+            await disconnectAgentBotFromInbox(agent.chatwootInboxId);
+            console.log(`[Client] ✅ Agent Bot desconectado do inbox ${agent.chatwootInboxId}`);
           } catch (error: any) {
             console.warn(`[Client] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
           }
