@@ -96,6 +96,9 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const { data: authData } = trpc.auth.me.useQuery();
+  const currentUser = authData?.type === 'client' ? authData.tenant : null;
+
   const { data: conversations, isLoading: isLoadingConversations, refetch: refetchConversations } = 
     trpc.chatwoot.getMyConversations.useQuery(undefined, {
       refetchInterval: 30000, // Atualizar a cada 30 segundos
@@ -552,6 +555,23 @@ export default function MessagesPage() {
                 {/* Cabeçalho da Conversa */}
                 <div className="border-b p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4">
+                    {/* Avatar do Cliente */}
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      {contact?.thumbnail ? (
+                        <img 
+                          src={contact.thumbnail} 
+                          alt={contact?.name || 'Contato'}
+                          className="h-12 w-12 rounded-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center ${contact?.thumbnail ? 'hidden' : ''}`}>
+                        <User className="h-6 w-6 text-primary" />
+                      </div>
+                    </div>
                     <div>
                       <h2 className="font-semibold">
                         {contact?.name || 'Contato'}
@@ -689,18 +709,45 @@ export default function MessagesPage() {
                             });
                           }
                           
+                          // Identificar remetente da mensagem
+                          const messageSender = message.sender?.name || 
+                                               (isOutgoing ? (currentUser?.companyName || 'Você') : (contact?.name || 'Contato'));
+                          const isFromAgent = message.content_attributes?.origin === 'ai' || 
+                                             message.content_attributes?.via === 'n8n' ||
+                                             message.content_attributes?.origin === 'bot';
+                          const senderLabel = isOutgoing 
+                            ? (currentUser?.companyName || 'Você')
+                            : (isFromAgent ? 'Agente' : messageSender);
+
                           return (
                             <div
                               key={message.id}
-                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
+                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} gap-2`}
                             >
-                              <div
-                                className={`max-w-[70%] rounded-lg p-3 ${
-                                  isOutgoing
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
-                                }`}
-                              >
+                              {/* Avatar do remetente (apenas para mensagens recebidas) */}
+                              {!isOutgoing && (
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                  {isFromAgent ? (
+                                    <MessageSquare className="h-4 w-4 text-primary" />
+                                  ) : (
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex flex-col max-w-[70%]">
+                                {/* Nome do remetente */}
+                                {!isOutgoing && (
+                                  <p className="text-xs text-muted-foreground mb-1 px-1">
+                                    {senderLabel}
+                                  </p>
+                                )}
+                                <div
+                                  className={`rounded-lg p-3 ${
+                                    isOutgoing
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'bg-muted'
+                                  }`}
+                                >
                                 {/* Anexos (imagens, arquivos) */}
                                 {hasAttachments && (
                                   <div className="space-y-2 mb-2">
@@ -757,13 +804,20 @@ export default function MessagesPage() {
                                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                                 )}
                                 
+                                </div>
                                 {/* Timestamp */}
-                                <p className={`text-xs mt-1 ${
-                                  isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                <p className={`text-xs mt-1 px-1 ${
+                                  isOutgoing ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground'
                                 }`}>
                                   {formatMessageTime(message.created_at)}
                                 </p>
                               </div>
+                              {/* Avatar do remetente (apenas para mensagens enviadas) */}
+                              {isOutgoing && (
+                                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -821,8 +875,8 @@ export default function MessagesPage() {
                 )}
 
                 {/* Input de Mensagem */}
-                <div className="border-t p-4">
-                  <div className="flex gap-2">
+                <div className="border-t p-4 bg-background">
+                  <div className="flex gap-2 items-end">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -837,6 +891,7 @@ export default function MessagesPage() {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading || sendMessageMutation.isPending}
                       title="Anexar arquivo"
+                      className="flex-shrink-0 h-[60px] w-[60px]"
                     >
                       <Image className="h-4 w-4" />
                     </Button>
@@ -850,13 +905,14 @@ export default function MessagesPage() {
                         }
                       }}
                       placeholder="Digite sua mensagem..."
-                      className="min-h-[60px] resize-none"
+                      className="min-h-[60px] resize-none flex-1"
                       disabled={isUploading || sendMessageMutation.isPending}
                     />
                     <Button
                       onClick={handleSendMessage}
                       disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading || sendMessageMutation.isPending}
                       size="lg"
+                      className="flex-shrink-0 h-[60px] w-[60px]"
                     >
                       {(isUploading || sendMessageMutation.isPending) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

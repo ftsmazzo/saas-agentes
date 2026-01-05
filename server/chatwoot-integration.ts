@@ -898,6 +898,8 @@ export async function sendChatwootMessage(
       formData.append('content_type', contentType);
       formData.append('content_attributes[origin]', 'web');
       formData.append('content_attributes[via]', 'web_interface');
+      // Adicionar informações do remetente para identificar mensagens do cliente
+      // Isso ajuda a diferenciar mensagens do cliente das mensagens do agente
       
       // Adicionar cada anexo - Chatwoot espera attachments[] como array simples
       attachments.forEach((att) => {
