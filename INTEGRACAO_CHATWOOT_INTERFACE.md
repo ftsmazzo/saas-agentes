@@ -205,11 +205,14 @@ Retorna apenas conversas do inbox do tenant
 
 ## 🔮 Melhorias Futuras
 
-- [ ] WebSocket para atualização em tempo real
-- [ ] Envio de mídia (imagens, áudios, documentos)
+- [x] ✅ **Filtro de mensagens do Evolution API** - Mensagens do sistema são ocultadas automaticamente
+- [x] ✅ **Busca dentro das mensagens** - Busca por conteúdo nas mensagens da conversa
+- [x] ✅ **Suporte para anexos** - Visualização de imagens e arquivos nas mensagens
+- [ ] WebSocket para atualização em tempo real (atualmente usa polling a cada 5s)
+- [ ] Envio de mídia (imagens, áudios, documentos) - Estrutura pronta, falta UI de upload
 - [ ] Notificações de novas mensagens
 - [ ] Tags e labels nas conversas
 - [ ] Atribuição de agentes
-- [ ] Histórico e busca avançada
+- [ ] Histórico e busca avançada (busca básica implementada)
 - [ ] Exportação de conversas
 
