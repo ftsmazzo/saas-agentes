@@ -129,16 +129,16 @@ export async function getConversationMessages(
         const origin = (contentAttrs.origin || '').toLowerCase();
         const via = (contentAttrs.via || '').toLowerCase();
         
-        // Filtrar mensagens do Evolution API (múltiplas variações)
+        // Filtrar APENAS mensagens do Evolution API (não do agente/bot)
+        // O agente usa origin: 'ai' ou via: 'n8n', mas não queremos filtrar essas
         if (origin.includes('evolution') || 
-            via.includes('evolution') || 
-            origin === 'api' || 
-            via === 'api' ||
-            origin.includes('n8n') ||
-            via.includes('n8n')) {
+            via.includes('evolution')) {
           console.log(`[Chatwoot] 🚫 Filtrando mensagem do Evolution: origin=${origin}, via=${via}`);
           return false;
         }
+        
+        // NÃO filtrar mensagens do agente (origin: 'ai' ou via: 'n8n' são do agente)
+        // Essas são mensagens importantes que o usuário precisa ver
         
         // Filtrar mensagens de eventos automáticos do sistema
         if (msg.message_type === 'activity' || msg.message_type === 'system') {
