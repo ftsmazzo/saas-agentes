@@ -884,57 +884,57 @@ export async function sendChatwootMessage(
   contentType: 'text' | 'input_text' = 'text',
   attachments?: Array<{ file_url: string; file_type: string; file_name?: string }>
 ): Promise<any> {
-  try {
-    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
-    
-    const payload: any = {
-      content,
-      message_type: messageType,
-      private: false,
-      content_type: contentType,
-      // Marcar como mensagem do sistema (não do Evolution API)
-      content_attributes: {
-        origin: 'web',
-        via: 'web_interface'
-      }
-    };
-
-    // Adicionar anexos se houver
-    // O Chatwoot espera attachments no formato específico
-    if (attachments && attachments.length > 0) {
-      payload.attachments = attachments.map(att => {
-        let dataUrl = att.file_url;
-        
-        // Se for data URL completa (data:image/png;base64,...), usar como está
-        // Se tiver prefixo http/https, remover (como no N8N workflow)
-        if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
-          // Remover prefixo se houver duplicação (http://https://)
-          dataUrl = dataUrl.replace(/^https?:\/\/https?:\/\//, 'https://');
-          dataUrl = dataUrl.replace(/^http:\/\/https:\/\//, 'https://');
-        }
-        
-        const attachment = {
-          data_url: dataUrl,
-          file_type: att.file_type
-        };
-        
-        // Adicionar file_name apenas se existir
-        if (att.file_name) {
-          attachment.file_name = att.file_name;
-        }
-        
-        return attachment;
-      });
-      
-      console.log("[Chatwoot] Payload com attachments:", JSON.stringify({
-        ...payload,
-        attachments: payload.attachments.map((att: any) => ({
-          ...att,
-          data_url: att.data_url?.substring(0, 100) + '...' // Log apenas início do data_url
-        }))
-      }, null, 2));
+  const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+  
+  const payload: any = {
+    content,
+    message_type: messageType,
+    private: false,
+    content_type: contentType,
+    // Marcar como mensagem do sistema (não do Evolution API)
+    content_attributes: {
+      origin: 'web',
+      via: 'web_interface'
     }
+  };
+
+  // Adicionar anexos se houver
+  // O Chatwoot espera attachments no formato específico
+  if (attachments && attachments.length > 0) {
+    payload.attachments = attachments.map(att => {
+      let dataUrl = att.file_url;
+      
+      // Se for data URL completa (data:image/png;base64,...), usar como está
+      // Se tiver prefixo http/https, remover (como no N8N workflow)
+      if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
+        // Remover prefixo se houver duplicação (http://https://)
+        dataUrl = dataUrl.replace(/^https?:\/\/https?:\/\//, 'https://');
+        dataUrl = dataUrl.replace(/^http:\/\/https:\/\//, 'https://');
+      }
+      
+      const attachment: any = {
+        data_url: dataUrl,
+        file_type: att.file_type
+      };
+      
+      // Adicionar file_name apenas se existir
+      if (att.file_name) {
+        attachment.file_name = att.file_name;
+      }
+      
+      return attachment;
+    });
     
+    console.log("[Chatwoot] Payload com attachments:", JSON.stringify({
+      ...payload,
+      attachments: payload.attachments.map((att: any) => ({
+        ...att,
+        data_url: att.data_url?.substring(0, 100) + '...' // Log apenas início do data_url
+      }))
+    }, null, 2));
+  }
+  
+  try {
     console.log("[Chatwoot] Enviando mensagem para conversa:", conversationId);
     const response = await chatwootApi.post(
       `/accounts/${accountId}/conversations/${conversationId}/messages`,
