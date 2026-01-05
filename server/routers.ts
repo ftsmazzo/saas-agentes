@@ -10,7 +10,7 @@ import * as db from "./db";
 import { provisionTenant, deprovisionTenant, getTenantDatabaseCredentials } from "./tenant-provisioning";
 import { cloneWorkflowForTenant, activateWorkflow, deactivateWorkflow, deleteWorkflow, getWorkflowExecutionStats, syncAgentConfigToN8N, isWorkflowPublished, updateModelInWorkflow } from "./n8n-integration";
 import { createEvolutionInstance, generateQRCode, getConnectionStatus, deleteEvolutionInstance, logoutInstance } from "./evolution-integration";
-import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot } from "./chatwoot-integration";
+import { getInboxConversations, getConversationMessages, getInboxStats, deleteChatwootInbox, deleteChatwootInboxByName, findChatwootInboxByName, deleteChatwootWebhookByUrl, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, deleteChatwootAgentBotByName, disconnectAgentBotFromInbox, deleteChatwootAgentBot, sendChatwootMessage, updateConversationStatus, getConversationDetails, getConversationContact } from "./chatwoot-integration";
 import { notifyOwner } from "./_core/notification";
 import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
@@ -2875,6 +2875,148 @@ PROMPT MELHORADO:`;
           return { success: true };
         }),
     }),
+  }),
+
+  chatwoot: router({
+    /**
+     * Lista todas as conversas do inbox do tenant logado
+     */
+    getMyConversations: protectedProcedure.query(async ({ ctx }) => {
+      const tenants = await db.getAllTenants();
+      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      
+      if (!userTenant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+      }
+
+      if (!userTenant.chatwootInboxId) {
+        return [];
+      }
+
+      const conversations = await getInboxConversations(userTenant.chatwootInboxId);
+      
+      // Ordenar por última mensagem (mais recente primeiro)
+      return conversations.sort((a: any, b: any) => {
+        const timeA = new Date(a.last_activity_at || a.updated_at || 0).getTime();
+        const timeB = new Date(b.last_activity_at || b.updated_at || 0).getTime();
+        return timeB - timeA;
+      });
+    }),
+
+    /**
+     * Busca mensagens de uma conversa específica
+     */
+    getConversationMessages: protectedProcedure
+      .input(z.object({ conversationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // Validar que a conversa pertence ao tenant do usuário
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant || !userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        // Verificar se a conversa pertence ao inbox do tenant
+        const conversation = await getConversationDetails(input.conversationId);
+        if (conversation.inbox_id !== userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversa não pertence ao seu tenant' });
+        }
+
+        const messages = await getConversationMessages(input.conversationId);
+        return messages.sort((a: any, b: any) => {
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          return timeA - timeB; // Ordem cronológica
+        });
+      }),
+
+    /**
+     * Busca detalhes de uma conversa
+     */
+    getConversationDetails: protectedProcedure
+      .input(z.object({ conversationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant || !userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        const conversation = await getConversationDetails(input.conversationId);
+        
+        // Validar que a conversa pertence ao inbox do tenant
+        if (conversation.inbox_id !== userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversa não pertence ao seu tenant' });
+        }
+
+        // Buscar informações do contato
+        const contact = await getConversationContact(input.conversationId);
+        
+        return {
+          ...conversation,
+          contact: contact || conversation.meta?.sender || conversation.contact
+        };
+      }),
+
+    /**
+     * Envia uma mensagem em uma conversa
+     */
+    sendMessage: protectedProcedure
+      .input(z.object({
+        conversationId: z.number(),
+        content: z.string().min(1, 'Mensagem não pode estar vazia'),
+        messageType: z.enum(['outgoing', 'incoming']).default('outgoing')
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant || !userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        // Validar que a conversa pertence ao inbox do tenant
+        const conversation = await getConversationDetails(input.conversationId);
+        if (conversation.inbox_id !== userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversa não pertence ao seu tenant' });
+        }
+
+        const message = await sendChatwootMessage(
+          input.conversationId,
+          input.content,
+          input.messageType
+        );
+
+        return message;
+      }),
+
+    /**
+     * Atualiza o status de uma conversa
+     */
+    updateConversationStatus: protectedProcedure
+      .input(z.object({
+        conversationId: z.number(),
+        status: z.enum(['open', 'resolved', 'pending'])
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenants = await db.getAllTenants();
+        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        
+        if (!userTenant || !userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        }
+
+        // Validar que a conversa pertence ao inbox do tenant
+        const conversation = await getConversationDetails(input.conversationId);
+        if (conversation.inbox_id !== userTenant.chatwootInboxId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversa não pertence ao seu tenant' });
+        }
+
+        const updated = await updateConversationStatus(input.conversationId, input.status);
+        return updated;
+      }),
   }),
 });
 

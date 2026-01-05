@@ -26,6 +26,7 @@ import SubscriptionPage from "./pages/client/Subscription";
 import WhatsAppQRCode from "./pages/client/WhatsAppQRCode";
 import AgentSettings from "./pages/client/AgentSettings";
 import ClientLogin from "./pages/client/Login";
+import MessagesPage from "./pages/client/Messages";
 import CreateAgentPage from "./pages/client/CreateAgent";
 import ActivateAccount from "./pages/ActivateAccount";
 
@@ -58,6 +59,7 @@ function Router() {
       <Route path={"/client/settings"} component={AgentConfigUnifiedPage} />
       <Route path={"/client/agent"} component={AgentConfigUnifiedPage} />
       <Route path={"/client/interactions"} component={InteractionsPage} />
+      <Route path={"/client/messages"} component={MessagesPage} />
       <Route path={"/client/metrics"} component={MetricsPage} />
       <Route path={"/client/subscription"} component={SubscriptionPage} />
       

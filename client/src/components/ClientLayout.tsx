@@ -110,6 +110,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   const navigation = [
     { name: "WhatsApp", href: "/client", icon: Smartphone },
+    { name: "Mensagens", href: "/client/messages", icon: MessageSquare },
     { name: "Interações", href: "/client/interactions", icon: MessageSquare },
     { name: "Configurações", href: "/client/settings", icon: Settings },
     { name: "Métricas", href: "/client/metrics", icon: BarChart3 },

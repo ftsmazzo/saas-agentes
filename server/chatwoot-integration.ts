@@ -710,3 +710,98 @@ export async function deleteChatwootAgentBotByName(botName: string): Promise<boo
     return false;
   }
 }
+
+// ========== MENSAGENS E INTERAÇÕES ==========
+
+/**
+ * Envia uma mensagem em uma conversa do Chatwoot
+ */
+export async function sendChatwootMessage(
+  conversationId: number,
+  content: string,
+  messageType: 'outgoing' | 'incoming' = 'outgoing',
+  contentType: 'text' | 'input_text' = 'text'
+): Promise<any> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    const response = await chatwootApi.post(
+      `/accounts/${accountId}/conversations/${conversationId}/messages`,
+      {
+        content,
+        message_type: messageType,
+        private: false,
+        content_type: contentType
+      }
+    );
+
+    return response.data.payload || response.data;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao enviar mensagem:", error.response?.data || error.message);
+    throw new Error(`Falha ao enviar mensagem: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Atualiza o status de uma conversa
+ */
+export async function updateConversationStatus(
+  conversationId: number,
+  status: 'open' | 'resolved' | 'pending'
+): Promise<any> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    const response = await chatwootApi.put(
+      `/accounts/${accountId}/conversations/${conversationId}`,
+      { status }
+    );
+
+    return response.data.payload || response.data;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao atualizar status da conversa:", error.response?.data || error.message);
+    throw new Error(`Falha ao atualizar status: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Busca detalhes completos de uma conversa
+ */
+export async function getConversationDetails(conversationId: number): Promise<any> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    const response = await chatwootApi.get(
+      `/accounts/${accountId}/conversations/${conversationId}`
+    );
+
+    return response.data.payload || response.data;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar detalhes da conversa:", error.response?.data || error.message);
+    throw new Error(`Falha ao buscar detalhes: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Busca contato de uma conversa
+ */
+export async function getConversationContact(conversationId: number): Promise<any> {
+  try {
+    const conversation = await getConversationDetails(conversationId);
+    const contactId = conversation?.meta?.sender?.id || conversation?.contact?.id;
+    
+    if (!contactId) {
+      return null;
+    }
+
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    const response = await chatwootApi.get(
+      `/accounts/${accountId}/contacts/${contactId}`
+    );
+
+    return response.data.payload || response.data;
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao buscar contato:", error.response?.data || error.message);
+    return null;
+  }
+}
