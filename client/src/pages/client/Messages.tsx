@@ -349,12 +349,49 @@ export default function MessagesPage() {
 
   const formatMessageTime = (dateString: string) => {
     try {
-      return formatDistanceToNow(new Date(dateString), {
+      const date = new Date(dateString);
+      
+      // Verificar se a data é válida
+      if (isNaN(date.getTime())) {
+        return 'Data inválida';
+      }
+      
+      // Verificar se a data não é muito antiga (mais de 1 ano)
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      
+      if (date < oneYearAgo) {
+        // Se for muito antiga, mostrar data formatada
+        return new Intl.DateTimeFormat('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(date);
+      }
+      
+      // Para datas recentes, usar formatDistanceToNow
+      const distance = formatDistanceToNow(date, {
         addSuffix: true,
         locale: ptBR,
       });
-    } catch {
-      return dateString;
+      
+      // Se retornar algo como "mais de X anos", usar formatação de data
+      if (distance.includes('anos') && parseInt(distance) > 1) {
+        return new Intl.DateTimeFormat('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(date);
+      }
+      
+      return distance;
+    } catch (error) {
+      console.error('[Messages] Erro ao formatar data:', dateString, error);
+      return 'Data inválida';
     }
   };
 

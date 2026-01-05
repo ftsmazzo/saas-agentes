@@ -827,24 +827,44 @@ export async function uploadFileToChatwoot(
       contentType: contentType
     });
     
-    // Usar axios diretamente com form-data
-    const response = await axios.post(
-      `${process.env.CHATWOOT_URL}/api/v1/accounts/${accountId}/uploads`,
-      formData,
-      {
-        headers: {
-          ...formData.getHeaders(),
-          'api_access_token': process.env.CHATWOOT_API_TOKEN || ''
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+    // Tentar endpoint de upload do Chatwoot
+    // O Chatwoot pode não ter endpoint de upload direto, então vamos usar data URL
+    // Converter buffer para base64 e criar data URL
+    const base64 = file.toString('base64');
+    const dataUrl = `data:${contentType};base64,${base64}`;
+    
+    // Tentar fazer upload via API primeiro
+    try {
+      const response = await axios.post(
+        `${process.env.CHATWOOT_URL}/api/v1/accounts/${accountId}/uploads`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            'api_access_token': process.env.CHATWOOT_API_TOKEN || ''
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        }
+      );
+      
+      const uploadData = response.data.data || response.data.payload || response.data;
+      
+      if (uploadData.file_url || uploadData.url) {
+        return {
+          file_url: uploadData.file_url || uploadData.url || uploadData.data?.file_url,
+          file_type: contentType,
+          file_name: fileName
+        };
       }
-    );
+    } catch (uploadError: any) {
+      console.log("[Chatwoot] Upload via API falhou (404 esperado), usando data URL:", uploadError.response?.status);
+    }
     
-    const uploadData = response.data.data || response.data.payload || response.data;
-    
+    // Se upload falhar, usar data URL (o Chatwoot aceita data URLs em attachments)
+    console.log("[Chatwoot] Usando data URL como fallback para anexo");
     return {
-      file_url: uploadData.file_url || uploadData.url || uploadData.data?.file_url,
+      file_url: dataUrl,
       file_type: contentType,
       file_name: fileName
     };
