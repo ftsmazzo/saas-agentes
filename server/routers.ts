@@ -3127,7 +3127,8 @@ PROMPT MELHORADO:`;
           input.content,
           input.messageType,
           'text',
-          input.attachments
+          input.attachments,
+          userTenant.chatwootAgentId || undefined // Usar o ID do agente do tenant se existir
         );
 
         return message;

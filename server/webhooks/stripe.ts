@@ -146,32 +146,49 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     evolutionData = await createEvolutionInstance(tenant.id, companyName);
     console.log(`[Provisioning] Evolution instance created: ${evolutionData.instanceName}`);
     
-    // Buscar inboxId criado pelo Evolution (pode levar alguns segundos para aparecer)
-    let chatwootInboxId: number | null = null;
-    try {
-      // Aguardar um pouco para o Evolution criar o inbox
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Tentar buscar pelo nome (Evolution usa o nome que passamos)
-      chatwootInboxId = await findChatwootInboxByName(companyName);
-      
-      if (chatwootInboxId) {
-        console.log(`[Provisioning] Chatwoot inbox found: ${chatwootInboxId}`);
-      } else {
-        console.log(`[Provisioning] Chatwoot inbox not found immediately (may be created later)`);
+      // Buscar inboxId criado pelo Evolution (pode levar alguns segundos para aparecer)
+      let chatwootInboxId: number | null = null;
+      try {
+        // Aguardar um pouco para o Evolution criar o inbox
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Tentar buscar pelo nome (Evolution usa o nome que passamos)
+        chatwootInboxId = await findChatwootInboxByName(companyName);
+        
+        if (chatwootInboxId) {
+          console.log(`[Provisioning] Chatwoot inbox found: ${chatwootInboxId}`);
+        } else {
+          console.log(`[Provisioning] Chatwoot inbox not found immediately (may be created later)`);
+        }
+      } catch (error: any) {
+        console.warn(`[Provisioning] Error finding inbox (non-critical):`, error.message);
       }
-    } catch (error: any) {
-      console.warn(`[Provisioning] Error finding inbox (non-critical):`, error.message);
-    }
-    
-    // Atualizar tenant com dados Evolution
-    await db.update(tenants)
-      .set({
-        evolutionInstanceName: evolutionData.instanceName,
-        evolutionApiKey: evolutionData.apiKey,
-        chatwootInboxId: chatwootInboxId || undefined,
-      })
-      .where(eq(tenants.id, tenant.id));
+      
+      // Criar agente no Chatwoot para o tenant
+      let chatwootAgentId: number | null = null;
+      try {
+        console.log(`[Provisioning] Criando agente no Chatwoot para ${companyName}...`);
+        const agent = await createChatwootAgent(
+          companyName, // Nome do agente = nome da empresa
+          tenant.email, // Email do tenant
+          'agent' // Role: agent (não admin)
+        );
+        chatwootAgentId = agent.id;
+        console.log(`[Provisioning] ✅ Agente criado no Chatwoot: ID=${chatwootAgentId}, Nome=${agent.name}`);
+      } catch (error: any) {
+        console.warn(`[Provisioning] Erro ao criar agente no Chatwoot (não crítico):`, error.message);
+        // Não falhar o provisionamento se não conseguir criar o agente
+      }
+      
+      // Atualizar tenant com dados Evolution e agente
+      await db.update(tenants)
+        .set({
+          evolutionInstanceName: evolutionData.instanceName,
+          evolutionApiKey: evolutionData.apiKey,
+          chatwootInboxId: chatwootInboxId || undefined,
+          chatwootAgentId: chatwootAgentId || undefined,
+        })
+        .where(eq(tenants.id, tenant.id));
   } catch (error: any) {
     console.error(`[Provisioning] Evolution failed:`, error);
     await createPlatformLog({

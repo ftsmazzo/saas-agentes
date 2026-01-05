@@ -898,8 +898,11 @@ export async function sendChatwootMessage(
       formData.append('content_type', contentType);
       formData.append('content_attributes[origin]', 'web');
       formData.append('content_attributes[via]', 'web_interface');
-      // Adicionar informações do remetente para identificar mensagens do cliente
-      // Isso ajuda a diferenciar mensagens do cliente das mensagens do agente
+      
+      // Se tiver senderId, adicionar para identificar o agente que está enviando
+      if (senderId) {
+        formData.append('sender_id', senderId.toString());
+      }
       
       // Adicionar cada anexo - Chatwoot espera attachments[] como array simples
       attachments.forEach((att) => {
@@ -955,6 +958,11 @@ export async function sendChatwootMessage(
       via: 'web_interface'
     }
   };
+  
+  // Se tiver senderId, adicionar para identificar o agente que está enviando
+  if (senderId) {
+    payload.sender_id = senderId;
+  }
   
   try {
     console.log("[Chatwoot] Enviando mensagem sem anexos");
@@ -1036,5 +1044,69 @@ export async function getConversationContact(conversationId: number): Promise<an
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao buscar contato:", error.response?.data || error.message);
     return null;
+  }
+}
+
+/**
+ * Cria um agente (user) no Chatwoot para um tenant
+ * Isso permite que as mensagens enviadas pelo tenant apareçam com o nome correto
+ */
+export async function createChatwootAgent(
+  name: string,
+  email: string,
+  role: 'agent' | 'administrator' = 'agent'
+): Promise<{ id: number; email: string; name: string }> {
+  try {
+    const accountId = process.env.CHATWOOT_ACCOUNT_ID;
+    
+    // Verificar se já existe um agente com esse email
+    try {
+      const usersResponse = await chatwootApi.get(`/accounts/${accountId}/agents`);
+      const users = usersResponse.data.payload || usersResponse.data.data || usersResponse.data || [];
+      
+      if (Array.isArray(users)) {
+        const existingUser = users.find((u: any) => u.email === email);
+        if (existingUser) {
+          console.log(`[Chatwoot] Agente já existe com email ${email}, retornando existente`);
+          return {
+            id: existingUser.id,
+            email: existingUser.email,
+            name: existingUser.name
+          };
+        }
+      }
+    } catch (error: any) {
+      console.warn("[Chatwoot] Erro ao verificar agentes existentes (continuando):", error.message);
+    }
+    
+    // Criar novo agente
+    console.log(`[Chatwoot] Criando novo agente: ${name} (${email})`);
+    const response = await chatwootApi.post(`/accounts/${accountId}/agents`, {
+      email,
+      name,
+      role,
+      // O Chatwoot vai enviar um email de convite, mas podemos criar diretamente
+      // Se precisar de senha, podemos gerar uma aleatória
+      password: `Temp${Math.random().toString(36).slice(-12)}!`, // Senha temporária
+      confirm_password: `Temp${Math.random().toString(36).slice(-12)}!`
+    });
+
+    const agentData = response.data.payload || response.data.data || response.data;
+    const agentId = agentData.id || agentData.user?.id;
+    
+    if (!agentId) {
+      throw new Error("Resposta do Chatwoot não contém ID do agente");
+    }
+
+    console.log(`[Chatwoot] ✅ Agente criado: ID=${agentId}, Nome=${name}, Email=${email}`);
+    
+    return {
+      id: agentId,
+      email: agentData.email || email,
+      name: agentData.name || name
+    };
+  } catch (error: any) {
+    console.error("[Chatwoot] Erro ao criar agente:", error.response?.data || error.message);
+    throw new Error(`Falha ao criar agente no Chatwoot: ${error.response?.data?.message || error.message}`);
   }
 }
