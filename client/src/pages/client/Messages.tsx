@@ -443,7 +443,7 @@ export default function MessagesPage() {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar - Lista de Conversas */}
-          <div className="w-80 border-r flex flex-col">
+          <div className="w-80 border-r flex flex-col flex-shrink-0">
             {/* Filtros e Busca */}
             <div className="p-4 border-b space-y-3">
               <div className="relative">
@@ -554,42 +554,32 @@ export default function MessagesPage() {
               <>
                 {/* Cabeçalho da Conversa */}
                 <div className="border-b p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* Avatar do Cliente */}
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       {contact?.thumbnail ? (
                         <img 
                           src={contact.thumbnail} 
                           alt={contact?.name || 'Contato'}
-                          className="h-12 w-12 rounded-full object-cover"
+                          className="h-10 w-10 rounded-full object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.nextElementSibling?.classList.remove('hidden');
                           }}
                         />
                       ) : null}
-                      <div className={`h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center ${contact?.thumbnail ? 'hidden' : ''}`}>
-                        <User className="h-6 w-6 text-primary" />
+                      <div className={`h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center ${contact?.thumbnail ? 'hidden' : ''}`}>
+                        <User className="h-5 w-5 text-primary" />
                       </div>
                     </div>
                     <div>
-                      <h2 className="font-semibold">
+                      <h2 className="font-semibold text-base">
                         {contact?.name || 'Contato'}
                       </h2>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        {contact?.phone_number && (
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {contact.phone_number}
-                          </div>
-                        )}
-                        {contact?.email && (
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {contact.email}
-                          </div>
-                        )}
-                      </div>
+                      {contact?.phone_number && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {contact.phone_number}
+                        </p>
+                      )}
                     </div>
                   </div>
                   
@@ -709,45 +699,18 @@ export default function MessagesPage() {
                             });
                           }
                           
-                          // Identificar remetente da mensagem
-                          const messageSender = message.sender?.name || 
-                                               (isOutgoing ? (currentUser?.companyName || 'Você') : (contact?.name || 'Contato'));
-                          const isFromAgent = message.content_attributes?.origin === 'ai' || 
-                                             message.content_attributes?.via === 'n8n' ||
-                                             message.content_attributes?.origin === 'bot';
-                          const senderLabel = isOutgoing 
-                            ? (currentUser?.companyName || 'Você')
-                            : (isFromAgent ? 'Agente' : messageSender);
-
                           return (
                             <div
                               key={message.id}
-                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} gap-2`}
+                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
                             >
-                              {/* Avatar do remetente (apenas para mensagens recebidas) */}
-                              {!isOutgoing && (
-                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                                  {isFromAgent ? (
-                                    <MessageSquare className="h-4 w-4 text-primary" />
-                                  ) : (
-                                    <User className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                </div>
-                              )}
-                              <div className="flex flex-col max-w-[70%]">
-                                {/* Nome do remetente */}
-                                {!isOutgoing && (
-                                  <p className="text-xs text-muted-foreground mb-1 px-1">
-                                    {senderLabel}
-                                  </p>
-                                )}
-                                <div
-                                  className={`rounded-lg p-3 ${
-                                    isOutgoing
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted'
-                                  }`}
-                                >
+                              <div
+                                className={`max-w-[75%] rounded-lg p-3 ${
+                                  isOutgoing
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                }`}
+                              >
                                 {/* Anexos (imagens, arquivos) */}
                                 {hasAttachments && (
                                   <div className="space-y-2 mb-2">
@@ -806,18 +769,12 @@ export default function MessagesPage() {
                                 
                                 </div>
                                 {/* Timestamp */}
-                                <p className={`text-xs mt-1 px-1 ${
-                                  isOutgoing ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground'
+                                <p className={`text-xs mt-1 ${
+                                  isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
                                 }`}>
                                   {formatMessageTime(message.created_at)}
                                 </p>
                               </div>
-                              {/* Avatar do remetente (apenas para mensagens enviadas) */}
-                              {isOutgoing && (
-                                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                  <User className="h-4 w-4 text-primary" />
-                                </div>
-                              )}
                             </div>
                           );
                         })}
