@@ -2882,15 +2882,27 @@ PROMPT MELHORADO:`;
      * Lista todas as conversas do inbox do tenant logado
      */
     getMyConversations: protectedProcedure.query(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      // Se for cliente, usar tenant direto
+      let userTenant: db.Tenant | null = null;
+      
+      if (ctx.tenant) {
+        // Cliente logado - usar tenant direto
+        userTenant = ctx.tenant;
+        console.log(`[Chatwoot Router] 🔍 Cliente logado: ${userTenant.companyName} (ID: ${userTenant.id})`);
+      } else if (ctx.user) {
+        // Admin logado - buscar tenant pelo ownerId
+        const tenants = await db.getAllTenants();
+        userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        if (userTenant) {
+          console.log(`[Chatwoot Router] 🔍 Admin logado - Tenant encontrado: ${userTenant.companyName} (ID: ${userTenant.id})`);
+        }
+      }
       
       if (!userTenant) {
-        console.log(`[Chatwoot Router] ❌ Tenant não encontrado para user ${ctx.user.id}`);
+        console.log(`[Chatwoot Router] ❌ Tenant não encontrado`);
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
       }
 
-      console.log(`[Chatwoot Router] 🔍 Tenant encontrado: ${userTenant.companyName} (ID: ${userTenant.id})`);
       console.log(`[Chatwoot Router] 📋 chatwootInboxId: ${userTenant.chatwootInboxId || 'NÃO CONFIGURADO'}`);
 
       if (!userTenant.chatwootInboxId) {
@@ -2917,8 +2929,21 @@ PROMPT MELHORADO:`;
      * Verifica e atualiza o chatwootInboxId do tenant (útil para debug)
      */
     checkAndUpdateInboxId: protectedProcedure.mutation(async ({ ctx }) => {
-      const tenants = await db.getAllTenants();
-      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      // Se for cliente, usar tenant direto
+      let userTenant: db.Tenant | null = null;
+      
+      if (ctx.tenant) {
+        // Cliente logado - usar tenant direto
+        userTenant = ctx.tenant;
+        console.log(`[Chatwoot Router] 🔍 Cliente logado: ${userTenant.companyName} (ID: ${userTenant.id})`);
+      } else if (ctx.user) {
+        // Admin logado - buscar tenant pelo ownerId
+        const tenants = await db.getAllTenants();
+        userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        if (userTenant) {
+          console.log(`[Chatwoot Router] 🔍 Admin logado - Tenant encontrado: ${userTenant.companyName} (ID: ${userTenant.id})`);
+        }
+      }
       
       if (!userTenant) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
@@ -2962,9 +2987,15 @@ PROMPT MELHORADO:`;
     getConversationMessages: protectedProcedure
       .input(z.object({ conversationId: z.number() }))
       .query(async ({ input, ctx }) => {
-        // Validar que a conversa pertence ao tenant do usuário
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        // Se for cliente, usar tenant direto
+        let userTenant: db.Tenant | null = null;
+        
+        if (ctx.tenant) {
+          userTenant = ctx.tenant;
+        } else if (ctx.user) {
+          const tenants = await db.getAllTenants();
+          userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        }
         
         if (!userTenant || !userTenant.chatwootInboxId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
@@ -2990,8 +3021,15 @@ PROMPT MELHORADO:`;
     getConversationDetails: protectedProcedure
       .input(z.object({ conversationId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        // Se for cliente, usar tenant direto
+        let userTenant: db.Tenant | null = null;
+        
+        if (ctx.tenant) {
+          userTenant = ctx.tenant;
+        } else if (ctx.user) {
+          const tenants = await db.getAllTenants();
+          userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        }
         
         if (!userTenant || !userTenant.chatwootInboxId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
@@ -3023,8 +3061,15 @@ PROMPT MELHORADO:`;
         messageType: z.enum(['outgoing', 'incoming']).default('outgoing')
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        // Se for cliente, usar tenant direto
+        let userTenant: db.Tenant | null = null;
+        
+        if (ctx.tenant) {
+          userTenant = ctx.tenant;
+        } else if (ctx.user) {
+          const tenants = await db.getAllTenants();
+          userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        }
         
         if (!userTenant || !userTenant.chatwootInboxId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
@@ -3054,8 +3099,15 @@ PROMPT MELHORADO:`;
         status: z.enum(['open', 'resolved', 'pending'])
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+        // Se for cliente, usar tenant direto
+        let userTenant: db.Tenant | null = null;
+        
+        if (ctx.tenant) {
+          userTenant = ctx.tenant;
+        } else if (ctx.user) {
+          const tenants = await db.getAllTenants();
+          userTenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+        }
         
         if (!userTenant || !userTenant.chatwootInboxId) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
