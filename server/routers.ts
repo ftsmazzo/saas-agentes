@@ -2914,13 +2914,33 @@ PROMPT MELHORADO:`;
       const conversations = await getInboxConversations(userTenant.chatwootInboxId);
       console.log(`[Chatwoot Router] ✅ ${conversations.length} conversas encontradas`);
       
-      // Filtrar conversas que tenham apenas mensagens do sistema (Evolution API)
-      // Isso ajuda a ocultar conversas vazias ou apenas com eventos do sistema
+      // Filtrar conversas do Evolution e do sistema
       const filteredConversations = conversations.filter((conv: any) => {
+        // Filtrar conversas com nome "Evolution" (são conversas do sistema)
+        const contactName = conv.meta?.sender?.name || 
+                           conv.contact?.name || 
+                           conv.meta?.sender?.identifier ||
+                           '';
+        const nameLower = contactName.toLowerCase();
+        
+        if (nameLower === 'evolution' || 
+            nameLower.includes('evolution') ||
+            nameLower === 'system' ||
+            nameLower.includes('sistema')) {
+          console.log(`[Chatwoot Router] 🚫 Filtrando conversa do Evolution: ${contactName}`);
+          return false;
+        }
+        
         // Se não tem última atividade, pode ser conversa apenas do sistema
         if (!conv.last_activity_at && !conv.updated_at) {
           return false;
         }
+        
+        // Filtrar conversas sem contato válido
+        if (!conv.meta?.sender && !conv.contact) {
+          return false;
+        }
+        
         return true;
       });
       

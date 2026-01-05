@@ -146,18 +146,56 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Selecionar primeira conversa automaticamente
+  // Selecionar primeira conversa automaticamente (apenas se não houver seleção)
   useEffect(() => {
     if (conversations && conversations.length > 0 && !selectedConversationId) {
-      setSelectedConversationId(conversations[0].id);
+      // Filtrar conversas válidas (não Evolution)
+      const validConversations = conversations.filter((conv: Conversation) => {
+        const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
+        const nameLower = contactName.toLowerCase();
+        return nameLower !== 'evolution' && !nameLower.includes('evolution');
+      });
+      
+      if (validConversations.length > 0) {
+        setSelectedConversationId(validConversations[0].id);
+      }
+    }
+  }, [conversations, selectedConversationId]);
+  
+  // Garantir que a conversa selecionada ainda existe após refetch
+  useEffect(() => {
+    if (selectedConversationId && conversations) {
+      const conversationExists = conversations.some((c: Conversation) => c.id === selectedConversationId);
+      if (!conversationExists) {
+        // Se a conversa selecionada não existe mais, selecionar a primeira válida
+        const validConversations = conversations.filter((conv: Conversation) => {
+          const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
+          const nameLower = contactName.toLowerCase();
+          return nameLower !== 'evolution' && !nameLower.includes('evolution');
+        });
+        
+        if (validConversations.length > 0) {
+          setSelectedConversationId(validConversations[0].id);
+        } else {
+          setSelectedConversationId(null);
+        }
+      }
     }
   }, [conversations, selectedConversationId]);
 
   const filteredConversations = conversations?.filter((conv: Conversation) => {
-    const matchesSearch = !searchQuery || 
-      conv.meta?.sender?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.contact?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    // Filtrar conversas do Evolution
+    const contactName = conv.meta?.sender?.name || conv.contact?.name || '';
+    const nameLower = contactName.toLowerCase();
+    if (nameLower === 'evolution' || nameLower.includes('evolution')) {
+      return false;
+    }
     
+    // Filtrar por busca
+    const matchesSearch = !searchQuery || 
+      contactName.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Filtrar por status
     const matchesStatus = statusFilter === 'all' || conv.status === statusFilter;
     
     return matchesSearch && matchesStatus;

@@ -120,11 +120,17 @@ export async function getConversationMessages(
       messages = messages.filter((msg: any) => {
         // Filtrar mensagens com content_attributes indicando origem do sistema
         const contentAttrs = msg.content_attributes || {};
-        const origin = contentAttrs.origin || '';
-        const via = contentAttrs.via || '';
+        const origin = (contentAttrs.origin || '').toLowerCase();
+        const via = (contentAttrs.via || '').toLowerCase();
         
-        // Filtrar mensagens do Evolution API
-        if (origin === 'evolution' || via === 'evolution' || origin === 'api' || via === 'api') {
+        // Filtrar mensagens do Evolution API (múltiplas variações)
+        if (origin.includes('evolution') || 
+            via.includes('evolution') || 
+            origin === 'api' || 
+            via === 'api' ||
+            origin.includes('n8n') ||
+            via.includes('n8n')) {
+          console.log(`[Chatwoot] 🚫 Filtrando mensagem do Evolution: origin=${origin}, via=${via}`);
           return false;
         }
         
@@ -133,13 +139,20 @@ export async function getConversationMessages(
           return false;
         }
         
-        // Filtrar mensagens privadas do sistema
+        // Filtrar mensagens privadas do sistema (exceto mensagens enviadas pelo usuário)
         if (msg.private === true && msg.message_type !== 'outgoing') {
           return false;
         }
         
         // Filtrar mensagens vazias ou apenas espaços
         if (!msg.content || msg.content.trim().length === 0) {
+          return false;
+        }
+        
+        // Filtrar mensagens do sender "Evolution" ou "System"
+        const senderName = (msg.sender?.name || '').toLowerCase();
+        if (senderName === 'evolution' || senderName.includes('evolution') || senderName === 'system') {
+          console.log(`[Chatwoot] 🚫 Filtrando mensagem do sender Evolution: ${senderName}`);
           return false;
         }
         
