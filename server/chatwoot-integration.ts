@@ -886,56 +886,79 @@ export async function sendChatwootMessage(
 ): Promise<any> {
   const accountId = process.env.CHATWOOT_ACCOUNT_ID;
   
+  // Se houver attachments, enviar como multipart/form-data
+  if (attachments && attachments.length > 0) {
+    try {
+      const formData = new FormData();
+      
+      // Adicionar campos da mensagem
+      formData.append('content', content || '');
+      formData.append('message_type', messageType);
+      formData.append('private', 'false');
+      formData.append('content_type', contentType);
+      formData.append('content_attributes[origin]', 'web');
+      formData.append('content_attributes[via]', 'web_interface');
+      
+      // Adicionar cada anexo
+      attachments.forEach((att, index) => {
+        // Se for data URL, converter para buffer
+        if (att.file_url.startsWith('data:')) {
+          const base64Data = att.file_url.split(',')[1];
+          const buffer = Buffer.from(base64Data, 'base64');
+          formData.append(`attachments[${index}][data]`, buffer, {
+            filename: att.file_name || `file_${index}`,
+            contentType: att.file_type
+          });
+        } else {
+          // Se for URL, adicionar como data_url
+          formData.append(`attachments[${index}][data_url]`, att.file_url);
+        }
+        formData.append(`attachments[${index}][file_type]`, att.file_type);
+        if (att.file_name) {
+          formData.append(`attachments[${index}][file_name]`, att.file_name);
+        }
+      });
+      
+      console.log("[Chatwoot] Enviando mensagem com anexos via multipart/form-data");
+      const response = await axios.post(
+        `${process.env.CHATWOOT_URL}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            'api_access_token': process.env.CHATWOOT_API_TOKEN || ''
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        }
+      );
+
+      return response.data.payload || response.data;
+    } catch (error: any) {
+      console.error("[Chatwoot] Erro ao enviar mensagem com anexos:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw new Error(`Falha ao enviar mensagem: ${JSON.stringify(error.response?.data || error.message)}`);
+    }
+  }
+  
+  // Se não houver attachments, enviar como JSON normal
   const payload: any = {
     content,
     message_type: messageType,
     private: false,
     content_type: contentType,
-    // Marcar como mensagem do sistema (não do Evolution API)
     content_attributes: {
       origin: 'web',
       via: 'web_interface'
     }
   };
-
-  // Adicionar anexos se houver
-  // O Chatwoot espera attachments no formato específico
-  if (attachments && attachments.length > 0) {
-    payload.attachments = attachments.map(att => {
-      let dataUrl = att.file_url;
-      
-      // Se for data URL completa (data:image/png;base64,...), usar como está
-      // Se tiver prefixo http/https, remover (como no N8N workflow)
-      if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
-        // Remover prefixo se houver duplicação (http://https://)
-        dataUrl = dataUrl.replace(/^https?:\/\/https?:\/\//, 'https://');
-        dataUrl = dataUrl.replace(/^http:\/\/https:\/\//, 'https://');
-      }
-      
-      const attachment: any = {
-        data_url: dataUrl,
-        file_type: att.file_type
-      };
-      
-      // Adicionar file_name apenas se existir
-      if (att.file_name) {
-        attachment.file_name = att.file_name;
-      }
-      
-      return attachment;
-    });
-    
-    console.log("[Chatwoot] Payload com attachments:", JSON.stringify({
-      ...payload,
-      attachments: payload.attachments.map((att: any) => ({
-        ...att,
-        data_url: att.data_url?.substring(0, 100) + '...' // Log apenas início do data_url
-      }))
-    }, null, 2));
-  }
   
   try {
-    console.log("[Chatwoot] Enviando mensagem para conversa:", conversationId);
+    console.log("[Chatwoot] Enviando mensagem sem anexos");
     const response = await chatwootApi.post(
       `/accounts/${accountId}/conversations/${conversationId}/messages`,
       payload
@@ -947,14 +970,7 @@ export async function sendChatwootMessage(
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      message: error.message,
-      payload: {
-        ...payload,
-        attachments: payload.attachments?.map((att: any) => ({
-          ...att,
-          data_url: att.data_url?.substring(0, 100) + '...'
-        }))
-      }
+      message: error.message
     });
     throw new Error(`Falha ao enviar mensagem: ${JSON.stringify(error.response?.data || error.message)}`);
   }
