@@ -30,45 +30,79 @@ const stripe = new Stripe(stripeApiKey, {
 // Importar adminProcedure do trpc (já tem verificação correta de ctx.user)
 // Não redefinir aqui para evitar duplicação e bugs
 
+// ========== HELPER FUNCTIONS ==========
+
+/**
+ * Busca o primeiro agente de um tenant
+ * Helper para compatibilidade com código antigo que usava tenant.n8nWorkflowId
+ */
+async function getTenantAgent(tenantId: number): Promise<db.Agent | null> {
+  try {
+    return await db.getFirstAgentByTenantId(tenantId) || null;
+  } catch (error) {
+    console.error(`[Helper] Erro ao buscar agente do tenant ${tenantId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Busca todos os agentes de um tenant
+ */
+async function getTenantAgents(tenantId: number): Promise<db.Agent[]> {
+  try {
+    return await db.getAgentsByTenantId(tenantId);
+  } catch (error) {
+    console.error(`[Helper] Erro ao buscar agentes do tenant ${tenantId}:`, error);
+    return [];
+  }
+}
+
+// ========== TENANT DELETION ==========
+
 // Função auxiliar para deletar um tenant completamente (N8N, Evolution, Chatwoot, Banco)
 async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boolean; errors: string[] }> {
   const errors: string[] = [];
 
-  // 1. Deletar workflow do N8N
-  if (tenant.n8nWorkflowId) {
-    try {
-      await deleteWorkflow(tenant.n8nWorkflowId);
-      console.log(`[Delete] ✅ Workflow N8N ${tenant.n8nWorkflowId} deletado`);
-    } catch (error: any) {
-      const errorMsg = `N8N: ${error.message}`;
-      console.error(`[Delete] ❌ Erro ao deletar workflow N8N:`, errorMsg);
-      errors.push(errorMsg);
-    }
-  }
+  // Buscar todos os agentes do tenant
+  const agents = await getTenantAgents(tenant.id);
 
-  // 2. Deletar instância Evolution
-  if (tenant.evolutionInstanceName) {
-    try {
-      await deleteEvolutionInstance(tenant.evolutionInstanceName);
-      console.log(`[Delete] ✅ Instância Evolution ${tenant.evolutionInstanceName} deletada`);
-    } catch (error: any) {
-      const errorMsg = `Evolution: ${error.message}`;
-      console.error(`[Delete] ❌ Erro ao deletar Evolution:`, errorMsg);
-      errors.push(errorMsg);
+  // Deletar recursos de cada agente
+  for (const agent of agents) {
+    // 1. Deletar workflow do N8N
+    if (agent.n8nWorkflowId) {
+      try {
+        await deleteWorkflow(agent.n8nWorkflowId);
+        console.log(`[Delete] ✅ Workflow N8N ${agent.n8nWorkflowId} deletado (agente ${agent.id})`);
+      } catch (error: any) {
+        const errorMsg = `N8N: ${error.message}`;
+        console.error(`[Delete] ❌ Erro ao deletar workflow N8N:`, errorMsg);
+        errors.push(errorMsg);
+      }
     }
-  }
 
-  // 3. Deletar inbox do Chatwoot
-  if (tenant.chatwootInboxId) {
-    try {
-      await deleteChatwootInbox(tenant.chatwootInboxId);
-      console.log(`[Delete] ✅ Inbox Chatwoot ${tenant.chatwootInboxId} deletado`);
-    } catch (error: any) {
-      const errorMsg = `Chatwoot: ${error.message}`;
-      console.error(`[Delete] ❌ Erro ao deletar Chatwoot:`, errorMsg);
-      errors.push(errorMsg);
+    // 2. Deletar instância Evolution
+    if (agent.evolutionInstanceName) {
+      try {
+        await deleteEvolutionInstance(agent.evolutionInstanceName);
+        console.log(`[Delete] ✅ Instância Evolution ${agent.evolutionInstanceName} deletada (agente ${agent.id})`);
+      } catch (error: any) {
+        const errorMsg = `Evolution: ${error.message}`;
+        console.error(`[Delete] ❌ Erro ao deletar Evolution:`, errorMsg);
+        errors.push(errorMsg);
+      }
     }
-  } else {
+
+    // 3. Deletar inbox do Chatwoot
+    if (agent.chatwootInboxId) {
+      try {
+        await deleteChatwootInbox(agent.chatwootInboxId);
+        console.log(`[Delete] ✅ Inbox Chatwoot ${agent.chatwootInboxId} deletado (agente ${agent.id})`);
+      } catch (error: any) {
+        const errorMsg = `Chatwoot: ${error.message}`;
+        console.error(`[Delete] ❌ Erro ao deletar Chatwoot:`, errorMsg);
+        errors.push(errorMsg);
+      }
+    } else {
     // Se não temos o ID salvo, tentar buscar e deletar pelo nome
     // Tentar múltiplas variações do nome (Evolution pode criar com nome diferente)
     const possibleNames = [
@@ -705,9 +739,12 @@ export const appRouter = router({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
         }
 
-        // Desativar workflow
-        if (tenant.n8nWorkflowId) {
-          await deactivateWorkflow(tenant.n8nWorkflowId);
+        // Desativar workflows de todos os agentes
+        const agents = await getTenantAgents(tenant.id);
+        for (const agent of agents) {
+          if (agent.n8nWorkflowId) {
+            await deactivateWorkflow(agent.n8nWorkflowId);
+          }
         }
 
         await db.updateTenant(input.id, { status: 'suspended' });
@@ -731,9 +768,12 @@ export const appRouter = router({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
         }
 
-        // Reativar workflow
-        if (tenant.n8nWorkflowId) {
-          await activateWorkflow(tenant.n8nWorkflowId);
+        // Reativar workflows de todos os agentes
+        const agents = await getTenantAgents(tenant.id);
+        for (const agent of agents) {
+          if (agent.n8nWorkflowId) {
+            await activateWorkflow(agent.n8nWorkflowId);
+          }
         }
 
         await db.updateTenant(input.id, { status: 'active' });
@@ -1099,15 +1139,15 @@ export const appRouter = router({
         // Sincronizar configuração com N8N em background (não bloqueia)
         if (tenantId) {
           try {
-            const tenant = await db.getTenantById(tenantId);
-            if (tenant?.n8nWorkflowId) {
+            const agent = await getTenantAgent(tenantId);
+            if (agent?.n8nWorkflowId) {
               // Se o modelo foi alterado, atualizar diretamente no workflow
               if (input.openaiModel) {
-                await updateModelInWorkflow(tenant.n8nWorkflowId, input.openaiModel);
+                await updateModelInWorkflow(agent.n8nWorkflowId, input.openaiModel);
               }
               
               // Sincronizar outras configurações
-              await syncAgentConfigToN8N(tenant.n8nWorkflowId, tenantId, input);
+              await syncAgentConfigToN8N(agent.n8nWorkflowId, tenantId, input);
             }
           } catch (error: any) {
             console.warn(`[AgentConfig] Erro ao sincronizar com N8N (não bloqueia):`, error.message);
