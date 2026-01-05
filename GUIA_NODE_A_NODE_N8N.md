@@ -368,7 +368,7 @@ Este node já usa PostgreSQL para inserir em `n8n_chat_histories`, mas precisa i
 - **Tipo:** `n8n-nodes-base.postgres`
 - **Operação:** `Insert` (pode manter ou mudar para Execute Query)
 - **Tabela:** `n8n_chat_histories`
-- **Session ID:** `={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}`
+- **Session ID:** `={{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}`
 - **Message:** Mantém o mesmo formato
 
 ### 📝 Passos:
@@ -380,7 +380,7 @@ Este node já usa PostgreSQL para inserir em `n8n_chat_histories`, mas precisa i
    ```
    Para:
    ```
-   ={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}
+   ={{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}
    ```
 4. Isso garante que cada tenant tenha seu próprio histórico isolado
 5. O campo `message` pode permanecer igual
@@ -400,7 +400,7 @@ Este node já usa PostgreSQL para inserir em `n8n_chat_histories`, mas precisa i
 O Memory Node do LangChain não suporta filtro por tenantId diretamente. Você tem duas opções:
 
 **Opção A: Usar session_id único por tenant**
-- **Session Key:** `={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}`
+- **Session Key:** `={{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}`
 - Isso cria sessões isoladas por tenant
 
 **Opção B: Substituir por queries manuais**
@@ -411,7 +411,7 @@ Criar nodes PostgreSQL para gerenciar histórico manualmente (mais complexo, mas
 1. Abra o node "Postgres Chat Memory"
 2. Altere o **Session Key** para:
 ```
-={{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}
+={{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}
 ```
 3. Isso garante que cada tenant tenha seu próprio histórico isolado
 
@@ -431,7 +431,7 @@ Criar nodes PostgreSQL para gerenciar histórico manualmente (mais complexo, mas
 ```sql
 INSERT INTO n8n_chat_histories (session_id, message)
 VALUES (
-  '{{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}',
+  '{{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}',
   '{"type": "ai", "content": "{{ $('Info2').item.json.mensagem.replace(/\r?\n|\r/g, ' ') }}", "additional_kwargs": {}, "response_metadata": {}}'::jsonb
 )
 ON CONFLICT DO NOTHING;

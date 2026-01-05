@@ -646,7 +646,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO n8n_chat_histories (session_id, message)\nVALUES (\n  '{{ $('Edit Fields2').item.json.tenantId }}_${ $('Info2').item.json.telefone }}',\n  '{\"type\": \"ai\", \"content\": \"{{ $('Info2').item.json.mensagem.replace(/\\r?\\n|\\r/g, ' ') }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}'::jsonb\n)\nON CONFLICT DO NOTHING;",
+        "query": "INSERT INTO n8n_chat_histories (session_id, message)\nVALUES (\n  '{{ $('Edit Fields2').item.json.tenantId }}_{{ $('Info2').item.json.telefone }}',\n  '{\"type\": \"ai\", \"content\": \"{{ $('Info2').item.json.mensagem.replace(/\\r?\\n|\\r/g, ' ') }}\", \"additional_kwargs\": {}, \"response_metadata\": {}}'::jsonb\n)\nON CONFLICT DO NOTHING;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
