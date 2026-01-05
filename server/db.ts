@@ -10,6 +10,9 @@ import {
   plans,
   Plan,
   InsertPlan,
+  agents,
+  Agent,
+  InsertAgent,
   agentConfigs,
   AgentConfig,
   InsertAgentConfig,
@@ -258,10 +261,11 @@ export async function deleteTenant(id: number): Promise<void> {
   if (!db) throw new Error("Database not available");
 
   // Hard delete - deletar fisicamente do banco
-  await db.delete(tenants).where(eq(tenants.id, id));
+  // Primeiro deletar agents (que vai deletar agentConfigs por cascade)
+  await db.delete(agents).where(eq(agents.tenantId, id));
   
-  // Também deletar configurações do agente relacionadas
-  await db.delete(agentConfigs).where(eq(agentConfigs.tenantId, id));
+  // Depois deletar tenant
+  await db.delete(tenants).where(eq(tenants.id, id));
   
   // Deletar tokens de ativação
   await db.delete(activationTokens).where(eq(activationTokens.tenantId, id));
@@ -304,6 +308,65 @@ export async function getPlanByStripePriceId(stripePriceId: string): Promise<Pla
 
 // ========== AGENT CONFIG OPERATIONS ==========
 
+// ========== AGENTS OPERATIONS ==========
+
+export async function createAgent(agent: InsertAgent): Promise<Agent> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(agents).values(agent).returning();
+  if (!result[0]) throw new Error("Failed to create agent");
+  
+  return result[0];
+}
+
+export async function getAgentById(agentId: number): Promise<Agent | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
+  return result[0];
+}
+
+export async function getAgentsByTenantId(tenantId: number): Promise<Agent[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(agents)
+    .where(eq(agents.tenantId, tenantId))
+    .orderBy(desc(agents.createdAt));
+}
+
+export async function getFirstAgentByTenantId(tenantId: number): Promise<Agent | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(agents)
+    .where(eq(agents.tenantId, tenantId))
+    .orderBy(desc(agents.createdAt))
+    .limit(1);
+  
+  return result[0];
+}
+
+export async function updateAgent(agentId: number, updates: Partial<InsertAgent>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(agents)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(agents.id, agentId));
+}
+
+export async function deleteAgent(agentId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(agents).where(eq(agents.id, agentId));
+}
+
+// ========== AGENT CONFIGS OPERATIONS ==========
+
 export async function createAgentConfig(config: InsertAgentConfig): Promise<AgentConfig> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -314,19 +377,45 @@ export async function createAgentConfig(config: InsertAgentConfig): Promise<Agen
   return result[0];
 }
 
+/**
+ * @deprecated Use getAgentConfigByAgentId instead
+ * Mantido para compatibilidade temporária
+ */
 export async function getAgentConfigByTenantId(tenantId: number): Promise<AgentConfig | undefined> {
+  // Buscar primeiro agente do tenant e depois sua config
+  const agent = await getFirstAgentByTenantId(tenantId);
+  if (!agent) return undefined;
+  
+  return getAgentConfigByAgentId(agent.id);
+}
+
+export async function getAgentConfigByAgentId(agentId: number): Promise<AgentConfig | undefined> {
   const db = await getDb();
   if (!db) return undefined;
 
-  const result = await db.select().from(agentConfigs).where(eq(agentConfigs.tenantId, tenantId)).limit(1);
+  const result = await db.select().from(agentConfigs).where(eq(agentConfigs.agentId, agentId)).limit(1);
   return result[0];
 }
 
+/**
+ * @deprecated Use updateAgentConfigByAgentId instead
+ * Mantido para compatibilidade temporária
+ */
 export async function updateAgentConfig(tenantId: number, updates: Partial<InsertAgentConfig>): Promise<void> {
+  // Buscar primeiro agente do tenant
+  const agent = await getFirstAgentByTenantId(tenantId);
+  if (!agent) throw new Error("Agent not found for tenant");
+  
+  return updateAgentConfigByAgentId(agent.id, updates);
+}
+
+export async function updateAgentConfigByAgentId(agentId: number, updates: Partial<InsertAgentConfig>): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(agentConfigs).set(updates).where(eq(agentConfigs.tenantId, tenantId));
+  await db.update(agentConfigs)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(agentConfigs.agentId, agentId));
 }
 
 // ========== USAGE METRICS OPERATIONS ==========
@@ -447,13 +536,15 @@ export async function getTenantByEmail(email: string): Promise<Tenant | undefine
 
 /**
  * Busca configuração do agente por tenant ID
+ * @deprecated Use getAgentConfigByAgentId - busca primeiro agente do tenant
+ * Mantido para compatibilidade temporária
  */
 export async function getAgentConfig(tenantId: number): Promise<AgentConfig | undefined> {
-  const db = await getDb();
-  if (!db) return undefined;
-
-  const result = await db.select().from(agentConfigs).where(eq(agentConfigs.tenantId, tenantId)).limit(1);
-  return result[0];
+  // Buscar primeiro agente do tenant e depois sua config
+  const agent = await getFirstAgentByTenantId(tenantId);
+  if (!agent) return undefined;
+  
+  return getAgentConfigByAgentId(agent.id);
 }
 
 export async function getAllAgentConfigs(): Promise<AgentConfig[]> {

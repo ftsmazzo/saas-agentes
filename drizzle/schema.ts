@@ -33,6 +33,7 @@ export const severityEnum = pgEnum("severity", ["info", "warning", "error", "cri
 export const conversationStatusEnum = pgEnum("conversationStatus", ["active", "paused", "closed"]);
 export const messageRoleEnum = pgEnum("messageRole", ["user", "assistant", "system"]);
 export const mediaTypeEnum = pgEnum("mediaType", ["text", "audio", "image", "document"]);
+export const agentStatusEnum = pgEnum("agentStatus", ["active", "paused", "deleted"]);
 
 /**
  * Core user table backing auth flow.
@@ -54,7 +55,8 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
- * Tenants (Inquilinos) - Clientes da plataforma SaaS
+ * Tenants (Empresas/Clientes) - Clientes da plataforma SaaS
+ * Cada tenant representa uma empresa que pode ter múltiplos agentes de IA
  */
 export const tenants = pgTable("tenants", {
   id: serial("id").primaryKey(),
@@ -68,19 +70,14 @@ export const tenants = pgTable("tenants", {
   passwordHash: text("passwordHash"), // Hash da senha do cliente
   isActivated: boolean("isActivated").default(false).notNull(), // Se já ativou a conta
   
-  // Informações de provisionamento
-  n8nWorkflowId: varchar("n8nWorkflowId", { length: 100 }),
-  evolutionInstanceName: varchar("evolutionInstanceName", { length: 100 }),
-  evolutionApiKey: text("evolutionApiKey"),
-  chatwootInboxId: integer("chatwootInboxId"),
-  chatwootAgentId: integer("chatwootAgentId"), // ID do Agente (User) criado no Chatwoot para o tenant
-  chatwootAgentBotId: integer("chatwootAgentBotId"), // ID do Agent Bot criado
-  chatwootAgentBotToken: text("chatwootAgentBotToken"), // Token de acesso do Agent Bot
-  dbHost: varchar("dbHost", { length: 255 }),
-  dbPort: integer("dbPort"),
-  dbName: varchar("dbName", { length: 100 }),
-  dbUser: varchar("dbUser", { length: 100 }),
-  dbPassword: text("dbPassword"), // Armazenado criptografado
+  // Informações de provisionamento Chatwoot (COMPARTILHADAS entre todos os agentes da empresa)
+  // Esses campos são por TENANT (empresa), não por agente
+  chatwootAgentId: integer("chatwootAgentId"), // ID do Agente Humano (User) - aparece no WhatsApp quando humano interage via Chatwoot
+  chatwootAgentBotId: integer("chatwootAgentBotId"), // ID do Agent Bot - credencial compartilhada para envio de mensagens
+  chatwootAgentBotToken: text("chatwootAgentBotToken"), // Token do Agent Bot - credencial compartilhada para envio de mensagens
+  // NOTA: chatwootInboxId foi movido para tabela agents (cada agente tem seu próprio inbox)
+  // NOTA: n8nWorkflowId, evolutionInstanceName, evolutionApiKey foram movidos para tabela agents (cada agente tem suas integrações)
+  // NOTA: Campos de DB (dbHost, dbPort, dbName, dbUser, dbPassword) foram removidos - usa DB único compartilhado
   
   // Stripe
   stripeCustomerId: varchar("stripeCustomerId", { length: 100 }),
@@ -132,11 +129,46 @@ export type Plan = typeof plans.$inferSelect;
 export type InsertPlan = typeof plans.$inferInsert;
 
 /**
- * Configurações do agente por inquilino
+ * Agentes de IA - Múltiplos agentes por empresa (tenant)
+ * Cada empresa pode ter vários agentes, cada um com suas próprias integrações
+ * 
+ * IMPORTANTE:
+ * - Cada agente precisa de seu próprio inbox no Chatwoot
+ * - Cada agente tem seu próprio workflow no N8N
+ * - Cada agente tem sua própria instância Evolution API
+ * - Mas compartilham: chatwootAgentId, chatwootAgentBotId, chatwootAgentBotToken (estão em tenants)
+ */
+export const agents = pgTable("agents", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(), // Referência à empresa (tenant) - permite múltiplos agentes por empresa
+  
+  // Informações básicas do agente
+  name: varchar("name", { length: 255 }).notNull(), // Nome do agente (definido pelo usuário na criação)
+  description: text("description"),
+  status: agentStatusEnum("status").default("active").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  
+  // Integrações específicas do agente (cada agente tem suas próprias)
+  n8nWorkflowId: varchar("n8nWorkflowId", { length: 100 }), // Workflow N8N específico deste agente
+  evolutionInstanceName: varchar("evolutionInstanceName", { length: 100 }), // Instância Evolution específica deste agente
+  evolutionApiKey: text("evolutionApiKey"), // API Key da Evolution para este agente
+  chatwootInboxId: integer("chatwootInboxId"), // Inbox do Chatwoot específico deste agente (cada agente precisa de um inbox)
+  
+  // Metadados
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Agent = typeof agents.$inferSelect;
+export type InsertAgent = typeof agents.$inferInsert;
+
+/**
+ * Configurações do agente (uma por agente)
+ * Agora referenciando agentId ao invés de tenantId único
  */
 export const agentConfigs = pgTable("agentConfigs", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenantId").notNull().unique(),
+  agentId: integer("agentId").notNull().unique(), // Referência ao agente (único - uma config por agente)
   
   // Configurações do agente
   systemPrompt: text("systemPrompt"),
@@ -260,10 +292,12 @@ export type InsertContact = typeof contacts.$inferInsert;
 /**
  * Conversas (compartilhado entre todos os tenants, isolado por tenantId)
  * Compatível com tabela 'chats' do template
+ * Agora também vinculado a um agente específico
  */
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(), // Isolamento multi-tenant
+  agentId: integer("agentId"), // Agente específico (opcional para compatibilidade)
   contactId: integer("contactId").notNull(),
   
   // Status da conversa
@@ -287,10 +321,12 @@ export type InsertConversation = typeof conversations.$inferInsert;
 /**
  * Mensagens de chat (compartilhado entre todos os tenants, isolado por tenantId)
  * Compatível com tabela 'chat_messages' do template
+ * Agora também vinculado a um agente específico
  */
 export const chatMessages = pgTable("chatMessages", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(), // Isolamento multi-tenant
+  agentId: integer("agentId"), // Agente específico (opcional para compatibilidade)
   conversationId: integer("conversationId").notNull(),
   contactId: integer("contactId").notNull(),
   
@@ -385,10 +421,12 @@ export type InsertDocument = typeof documents.$inferInsert;
 
 /**
  * Transações detalhadas de uso (histórico completo)
+ * Agora também rastreia qual agente utilizou os créditos
  */
 export const usageTransactions = pgTable("usageTransactions", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(),
+  agentId: integer("agentId"), // Agente específico que utilizou (opcional para compatibilidade)
   
   // Tipo de operação
   operation: varchar("operation", { length: 20 }).notNull(), // 'chat', 'audio', 'image', 'format', 'pdf'
