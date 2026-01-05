@@ -355,18 +355,18 @@ export default function MessagesPage() {
 
   return (
     <ClientLayout>
-      <div className="h-screen flex flex-col overflow-hidden">
+      <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="h-16 border-b bg-background flex items-center px-6 flex-shrink-0">
           <h1 className="text-xl font-semibold">Mensagens</h1>
         </div>
 
         {/* Main Content - 3 Column Layout */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Left Sidebar - Conversations List (Fixed Width) */}
-          <div className="w-80 border-r bg-background flex flex-col flex-shrink-0">
+          <div className="w-80 border-r bg-background flex flex-col flex-shrink-0 min-h-0">
             {/* Search and Filters */}
-            <div className="p-4 border-b space-y-3 bg-background">
+            <div className="p-4 border-b space-y-3 bg-background flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
