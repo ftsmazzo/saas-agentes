@@ -115,6 +115,11 @@ export async function getConversationMessages(
 
     let messages = response.data.payload || [];
     
+    // Log para debug - ver estrutura das mensagens
+    if (messages.length > 0) {
+      console.log(`[Chatwoot] 📋 Exemplo de mensagem (primeira):`, JSON.stringify(messages[0], null, 2).substring(0, 500));
+    }
+    
     // Filtrar mensagens do sistema (Evolution API, eventos automáticos, etc)
     if (filterSystemMessages) {
       messages = messages.filter((msg: any) => {
@@ -144,8 +149,10 @@ export async function getConversationMessages(
           return false;
         }
         
-        // Filtrar mensagens vazias ou apenas espaços
-        if (!msg.content || msg.content.trim().length === 0) {
+        // Filtrar mensagens vazias ou apenas espaços (MAS manter se tiver anexos)
+        const hasAttachments = msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0;
+        if ((!msg.content || msg.content.trim().length === 0) && !hasAttachments) {
+          // Se não tem conteúdo E não tem anexos, filtrar
           return false;
         }
         

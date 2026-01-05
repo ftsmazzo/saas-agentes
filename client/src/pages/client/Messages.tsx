@@ -467,8 +467,18 @@ export default function MessagesPage() {
                         })
                         .map((message: Message) => {
                           const isOutgoing = message.message_type === 'outgoing';
-                          const hasAttachments = message.attachments && message.attachments.length > 0;
+                          const hasAttachments = message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0;
                           const contentType = message.content_type || 'text';
+                          
+                          // Log para debug de mensagens com anexos
+                          if (hasAttachments) {
+                            console.log('[Messages] Mensagem com anexos:', {
+                              id: message.id,
+                              attachments: message.attachments,
+                              content: message.content,
+                              contentType: message.content_type
+                            });
+                          }
                           
                           return (
                             <div
