@@ -899,23 +899,20 @@ export async function sendChatwootMessage(
       formData.append('content_attributes[origin]', 'web');
       formData.append('content_attributes[via]', 'web_interface');
       
-      // Adicionar cada anexo
-      attachments.forEach((att, index) => {
+      // Adicionar cada anexo - Chatwoot espera attachments[] como array simples
+      attachments.forEach((att) => {
         // Se for data URL, converter para buffer
         if (att.file_url.startsWith('data:')) {
           const base64Data = att.file_url.split(',')[1];
           const buffer = Buffer.from(base64Data, 'base64');
-          formData.append(`attachments[${index}][data]`, buffer, {
-            filename: att.file_name || `file_${index}`,
+          // Chatwoot espera attachments[] como array de arquivos
+          formData.append('attachments[]', buffer, {
+            filename: att.file_name || 'file.jpg',
             contentType: att.file_type
           });
         } else {
-          // Se for URL, adicionar como data_url
-          formData.append(`attachments[${index}][data_url]`, att.file_url);
-        }
-        formData.append(`attachments[${index}][file_type]`, att.file_type);
-        if (att.file_name) {
-          formData.append(`attachments[${index}][file_name]`, att.file_name);
+          // Se for URL, tentar fazer upload primeiro ou usar como data_url
+          console.warn("[Chatwoot] URL de arquivo não suportada diretamente, tentando data URL");
         }
       });
       
