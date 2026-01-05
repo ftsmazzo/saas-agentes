@@ -2914,14 +2914,24 @@ PROMPT MELHORADO:`;
       const conversations = await getInboxConversations(userTenant.chatwootInboxId);
       console.log(`[Chatwoot Router] ✅ ${conversations.length} conversas encontradas`);
       
+      // Filtrar conversas que tenham apenas mensagens do sistema (Evolution API)
+      // Isso ajuda a ocultar conversas vazias ou apenas com eventos do sistema
+      const filteredConversations = conversations.filter((conv: any) => {
+        // Se não tem última atividade, pode ser conversa apenas do sistema
+        if (!conv.last_activity_at && !conv.updated_at) {
+          return false;
+        }
+        return true;
+      });
+      
       // Ordenar por última mensagem (mais recente primeiro)
-      const sorted = conversations.sort((a: any, b: any) => {
+      const sorted = filteredConversations.sort((a: any, b: any) => {
         const timeA = new Date(a.last_activity_at || a.updated_at || 0).getTime();
         const timeB = new Date(b.last_activity_at || b.updated_at || 0).getTime();
         return timeB - timeA;
       });
       
-      console.log(`[Chatwoot Router] 📤 Retornando ${sorted.length} conversas ordenadas`);
+      console.log(`[Chatwoot Router] 📤 Retornando ${sorted.length} conversas ordenadas (${conversations.length - sorted.length} filtradas)`);
       return sorted;
     }),
 
@@ -3007,7 +3017,8 @@ PROMPT MELHORADO:`;
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Conversa não pertence ao seu tenant' });
         }
 
-        const messages = await getConversationMessages(input.conversationId);
+        // Filtrar mensagens do sistema (Evolution API, etc) por padrão
+        const messages = await getConversationMessages(input.conversationId, true);
         return messages.sort((a: any, b: any) => {
           const timeA = new Date(a.created_at || 0).getTime();
           const timeB = new Date(b.created_at || 0).getTime();
@@ -3058,7 +3069,12 @@ PROMPT MELHORADO:`;
       .input(z.object({
         conversationId: z.number(),
         content: z.string().min(1, 'Mensagem não pode estar vazia'),
-        messageType: z.enum(['outgoing', 'incoming']).default('outgoing')
+        messageType: z.enum(['outgoing', 'incoming']).default('outgoing'),
+        attachments: z.array(z.object({
+          file_url: z.string(),
+          file_type: z.string(),
+          file_name: z.string().optional()
+        })).optional()
       }))
       .mutation(async ({ input, ctx }) => {
         // Se for cliente, usar tenant direto
@@ -3084,7 +3100,9 @@ PROMPT MELHORADO:`;
         const message = await sendChatwootMessage(
           input.conversationId,
           input.content,
-          input.messageType
+          input.messageType,
+          'text',
+          input.attachments
         );
 
         return message;

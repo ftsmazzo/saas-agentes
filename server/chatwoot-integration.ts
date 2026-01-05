@@ -99,8 +99,13 @@ export async function getInboxConversations(inboxId: number): Promise<any[]> {
 
 /**
  * Busca mensagens de uma conversa específica
+ * @param conversationId - ID da conversa
+ * @param filterSystemMessages - Se true, filtra mensagens do sistema (Evolution API, etc)
  */
-export async function getConversationMessages(conversationId: number): Promise<any[]> {
+export async function getConversationMessages(
+  conversationId: number, 
+  filterSystemMessages: boolean = true
+): Promise<any[]> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     
@@ -108,7 +113,41 @@ export async function getConversationMessages(conversationId: number): Promise<a
       `/accounts/${accountId}/conversations/${conversationId}/messages`
     );
 
-    return response.data.payload || [];
+    let messages = response.data.payload || [];
+    
+    // Filtrar mensagens do sistema (Evolution API, eventos automáticos, etc)
+    if (filterSystemMessages) {
+      messages = messages.filter((msg: any) => {
+        // Filtrar mensagens com content_attributes indicando origem do sistema
+        const contentAttrs = msg.content_attributes || {};
+        const origin = contentAttrs.origin || '';
+        const via = contentAttrs.via || '';
+        
+        // Filtrar mensagens do Evolution API
+        if (origin === 'evolution' || via === 'evolution' || origin === 'api' || via === 'api') {
+          return false;
+        }
+        
+        // Filtrar mensagens de eventos automáticos do sistema
+        if (msg.message_type === 'activity' || msg.message_type === 'system') {
+          return false;
+        }
+        
+        // Filtrar mensagens privadas do sistema
+        if (msg.private === true && msg.message_type !== 'outgoing') {
+          return false;
+        }
+        
+        // Filtrar mensagens vazias ou apenas espaços
+        if (!msg.content || msg.content.trim().length === 0) {
+          return false;
+        }
+        
+        return true;
+      });
+    }
+
+    return messages;
   } catch (error: any) {
     console.error("[Chatwoot] Erro ao buscar mensagens:", error.response?.data || error.message);
     return [];
@@ -752,19 +791,32 @@ export async function sendChatwootMessage(
   conversationId: number,
   content: string,
   messageType: 'outgoing' | 'incoming' = 'outgoing',
-  contentType: 'text' | 'input_text' = 'text'
+  contentType: 'text' | 'input_text' = 'text',
+  attachments?: Array<{ file_url: string; file_type: string; file_name?: string }>
 ): Promise<any> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     
+    const payload: any = {
+      content,
+      message_type: messageType,
+      private: false,
+      content_type: contentType,
+      // Marcar como mensagem do sistema (não do Evolution API)
+      content_attributes: {
+        origin: 'web',
+        via: 'web_interface'
+      }
+    };
+
+    // Adicionar anexos se houver
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments;
+    }
+    
     const response = await chatwootApi.post(
       `/accounts/${accountId}/conversations/${conversationId}/messages`,
-      {
-        content,
-        message_type: messageType,
-        private: false,
-        content_type: contentType
-      }
+      payload
     );
 
     return response.data.payload || response.data;

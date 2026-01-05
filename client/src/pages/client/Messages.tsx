@@ -17,7 +17,14 @@ import {
   Loader2,
   User,
   Phone,
-  Mail
+  Mail,
+  Image,
+  FileText,
+  Download,
+  Filter,
+  Bell,
+  Tag,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -50,6 +57,17 @@ type Message = {
   content: string;
   message_type: 'incoming' | 'outgoing';
   created_at: string;
+  content_type?: 'text' | 'input_text' | 'image' | 'audio' | 'file';
+  attachments?: Array<{
+    id: number;
+    file_type: string;
+    file_url: string;
+    file_name?: string;
+  }>;
+  content_attributes?: {
+    origin?: string;
+    via?: string;
+  };
   sender?: {
     id: number;
     name: string;
@@ -61,6 +79,8 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'resolved' | 'pending'>('all');
   const [messageInput, setMessageInput] = useState("");
+  const [showSystemMessages, setShowSystemMessages] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations, isLoading: isLoadingConversations, refetch: refetchConversations } = 
@@ -373,6 +393,21 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
+                {/* Busca de Mensagens */}
+                <div className="border-b p-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar nas mensagens..."
+                        value={messageSearchQuery}
+                        onChange={(e) => setMessageSearchQuery(e.target.value)}
+                        className="pl-8 h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Área de Mensagens */}
                 <ScrollArea className="flex-1 p-4">
                   {isLoadingMessages ? (
@@ -381,31 +416,81 @@ export default function MessagesPage() {
                     </div>
                   ) : messages && messages.length > 0 ? (
                     <div className="space-y-4">
-                      {messages.map((message: Message) => {
-                        const isOutgoing = message.message_type === 'outgoing';
-                        
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
-                          >
+                      {messages
+                        .filter((message: Message) => {
+                          // Filtrar por busca de mensagens
+                          if (messageSearchQuery) {
+                            const searchLower = messageSearchQuery.toLowerCase();
+                            const contentMatch = message.content?.toLowerCase().includes(searchLower);
+                            const senderMatch = message.sender?.name?.toLowerCase().includes(searchLower);
+                            if (!contentMatch && !senderMatch) return false;
+                          }
+                          return true;
+                        })
+                        .map((message: Message) => {
+                          const isOutgoing = message.message_type === 'outgoing';
+                          const hasAttachments = message.attachments && message.attachments.length > 0;
+                          const contentType = message.content_type || 'text';
+                          
+                          return (
                             <div
-                              className={`max-w-[70%] rounded-lg p-3 ${
-                                isOutgoing
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted'
-                              }`}
+                              key={message.id}
+                              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
                             >
-                              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                              <p className={`text-xs mt-1 ${
-                                isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                              }`}>
-                                {formatMessageTime(message.created_at)}
-                              </p>
+                              <div
+                                className={`max-w-[70%] rounded-lg p-3 ${
+                                  isOutgoing
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                }`}
+                              >
+                                {/* Anexos (imagens, arquivos) */}
+                                {hasAttachments && (
+                                  <div className="space-y-2 mb-2">
+                                    {message.attachments!.map((attachment) => (
+                                      <div key={attachment.id} className="space-y-1">
+                                        {attachment.file_type?.startsWith('image/') ? (
+                                          <div className="rounded overflow-hidden">
+                                            <img
+                                              src={attachment.file_url}
+                                              alt={attachment.file_name || 'Imagem'}
+                                              className="max-w-full h-auto max-h-64 object-contain"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <a
+                                            href={attachment.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors"
+                                          >
+                                            <FileText className="h-4 w-4" />
+                                            <span className="text-xs truncate">
+                                              {attachment.file_name || 'Arquivo'}
+                                            </span>
+                                            <Download className="h-3 w-3 ml-auto" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {/* Conteúdo da mensagem */}
+                                {message.content && (
+                                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                )}
+                                
+                                {/* Timestamp */}
+                                <p className={`text-xs mt-1 ${
+                                  isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                }`}>
+                                  {formatMessageTime(message.created_at)}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                       <div ref={messagesEndRef} />
                     </div>
                   ) : (
