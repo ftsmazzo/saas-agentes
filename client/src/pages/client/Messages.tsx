@@ -107,6 +107,20 @@ export default function MessagesPage() {
     },
   });
 
+  const checkInboxMutation = trpc.chatwoot.checkAndUpdateInboxId.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message);
+        refetchConversations();
+      } else {
+        toast.warning(data.message);
+      }
+    },
+    onError: (error) => {
+      toast.error(`Erro ao verificar inbox: ${error.message}`);
+    },
+  });
+
   // Scroll para última mensagem quando novas mensagens chegarem
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -242,9 +256,29 @@ export default function MessagesPage() {
             {/* Lista de Conversas */}
             <ScrollArea className="flex-1">
               {filteredConversations.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
+                <div className="p-8 text-center text-muted-foreground space-y-4">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Nenhuma conversa encontrada</p>
+                  {!isLoadingConversations && (
+                    <div className="space-y-2">
+                      <p className="text-xs">Se você tem conversas no Chatwoot mas não aparecem aqui,</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => checkInboxMutation.mutate()}
+                        disabled={checkInboxMutation.isPending}
+                      >
+                        {checkInboxMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                            Verificando...
+                          </>
+                        ) : (
+                          "Verificar e Atualizar Inbox"
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="divide-y">

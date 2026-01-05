@@ -2886,21 +2886,74 @@ PROMPT MELHORADO:`;
       const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
       
       if (!userTenant) {
+        console.log(`[Chatwoot Router] ❌ Tenant não encontrado para user ${ctx.user.id}`);
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
       }
 
+      console.log(`[Chatwoot Router] 🔍 Tenant encontrado: ${userTenant.companyName} (ID: ${userTenant.id})`);
+      console.log(`[Chatwoot Router] 📋 chatwootInboxId: ${userTenant.chatwootInboxId || 'NÃO CONFIGURADO'}`);
+
       if (!userTenant.chatwootInboxId) {
+        console.log(`[Chatwoot Router] ⚠️ Tenant não tem chatwootInboxId configurado. Retornando array vazio.`);
         return [];
       }
 
+      console.log(`[Chatwoot Router] 🔄 Buscando conversas do inbox ${userTenant.chatwootInboxId}...`);
       const conversations = await getInboxConversations(userTenant.chatwootInboxId);
+      console.log(`[Chatwoot Router] ✅ ${conversations.length} conversas encontradas`);
       
       // Ordenar por última mensagem (mais recente primeiro)
-      return conversations.sort((a: any, b: any) => {
+      const sorted = conversations.sort((a: any, b: any) => {
         const timeA = new Date(a.last_activity_at || a.updated_at || 0).getTime();
         const timeB = new Date(b.last_activity_at || b.updated_at || 0).getTime();
         return timeB - timeA;
       });
+      
+      console.log(`[Chatwoot Router] 📤 Retornando ${sorted.length} conversas ordenadas`);
+      return sorted;
+    }),
+
+    /**
+     * Verifica e atualiza o chatwootInboxId do tenant (útil para debug)
+     */
+    checkAndUpdateInboxId: protectedProcedure.mutation(async ({ ctx }) => {
+      const tenants = await db.getAllTenants();
+      const userTenant = tenants.find(t => t.ownerId === ctx.user.id);
+      
+      if (!userTenant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+      }
+
+      // Se já tem inboxId, retornar
+      if (userTenant.chatwootInboxId) {
+        return {
+          success: true,
+          message: `Inbox ID já configurado: ${userTenant.chatwootInboxId}`,
+          inboxId: userTenant.chatwootInboxId
+        };
+      }
+
+      // Tentar encontrar pelo nome da empresa
+      console.log(`[Chatwoot Router] 🔍 Tentando encontrar inbox pelo nome: ${userTenant.companyName}`);
+      const inboxId = await findChatwootInboxByName(userTenant.companyName);
+      
+      if (inboxId) {
+        // Atualizar no banco
+        await db.updateTenant(userTenant.id, { chatwootInboxId: inboxId });
+        console.log(`[Chatwoot Router] ✅ Inbox encontrado e atualizado: ${inboxId}`);
+        
+        return {
+          success: true,
+          message: `Inbox encontrado e atualizado: ${inboxId}`,
+          inboxId: inboxId
+        };
+      }
+
+      return {
+        success: false,
+        message: `Inbox não encontrado para "${userTenant.companyName}". Verifique se o inbox foi criado no Chatwoot.`,
+        inboxId: null
+      };
     }),
 
     /**

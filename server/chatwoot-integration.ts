@@ -51,6 +51,8 @@ export async function getInboxConversations(inboxId: number): Promise<any[]> {
   try {
     const accountId = process.env.CHATWOOT_ACCOUNT_ID;
     
+    console.log(`[Chatwoot] 🔍 Buscando conversas do inbox ${inboxId} na conta ${accountId}`);
+    
     const response = await chatwootApi.get(`/accounts/${accountId}/conversations`, {
       params: {
         inbox_id: inboxId,
@@ -58,9 +60,39 @@ export async function getInboxConversations(inboxId: number): Promise<any[]> {
       }
     });
 
-    return response.data.data.payload || [];
+    // A API do Chatwoot pode retornar em diferentes formatos
+    let conversations: any[] = [];
+    
+    // Tentar diferentes estruturas de resposta
+    if (response.data?.payload && Array.isArray(response.data.payload)) {
+      conversations = response.data.payload;
+      console.log(`[Chatwoot] ✅ Conversas encontradas em response.data.payload: ${conversations.length}`);
+    } else if (response.data?.data?.payload && Array.isArray(response.data.data.payload)) {
+      conversations = response.data.data.payload;
+      console.log(`[Chatwoot] ✅ Conversas encontradas em response.data.data.payload: ${conversations.length}`);
+    } else if (Array.isArray(response.data)) {
+      conversations = response.data;
+      console.log(`[Chatwoot] ✅ Conversas encontradas em response.data (array direto): ${conversations.length}`);
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      conversations = response.data.data;
+      console.log(`[Chatwoot] ✅ Conversas encontradas em response.data.data: ${conversations.length}`);
+    } else {
+      console.warn(`[Chatwoot] ⚠️ Estrutura de resposta não reconhecida:`, JSON.stringify(response.data).substring(0, 500));
+    }
+
+    if (conversations.length > 0) {
+      console.log(`[Chatwoot] 📋 Primeira conversa (exemplo):`, JSON.stringify(conversations[0], null, 2).substring(0, 500));
+    } else {
+      console.log(`[Chatwoot] ⚠️ Nenhuma conversa encontrada para o inbox ${inboxId}`);
+    }
+
+    return conversations;
   } catch (error: any) {
-    console.error("[Chatwoot] Erro ao buscar conversas:", error.response?.data || error.message);
+    console.error("[Chatwoot] ❌ Erro ao buscar conversas:");
+    console.error("[Chatwoot] Status:", error.response?.status);
+    console.error("[Chatwoot] Status Text:", error.response?.statusText);
+    console.error("[Chatwoot] Response Data:", JSON.stringify(error.response?.data || error.message).substring(0, 500));
+    console.error("[Chatwoot] URL chamada:", error.config?.url);
     return [];
   }
 }
