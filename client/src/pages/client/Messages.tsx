@@ -347,36 +347,42 @@ export default function MessagesPage() {
     }
   };
 
-  const formatMessageTime = (dateString: string) => {
+  const formatMessageTime = (dateString: string | null | undefined) => {
     try {
       if (!dateString) {
-        return 'Data não disponível';
+        return 'Agora';
       }
       
-      const date = new Date(dateString);
+      // Tentar parsear como timestamp primeiro (em milissegundos ou segundos)
+      let date: Date;
+      const numValue = Number(dateString);
+      
+      if (!isNaN(numValue)) {
+        // Se for número, pode ser timestamp
+        if (numValue < 10000000000) {
+          // Timestamp em segundos, converter para milissegundos
+          date = new Date(numValue * 1000);
+        } else {
+          // Timestamp em milissegundos
+          date = new Date(numValue);
+        }
+      } else {
+        // Tentar parsear como string ISO
+        date = new Date(dateString);
+      }
       
       // Verificar se a data é válida e não é epoch (1970)
-      if (isNaN(date.getTime()) || date.getTime() < 1000000000) {
-        // Se for timestamp muito pequeno ou inválido, tentar parsear como timestamp
-        const timestamp = parseInt(dateString);
-        if (!isNaN(timestamp) && timestamp > 1000000000) {
-          const validDate = new Date(timestamp * 1000); // Se for timestamp em segundos
-          if (!isNaN(validDate.getTime())) {
-            return formatDistanceToNow(validDate, {
-              addSuffix: true,
-              locale: ptBR,
-            });
-          }
-        }
+      const timestamp = date.getTime();
+      if (isNaN(timestamp) || timestamp < 946684800000) { // 2000-01-01 em ms
+        console.warn('[Messages] Data inválida ou muito antiga:', dateString, 'timestamp:', timestamp);
         return 'Data inválida';
       }
       
-      // Verificar se a data não é muito antiga (antes de 2000 ou mais de 1 ano)
+      // Verificar se a data não é muito antiga (mais de 1 ano)
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      const year2000 = new Date('2000-01-01');
       
-      if (date < year2000 || date < oneYearAgo) {
+      if (date < oneYearAgo) {
         // Se for muito antiga, mostrar data formatada
         return new Intl.DateTimeFormat('pt-BR', {
           day: '2-digit',
@@ -408,7 +414,7 @@ export default function MessagesPage() {
       return distance;
     } catch (error) {
       console.error('[Messages] Erro ao formatar data:', dateString, error);
-      return 'Data inválida';
+      return 'Agora';
     }
   };
 

@@ -900,8 +900,13 @@ export async function sendChatwootMessage(
     };
 
     // Adicionar anexos se houver
+    // O Chatwoot espera attachments no formato: [{ data_url: string, file_type: string, file_name?: string }]
     if (attachments && attachments.length > 0) {
-      payload.attachments = attachments;
+      payload.attachments = attachments.map(att => ({
+        data_url: att.file_url, // Chatwoot usa data_url, não file_url
+        file_type: att.file_type,
+        file_name: att.file_name
+      }));
     }
     
     const response = await chatwootApi.post(
