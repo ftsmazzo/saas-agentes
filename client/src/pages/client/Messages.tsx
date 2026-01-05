@@ -767,7 +767,6 @@ export default function MessagesPage() {
                                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                                 )}
                                 
-                                </div>
                                 {/* Timestamp */}
                                 <p className={`text-xs mt-1 ${
                                   isOutgoing ? 'text-primary-foreground/70' : 'text-muted-foreground'
