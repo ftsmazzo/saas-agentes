@@ -56,6 +56,9 @@ await build({
   sourcemap: false,
   minify: false,
   keepNames: true,
+  // Forçar que todos os arquivos sejam tratados como ES modules
+  mainFields: ['module', 'main'],
+  conditions: ['import', 'module'],
 }).catch((error) => {
   console.error('Build failed:', error);
   process.exit(1);
