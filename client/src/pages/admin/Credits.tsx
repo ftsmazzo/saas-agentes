@@ -57,6 +57,21 @@ export default function CreditsPage() {
     return sum;
   }, 0) || 0;
 
+  const adjustCreditsMutation = trpc.metrics.adjustCredits.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Créditos ajustados com sucesso! Novo saldo: ${data.newCredits.toLocaleString('pt-BR')}`);
+      setIsDialogOpen(false);
+      setAdjustmentAmount("");
+      setAdjustmentReason("");
+      setSelectedTenantId(null);
+      utils.metrics.getTenantCredits.invalidate({ tenantId: selectedTenantId! });
+      refetchTenants();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao ajustar créditos: ${error.message}`);
+    },
+  });
+
   const handleAdjustCredits = async () => {
     if (!selectedTenantId || !adjustmentAmount || !adjustmentReason.trim()) {
       toast.error("Preencha todos os campos");
@@ -69,12 +84,11 @@ export default function CreditsPage() {
       return;
     }
 
-    // TODO: Implementar mutation para ajustar créditos
-    // Por enquanto, apenas mostrar mensagem
-    toast.info("Funcionalidade de ajuste manual será implementada em breve");
-    setIsDialogOpen(false);
-    setAdjustmentAmount("");
-    setAdjustmentReason("");
+    adjustCreditsMutation.mutate({
+      tenantId: selectedTenantId,
+      adjustment: amount,
+      reason: adjustmentReason.trim(),
+    });
   };
 
   if (isLoadingTenants) {
@@ -251,11 +265,18 @@ export default function CreditsPage() {
             ) : null}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={adjustCreditsMutation.isPending}>
                 Cancelar
               </Button>
-              <Button onClick={handleAdjustCredits} disabled={!adjustmentAmount || !adjustmentReason.trim()}>
-                Aplicar Ajuste
+              <Button onClick={handleAdjustCredits} disabled={!adjustmentAmount || !adjustmentReason.trim() || adjustCreditsMutation.isPending}>
+                {adjustCreditsMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Aplicando...
+                  </>
+                ) : (
+                  "Aplicar Ajuste"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

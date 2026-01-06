@@ -2082,6 +2082,83 @@ export const appRouter = router({
           },
         };
       }),
+
+    // Ajustar créditos manualmente (admin)
+    adjustCredits: adminProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        adjustment: z.number().int(), // Positivo para adicionar, negativo para remover
+        reason: z.string().min(1, "Motivo é obrigatório"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbInstance = await db.getDb();
+        if (!dbInstance) throw new Error("Database not available");
+
+        // Buscar créditos atuais
+        const existingCredits = await dbInstance
+          .select()
+          .from(tenantCredits)
+          .where(eq(tenantCredits.tenantId, input.tenantId))
+          .limit(1);
+
+        const oldCredits = existingCredits[0]?.currentCredits || 0;
+        const newCredits = oldCredits + input.adjustment;
+
+        if (newCredits < 0) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Não é possível deixar créditos negativos',
+          });
+        }
+
+        // Atualizar créditos
+        if (existingCredits[0]) {
+          await dbInstance
+            .update(tenantCredits)
+            .set({
+              currentCredits: newCredits,
+              totalCreditsPurchased: input.adjustment > 0 
+                ? sql`${tenantCredits.totalCreditsPurchased} + ${input.adjustment}`
+                : tenantCredits.totalCreditsPurchased,
+              totalCreditsBonus: input.adjustment > 0
+                ? sql`${tenantCredits.totalCreditsBonus} + ${input.adjustment}`
+                : tenantCredits.totalCreditsBonus,
+              updatedAt: new Date(),
+            })
+            .where(eq(tenantCredits.tenantId, input.tenantId));
+        } else {
+          // Criar registro se não existir
+          await dbInstance.insert(tenantCredits).values({
+            tenantId: input.tenantId,
+            currentCredits: newCredits,
+            totalCreditsPurchased: input.adjustment > 0 ? input.adjustment : 0,
+            totalCreditsBonus: input.adjustment > 0 ? input.adjustment : 0,
+          });
+        }
+
+        // Criar log
+        await db.createPlatformLog({
+          tenantId: input.tenantId,
+          eventType: 'config_updated',
+          severity: 'info',
+          message: `Créditos ajustados manualmente: ${input.adjustment > 0 ? '+' : ''}${input.adjustment} (${oldCredits} → ${newCredits})`,
+          metadata: JSON.stringify({
+            adjustment: input.adjustment,
+            oldCredits,
+            newCredits,
+            reason: input.reason,
+            adjustedBy: ctx.user?.id,
+            adjustedByEmail: ctx.user?.email,
+          }),
+        });
+
+        return {
+          success: true,
+          oldCredits,
+          newCredits,
+          adjustment: input.adjustment,
+        };
+      }),
   }),
 
   // ========== ROTAS DE LOGS ==========
