@@ -57,6 +57,73 @@ async function getTenantAgents(tenantId: number): Promise<db.Agent[]> {
   }
 }
 
+// ========== AGENT DELETION ==========
+
+// Função auxiliar para deletar um agente completamente (N8N, Evolution, Chatwoot, Banco)
+async function deleteAgentCompletely(agent: db.Agent): Promise<{ success: boolean; errors: string[] }> {
+  const errors: string[] = [];
+
+  // 1. Deletar workflow do N8N
+  if (agent.n8nWorkflowId) {
+    try {
+      await deleteWorkflow(agent.n8nWorkflowId);
+      console.log(`[Delete Agent] ✅ Workflow N8N ${agent.n8nWorkflowId} deletado (agente ${agent.id})`);
+    } catch (error: any) {
+      const errorMsg = `N8N: ${error.message}`;
+      console.error(`[Delete Agent] ❌ Erro ao deletar workflow N8N:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 2. Deletar instância Evolution
+  if (agent.evolutionInstanceName) {
+    try {
+      await deleteEvolutionInstance(agent.evolutionInstanceName);
+      console.log(`[Delete Agent] ✅ Instância Evolution ${agent.evolutionInstanceName} deletada (agente ${agent.id})`);
+    } catch (error: any) {
+      const errorMsg = `Evolution: ${error.message}`;
+      console.error(`[Delete Agent] ❌ Erro ao deletar Evolution:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 3. Desconectar Agent Bot do inbox (se houver inbox)
+  if (agent.chatwootInboxId) {
+    try {
+      await disconnectAgentBotFromInbox(agent.chatwootInboxId);
+      console.log(`[Delete Agent] ✅ Agent Bot desconectado do inbox ${agent.chatwootInboxId}`);
+    } catch (error: any) {
+      console.warn(`[Delete Agent] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
+    }
+  }
+
+  // 4. Deletar inbox do Chatwoot
+  if (agent.chatwootInboxId) {
+    try {
+      await deleteChatwootInbox(agent.chatwootInboxId);
+      console.log(`[Delete Agent] ✅ Inbox Chatwoot ${agent.chatwootInboxId} deletado (agente ${agent.id})`);
+    } catch (error: any) {
+      const errorMsg = `Chatwoot: ${error.message}`;
+      console.error(`[Delete Agent] ❌ Erro ao deletar Chatwoot:`, errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  // 5. Deletar do banco de dados (SEMPRE, mesmo se recursos externos falharem)
+  // Isso vai deletar agentConfigs por cascade
+  try {
+    await db.deleteAgent(agent.id);
+    console.log(`[Delete Agent] ✅ Agente ${agent.id} deletado do banco de dados`);
+  } catch (error: any) {
+    const errorMsg = `Banco: ${error.message}`;
+    console.error(`[Delete Agent] ❌ Erro ao deletar do banco:`, errorMsg);
+    errors.push(errorMsg);
+    throw error; // Se falhar no banco, lançar erro
+  }
+
+  return { success: errors.length === 0, errors };
+}
+
 // ========== TENANT DELETION ==========
 
 // Função auxiliar para deletar um tenant completamente (N8N, Evolution, Chatwoot, Banco)
@@ -1037,12 +1104,15 @@ export const appRouter = router({
           });
         }
 
-        // Verificar se já existe agente
-        const existingAgent = await getTenantAgent(tenant.id);
-        if (existingAgent) {
+        // Verificar quantidade atual de agentes (permitir múltiplos agentes)
+        const existingAgents = await db.getAgentsByTenantId(tenant.id);
+        const plan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+        const maxAgents = plan?.maxAgents || 1;
+        
+        if (existingAgents.length >= maxAgents) {
           throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'Agente já existe. Use a opção de editar para modificar.',
+            code: 'FORBIDDEN',
+            message: `Limite de ${maxAgents} agente(s) atingido para seu plano.`,
           });
         }
 
@@ -1192,6 +1262,300 @@ export const appRouter = router({
         }
 
         return { success: true };
+      }),
+
+    // Listar todos os agentes do tenant
+    list: protectedProcedure.query(async ({ ctx }) => {
+      let tenant: db.Tenant | null = null;
+      
+      // Se for cliente, usar tenant direto
+      if (ctx.tenant) {
+        tenant = ctx.tenant;
+      } else if (ctx.user) {
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        tenant = await db.getTenantByUserId(ctx.user.id);
+      }
+      
+      if (!tenant) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Cliente não encontrado',
+        });
+      }
+
+      const agents = await db.getAgentsByTenantId(tenant.id);
+      return agents;
+    }),
+
+    // Buscar agente específico por ID
+    getById: protectedProcedure
+      .input(z.object({ agentId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        let tenant: db.Tenant | null = null;
+        
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        const agent = await db.getAgentById(input.agentId);
+        
+        if (!agent) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Agente não encontrado',
+          });
+        }
+
+        // Verificar se o agente pertence ao tenant
+        if (agent.tenantId !== tenant.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Agente não pertence ao seu tenant',
+          });
+        }
+
+        return agent;
+      }),
+
+    // Deletar agente específico
+    delete: protectedProcedure
+      .input(z.object({ agentId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        let tenant: db.Tenant | null = null;
+        
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        const agent = await db.getAgentById(input.agentId);
+        
+        if (!agent) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Agente não encontrado',
+          });
+        }
+
+        // Verificar se o agente pertence ao tenant
+        if (agent.tenantId !== tenant.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Agente não pertence ao seu tenant',
+          });
+        }
+
+        // Deletar agente completamente (recursos externos + banco)
+        const result = await deleteAgentCompletely(agent);
+
+        await db.createPlatformLog({
+          tenantId: tenant.id,
+          eventType: 'agent_deactivated',
+          severity: 'info',
+          message: `Agente "${agent.name}" (ID: ${agent.id}) foi deletado`,
+          metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name }),
+        });
+
+        return {
+          success: result.success,
+          message: result.success 
+            ? 'Agente deletado com sucesso!' 
+            : 'Agente deletado, mas alguns recursos externos podem não ter sido removidos.',
+          errors: result.errors,
+        };
+      }),
+
+    // Desativar agente específico (não deletar, apenas desativar)
+    deactivate: protectedProcedure
+      .input(z.object({ agentId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        let tenant: db.Tenant | null = null;
+        
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        const agent = await db.getAgentById(input.agentId);
+        
+        if (!agent) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Agente não encontrado',
+          });
+        }
+
+        // Verificar se o agente pertence ao tenant
+        if (agent.tenantId !== tenant.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Agente não pertence ao seu tenant',
+          });
+        }
+
+        try {
+          // 1. Desativar workflow do N8N
+          if (agent.n8nWorkflowId) {
+            try {
+              await deactivateWorkflow(agent.n8nWorkflowId);
+              console.log(`[Deactivate Agent] ✅ Workflow N8N ${agent.n8nWorkflowId} desativado`);
+            } catch (error: any) {
+              console.warn(`[Deactivate Agent] ⚠️ Erro ao desativar workflow (não crítico):`, error.message);
+            }
+          }
+
+          // 2. Desconectar Agent Bot do inbox (se houver inbox)
+          if (agent.chatwootInboxId) {
+            try {
+              await disconnectAgentBotFromInbox(agent.chatwootInboxId);
+              console.log(`[Deactivate Agent] ✅ Agent Bot desconectado do inbox ${agent.chatwootInboxId}`);
+            } catch (error: any) {
+              console.warn(`[Deactivate Agent] ⚠️ Erro ao desconectar Agent Bot (não crítico):`, error.message);
+            }
+          }
+
+          // 3. Atualizar status no banco
+          await db.updateAgent(agent.id, {
+            isActive: false,
+            status: 'paused' as const,
+          });
+
+          await db.createPlatformLog({
+            tenantId: tenant.id,
+            eventType: 'agent_deactivated',
+            severity: 'info',
+            message: `Agente "${agent.name}" (ID: ${agent.id}) foi desativado`,
+            metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name }),
+          });
+
+          return {
+            success: true,
+            message: 'Agente desativado com sucesso!',
+          };
+        } catch (error: any) {
+          console.error(`[Deactivate Agent] ❌ Erro ao desativar agente ${agent.id}:`, error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao desativar agente: ${error.message}`,
+          });
+        }
+      }),
+
+    // Ativar agente específico
+    activate: protectedProcedure
+      .input(z.object({ agentId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        let tenant: db.Tenant | null = null;
+        
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Cliente não encontrado',
+          });
+        }
+
+        const agent = await db.getAgentById(input.agentId);
+        
+        if (!agent) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Agente não encontrado',
+          });
+        }
+
+        // Verificar se o agente pertence ao tenant
+        if (agent.tenantId !== tenant.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Agente não pertence ao seu tenant',
+          });
+        }
+
+        try {
+          // 1. Ativar workflow do N8N
+          if (agent.n8nWorkflowId) {
+            try {
+              await activateWorkflow(agent.n8nWorkflowId);
+              console.log(`[Activate Agent] ✅ Workflow N8N ${agent.n8nWorkflowId} ativado`);
+            } catch (error: any) {
+              console.warn(`[Activate Agent] ⚠️ Erro ao ativar workflow (não crítico):`, error.message);
+            }
+          }
+
+          // 2. Reconectar Agent Bot ao inbox (se houver inbox e Agent Bot compartilhado)
+          if (agent.chatwootInboxId && tenant.chatwootAgentBotId) {
+            try {
+              await connectAgentBotToInbox(agent.chatwootInboxId, tenant.chatwootAgentBotId);
+              console.log(`[Activate Agent] ✅ Agent Bot reconectado ao inbox ${agent.chatwootInboxId}`);
+            } catch (error: any) {
+              console.warn(`[Activate Agent] ⚠️ Erro ao reconectar Agent Bot (não crítico):`, error.message);
+            }
+          }
+
+          // 3. Atualizar status no banco
+          await db.updateAgent(agent.id, {
+            isActive: true,
+            status: 'active' as const,
+          });
+
+          await db.createPlatformLog({
+            tenantId: tenant.id,
+            eventType: 'agent_activated',
+            severity: 'info',
+            message: `Agente "${agent.name}" (ID: ${agent.id}) foi ativado`,
+            metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name }),
+          });
+
+          return {
+            success: true,
+            message: 'Agente ativado com sucesso!',
+          };
+        } catch (error: any) {
+          console.error(`[Activate Agent] ❌ Erro ao ativar agente ${agent.id}:`, error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao ativar agente: ${error.message}`,
+          });
+        }
       }),
   }),
 
