@@ -142,12 +142,12 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
 
   // 2. Provisionar Evolution API
   let evolutionData;
+  let chatwootInboxId: number | null = null; // Declarar fora do try para usar depois
   try {
     evolutionData = await createEvolutionInstance(tenant.id, companyName);
     console.log(`[Provisioning] Evolution instance created: ${evolutionData.instanceName}`);
     
       // Buscar inboxId criado pelo Evolution (pode levar alguns segundos para aparecer)
-      let chatwootInboxId: number | null = null;
       try {
         // Aguardar um pouco para o Evolution criar o inbox
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -220,9 +220,19 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
 
   // 3.5. Criar agente automaticamente para o tenant (CRÍTICO)
   // O sistema agora usa agents, não mais tenant diretamente
+  console.log(`[Provisioning] Verificando se deve criar agente... evolutionData:`, evolutionData ? 'existe' : 'não existe');
   if (evolutionData?.instanceName) {
+    console.log(`[Provisioning] ✅ Evolution instance existe: ${evolutionData.instanceName}`);
+    console.log(`[Provisioning] 📋 Dados para criar agente:`, {
+      tenantId: tenant.id,
+      name: companyName || `Agente ${tenant.id}`,
+      evolutionInstanceName: evolutionData.instanceName,
+      n8nWorkflowId: workflowData?.workflowId || 'null',
+      chatwootInboxId: chatwootInboxId || 'null',
+    });
+    
     try {
-      console.log(`[Provisioning] Criando agente automaticamente para tenant ${tenant.id}...`);
+      console.log(`[Provisioning] 🚀 Criando agente automaticamente para tenant ${tenant.id}...`);
       const agent = await createAgent({
         tenantId: tenant.id,
         name: companyName || `Agente ${tenant.id}`,
@@ -233,7 +243,14 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
         isActive: false, // Cliente ainda não ativou a conta
         status: "active" as const,
       });
-      console.log(`[Provisioning] ✅ Agente criado automaticamente: ID=${agent.id}, Nome=${agent.name}`);
+      console.log(`[Provisioning] ✅✅✅ Agente criado automaticamente: ID=${agent.id}, Nome=${agent.name}`);
+      console.log(`[Provisioning] ✅ Agente criado com sucesso! Dados:`, {
+        id: agent.id,
+        name: agent.name,
+        evolutionInstance: agent.evolutionInstanceName,
+        n8nWorkflow: agent.n8nWorkflowId,
+        chatwootInbox: agent.chatwootInboxId,
+      });
       
       await createPlatformLog({
         tenantId: tenant.id,
@@ -242,17 +259,19 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
         metadata: JSON.stringify({ agentId: agent.id, evolutionInstance: evolutionData.instanceName }),
       });
     } catch (error: any) {
-      console.error(`[Provisioning] ❌ Erro ao criar agente:`, error);
+      console.error(`[Provisioning] ❌❌❌ ERRO CRÍTICO ao criar agente:`, error);
+      console.error(`[Provisioning] Stack trace:`, error.stack);
       await createPlatformLog({
         tenantId: tenant.id,
         eventType: "agent_creation_failed",
         message: `Failed to create agent: ${error.message}`,
-        metadata: JSON.stringify({ error: error.message }),
+        metadata: JSON.stringify({ error: error.message, stack: error.stack }),
       });
       // Não falhar provisionamento, mas logar erro crítico
     }
   } else {
     console.warn(`[Provisioning] ⚠️ Agente não criado: Evolution instance não foi criada`);
+    console.warn(`[Provisioning] evolutionData:`, evolutionData);
   }
 
   // 4. Gerar token de ativação
