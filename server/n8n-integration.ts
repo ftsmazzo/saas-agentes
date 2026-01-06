@@ -27,6 +27,26 @@ export async function cloneWorkflowForTenant(
   }
   
   try {
+    // Verificar se já existe workflow para este tenant (evitar duplicação)
+    const expectedWorkflowName = `${tenantName} - Agente`;
+    console.log(`[N8N] Verificando se já existe workflow: "${expectedWorkflowName}"...`);
+    try {
+      const workflowsResponse = await n8nApi.get("/workflows");
+      const workflows = workflowsResponse.data.data || workflowsResponse.data || [];
+      const existingWorkflow = workflows.find((w: any) => w.name === expectedWorkflowName);
+      
+      if (existingWorkflow) {
+        console.log(`[N8N] ⚠️ Workflow já existe: ${existingWorkflow.id}. Retornando existente.`);
+        return {
+          workflowId: existingWorkflow.id,
+          webhookUrl: `${process.env.N8N_API_URL}/webhook/tenant_${tenantId}`
+        };
+      }
+    } catch (error: any) {
+      console.warn(`[N8N] ⚠️ Erro ao verificar workflows existentes (continuando):`, error.message);
+      // Continuar e criar novo workflow
+    }
+    
     const templateId = process.env.N8N_TEMPLATE_WORKFLOW_ID;
     console.log("[N8N] Buscando workflow template:", templateId);
     const templateResponse = await n8nApi.get(`/workflows/${templateId}`);
