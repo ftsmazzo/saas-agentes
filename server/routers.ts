@@ -1944,12 +1944,41 @@ export const appRouter = router({
     }
 
     // Buscar agente do tenant
-    const agent = await getTenantAgent(tenant.id);
+    let agent = await getTenantAgent(tenant.id);
+    
+    // Se não existir agente, criar um automaticamente (compatibilidade)
     if (!agent) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Agente não encontrado. Crie um agente primeiro.',
-      });
+      console.log(`[QR Code] Agente não encontrado para tenant ${tenant.id}. Criando automaticamente...`);
+      try {
+        // Verificar se há dados de Evolution no tenant (legado)
+        const tenantData = await db.getTenantById(tenant.id);
+        if (tenantData?.evolutionInstanceName) {
+          // Criar agente com dados do tenant (migração)
+          agent = await db.createAgent({
+            tenantId: tenant.id,
+            name: tenant.companyName || `Agente ${tenant.id}`,
+            evolutionInstanceName: tenantData.evolutionInstanceName,
+            evolutionApiKey: tenantData.evolutionApiKey || null,
+            n8nWorkflowId: tenantData.n8nWorkflowId || null,
+            chatwootInboxId: tenantData.chatwootInboxId || null,
+            isActive: false,
+            status: "active" as const,
+          });
+          console.log(`[QR Code] ✅ Agente criado automaticamente: ID=${agent.id}`);
+        } else {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Instância Evolution não provisionada. Aguarde o provisionamento automático ou contate o suporte.',
+          });
+        }
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
+        console.error(`[QR Code] Erro ao criar agente automaticamente:`, error);
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Agente não encontrado e não foi possível criar automaticamente. Crie um agente primeiro.',
+        });
+      }
     }
 
     if (!agent.evolutionInstanceName) {
