@@ -20,7 +20,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Coins
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
@@ -71,6 +72,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Início", href: "/admin", icon: LayoutDashboard },
     { name: "Clientes", href: "/admin/tenants", icon: Users },
     { name: "Planos", href: "/admin/plans", icon: CreditCard },
+    { name: "Créditos", href: "/admin/credits", icon: Coins },
     { name: "Usuários Admin", href: "/admin/users", icon: Users },
     { name: "Logs", href: "/admin/logs", icon: FileText },
     { name: "Meu Perfil", href: "/admin/profile", icon: Settings },

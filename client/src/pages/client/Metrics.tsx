@@ -1,12 +1,19 @@
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MessageSquare, Coins, TrendingUp, AlertTriangle, AlertCircle } from "lucide-react";
+import { MessageSquare, Coins, TrendingUp, AlertTriangle, AlertCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 export default function MetricsPage() {
+  const [operationFilter, setOperationFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageSize = 20;
+
   const { data: metrics, isLoading } = trpc.metrics.getMyMetrics.useQuery();
   const { data: credits, isLoading: isLoadingCredits, error: creditsError, refetch: refetchCredits } = trpc.metrics.getMyCredits.useQuery(undefined, {
     retry: 1,
@@ -14,7 +21,9 @@ export default function MetricsPage() {
     refetchInterval: 30000, // Refetch a cada 30 segundos
   });
   const { data: usageTransactions, isLoading: isLoadingTransactions } = trpc.metrics.getMyUsageTransactions.useQuery({
-    limit: 10,
+    limit: pageSize,
+    offset: currentPage * pageSize,
+    operation: operationFilter !== "all" ? operationFilter as "chat" | "audio" | "image" | "format" | "pdf" : undefined,
   }, {
     retry: 1,
     refetchOnWindowFocus: false,
@@ -131,46 +140,118 @@ export default function MetricsPage() {
                 </div>
               )}
 
-              {/* Últimas Transações */}
-              {usageTransactions && usageTransactions.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold">Últimas Transações</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {usageTransactions.slice(0, 5).map((transaction: any) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center justify-between p-2 rounded-lg border bg-muted/50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-medium capitalize">
-                              {transaction.operation === 'chat' ? '💬 Chat' :
-                               transaction.operation === 'audio' ? '🎤 Áudio' :
-                               transaction.operation === 'image' ? '🖼️ Imagem' :
-                               transaction.operation === 'pdf' ? '📄 PDF' :
-                               transaction.operation}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {transaction.model} • {new Date(transaction.createdAt).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-red-600">
-                            -{transaction.creditsUsed || 0}
-                          </span>
-                          <Coins className="h-4 w-4 text-yellow-500" />
-                        </div>
-                      </div>
-                    ))}
+              {/* Histórico de Transações - Melhorado */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Histórico de Transações</h4>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Select value={operationFilter} onValueChange={(value) => { setOperationFilter(value); setCurrentPage(0); }}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Filtrar por tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        <SelectItem value="chat">💬 Chat</SelectItem>
+                        <SelectItem value="audio">🎤 Áudio</SelectItem>
+                        <SelectItem value="image">🖼️ Imagem</SelectItem>
+                        <SelectItem value="pdf">📄 PDF</SelectItem>
+                        <SelectItem value="format">📝 Formatação</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              )}
+
+                {isLoadingTransactions ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : usageTransactions && usageTransactions.length > 0 ? (
+                  <>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {usageTransactions.map((transaction: any) => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium capitalize">
+                                  {transaction.operation === 'chat' ? '💬 Chat' :
+                                   transaction.operation === 'audio' ? '🎤 Áudio' :
+                                   transaction.operation === 'image' ? '🖼️ Imagem' :
+                                   transaction.operation === 'pdf' ? '📄 PDF' :
+                                   transaction.operation === 'format' ? '📝 Formatação' :
+                                   transaction.operation}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {transaction.model}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span>
+                                  {new Date(transaction.createdAt).toLocaleDateString('pt-BR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                                {transaction.totalTokens > 0 && (
+                                  <span>• {transaction.totalTokens.toLocaleString('pt-BR')} tokens</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-red-600">
+                              -{transaction.creditsUsed || 0}
+                            </span>
+                            <Coins className="h-4 w-4 text-yellow-500" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Paginação */}
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        Página {currentPage + 1} • {usageTransactions.length} transações
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                          disabled={currentPage === 0 || isLoadingTransactions}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={usageTransactions.length < pageSize || isLoadingTransactions}
+                        >
+                          Próxima
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <Coins className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma transação encontrada</p>
+                    {operationFilter !== "all" && (
+                      <p className="text-xs mt-1">Tente alterar o filtro</p>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Mensagem de erro se houver */}
               {creditsError && (
