@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  Play
+  Play,
+  XCircle
 } from "lucide-react";
 import AgentConfigAssistant from "@/components/AgentConfigAssistant";
 import ModelSelector from "@/components/ModelSelector";
@@ -770,6 +771,55 @@ export default function AgentConfigUnifiedPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Checklist de Requisitos para Ativar */}
+        {agent && !agent.isActive && (
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                Requisitos para Ativar o Agente
+              </CardTitle>
+              <CardDescription>
+                Complete os itens abaixo para poder ativar seu agente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  {config?.systemPrompt ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                  <span className={config?.systemPrompt ? "text-green-700" : "text-red-700"}>
+                    Prompt do sistema configurado
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {agent.evolutionInstanceName ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                  <span className={agent.evolutionInstanceName ? "text-green-700" : "text-red-700"}>
+                    WhatsApp conectado
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {agent.n8nWorkflowId ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                  <span className={agent.n8nWorkflowId ? "text-green-700" : "text-red-700"}>
+                    Workflow N8N provisionado
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Botões de Ação */}
         <div className="flex justify-end gap-3">

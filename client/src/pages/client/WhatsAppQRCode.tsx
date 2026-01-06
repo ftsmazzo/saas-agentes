@@ -266,7 +266,15 @@ export default function WhatsAppQRCode() {
                     <Button
                       variant="link"
                       className="p-0 h-auto ml-1 text-blue-800 underline"
-                      onClick={() => setLocation("/client/settings")}
+                      onClick={() => {
+                        // Tentar buscar primeiro agente e redirecionar para sua configuração
+                        const { data: agents } = trpc.agent.list.useQuery();
+                        if (agents && agents.length > 0) {
+                          setLocation(`/client/agents/${agents[0].id}/settings`);
+                        } else {
+                          setLocation("/client/agents");
+                        }
+                      }}
                     >
                       Configurar agora
                     </Button>

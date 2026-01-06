@@ -19,16 +19,15 @@ import UsersPage from "./pages/admin/Users";
 import CreditsPage from "./pages/admin/Credits";
 
 // Client pages
-import AgentConfigPage from "./pages/client/AgentConfig";
 import AgentConfigUnifiedPage from "./pages/client/AgentConfigUnified";
 import InteractionsPage from "./pages/client/Interactions";
 import MetricsPage from "./pages/client/Metrics";
 import SubscriptionPage from "./pages/client/Subscription";
 import WhatsAppQRCode from "./pages/client/WhatsAppQRCode";
-import AgentSettings from "./pages/client/AgentSettings";
 import ClientLogin from "./pages/client/Login";
 import MessagesPage from "./pages/client/Messages";
 import CreateAgentPage from "./pages/client/CreateAgent";
+import AgentsPage from "./pages/client/Agents";
 import AgentsPage from "./pages/client/Agents";
 import ActivateAccount from "./pages/ActivateAccount";
 

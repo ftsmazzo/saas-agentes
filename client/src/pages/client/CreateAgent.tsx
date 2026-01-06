@@ -36,11 +36,19 @@ export default function CreateAgentPage() {
   });
 
   const createAgentMutation = trpc.agent.createAgent.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Agente criado com sucesso! 🎉");
-      setTimeout(() => {
-        setLocation("/client/agents");
-      }, 1000);
+      // Redirecionar para página de configuração do agente recém-criado
+      if (data.agentId) {
+        setTimeout(() => {
+          setLocation(`/client/agents/${data.agentId}/settings`);
+        }, 1000);
+      } else {
+        // Fallback: redirecionar para lista de agentes
+        setTimeout(() => {
+          setLocation("/client/agents");
+        }, 1000);
+      }
     },
     onError: (error) => {
       toast.error(`Erro ao criar agente: ${error.message}`);

@@ -1142,7 +1142,11 @@ export const appRouter = router({
           message: `Agente "${input.agentName}" criado com sucesso`,
         });
 
-        return { success: true, message: "Agente criado com sucesso!" };
+        return { 
+          success: true, 
+          message: "Agente criado com sucesso!",
+          agentId: agent.id 
+        };
       }),
 
     // Buscar configuração do agente
