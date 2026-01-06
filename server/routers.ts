@@ -1037,18 +1037,26 @@ export const appRouter = router({
           });
         }
 
-        // Verificar se já existe configuração
-        const existingConfig = await db.getAgentConfig(tenant.id);
-        if (existingConfig) {
+        // Verificar se já existe agente
+        const existingAgent = await getTenantAgent(tenant.id);
+        if (existingAgent) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Agente já existe. Use a opção de editar para modificar.',
           });
         }
 
-        // Criar configuração do agente
-        await db.createAgentConfig({
+        // Criar agente primeiro (sem integrações - serão provisionadas depois)
+        const agent = await db.createAgent({
           tenantId: tenant.id,
+          name: input.agentName,
+          status: "active" as const,
+          isActive: false, // Será ativado depois
+        });
+
+        // Criar configuração do agente usando agentId
+        await db.createAgentConfig({
+          agentId: agent.id, // Usar agentId, não tenantId
           systemPrompt: input.systemPrompt,
           welcomeMessage: input.welcomeMessage || "Olá! Como posso ajudá-lo hoje?",
           companyInfo: input.companyInfo || null,
