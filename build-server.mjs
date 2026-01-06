@@ -43,11 +43,19 @@ await build({
   entryPoints: ['server/_core/index.ts'],
   bundle: true,
   platform: 'node',
+  target: 'node20',
   format: 'esm',
   outfile: 'dist/index.js',
   packages: 'external',
   plugins: [aliasPlugin],
   logLevel: 'info',
+  loader: {
+    '.ts': 'ts',
+  },
+  tsconfig: 'tsconfig.json',
+  sourcemap: false,
+  minify: false,
+  keepNames: true,
 }).catch((error) => {
   console.error('Build failed:', error);
   process.exit(1);
