@@ -186,11 +186,18 @@ export default function AgentConfigUnifiedPage() {
 
   const updateMutation = trpc.agent.updateConfig.useMutation({
     onSuccess: () => {
-      toast.success("Configurações salvas com sucesso!");
+      toast.success("✅ Configurações salvas com sucesso!", {
+        description: "Suas alterações foram aplicadas ao agente.",
+        duration: 3000,
+      });
       utils.agent.getConfig.invalidate({ agentId: agentIdNum });
+      utils.agent.list.invalidate(); // Atualizar lista também
     },
     onError: (error) => {
-      toast.error(`Erro ao salvar configurações: ${error.message}`);
+      toast.error(`❌ Erro ao salvar configurações`, {
+        description: error.message,
+        duration: 5000,
+      });
     },
   });
 

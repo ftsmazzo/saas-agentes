@@ -148,7 +148,7 @@ export default function WhatsAppQRCode() {
               <Button
                 variant="link"
                 className="p-0 h-auto ml-1 text-yellow-800 underline"
-                onClick={() => setLocation("/client/settings")}
+                onClick={() => setLocation("/client/agents")}
               >
                 Configurar agora
               </Button>
