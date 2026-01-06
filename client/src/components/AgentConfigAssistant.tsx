@@ -168,9 +168,11 @@ async function fetchCEP(cep: string): Promise<{
 }
 
 export default function AgentConfigAssistant({ 
+  agentId,
   onComplete,
   existingConfig 
 }: { 
+  agentId?: number;
   onComplete: () => void;
   existingConfig?: any;
 }) {
@@ -331,6 +333,7 @@ export default function AgentConfigAssistant({
     const mappedPersonality = personalityMap[selectedPersonality] || 'professional';
 
     generatePromptMutation.mutate({
+      agentId: agentId, // Passar agentId se disponível
       businessName: state.answers.businessName,
       businessType: state.answers.businessType || undefined,
       street: state.answers.street || undefined,

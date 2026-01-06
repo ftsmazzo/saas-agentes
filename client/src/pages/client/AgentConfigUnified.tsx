@@ -272,11 +272,12 @@ export default function AgentConfigUnifiedPage() {
         {(!config || !config.systemPrompt) && (
           <div className="mb-6">
             <AgentConfigAssistant
+              agentId={agentIdNum}
               existingConfig={config}
               onComplete={() => {
                 setShowAssistant(false);
                 setAssistantComplete(true);
-                utils.agent.getConfig.invalidate();
+                utils.agent.getConfig.invalidate({ agentId: agentIdNum });
                 toast.success('Configuração concluída! Agora você pode conectar o WhatsApp e ativar o agente.');
               }}
             />

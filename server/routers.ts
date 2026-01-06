@@ -3015,13 +3015,33 @@ export const appRouter = router({
         additionalInfo: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenant = ctx.tenant;
+        let tenant = ctx.tenant;
+        
+        // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
         if (!tenant) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
         }
 
+        // Se agentId foi fornecido, buscar agente específico
+        let agent: db.Agent | undefined;
+        if (input.agentId) {
+          agent = await db.getAgentById(input.agentId);
+          if (!agent || agent.tenantId !== tenant.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+          }
+        } else {
+          // Se não fornecido, buscar primeiro agente (compatibilidade)
+          agent = await db.getFirstAgentByTenantId(tenant.id);
+        }
+
         // Verificar se já existe configuração
-        const existingConfig = await db.getAgentConfig(tenant.id);
+        const existingConfig = agent 
+          ? await db.getAgentConfigByAgentId(agent.id)
+          : await db.getAgentConfig(tenant.id); // Fallback para compatibilidade
         const isUpdate = !!existingConfig;
 
         // Construir endereço completo
