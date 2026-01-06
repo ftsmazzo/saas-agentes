@@ -12,6 +12,9 @@ export default function WhatsAppQRCode() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [forceQRCode, setForceQRCode] = useState(false);
   
+  // Buscar lista de agentes para redirecionamento
+  const { data: agents } = trpc.agent.list.useQuery();
+  
   // Verificar se o agente existe
   const { data: agentConfig, isLoading: agentLoading } = trpc.agent.getConfig.useQuery();
   
@@ -267,8 +270,7 @@ export default function WhatsAppQRCode() {
                       variant="link"
                       className="p-0 h-auto ml-1 text-blue-800 underline"
                       onClick={() => {
-                        // Tentar buscar primeiro agente e redirecionar para sua configuração
-                        const { data: agents } = trpc.agent.list.useQuery();
+                        // Redirecionar para primeiro agente ou lista
                         if (agents && agents.length > 0) {
                           setLocation(`/client/agents/${agents[0].id}/settings`);
                         } else {
