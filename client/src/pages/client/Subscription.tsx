@@ -17,7 +17,9 @@ import {
   Loader2,
   TrendingUp,
   Calendar,
-  Zap
+  Zap,
+  AlertTriangle,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import CircularProgress from "@/components/CircularProgress";
@@ -150,6 +152,16 @@ export default function SubscriptionPage() {
   const creditsPercentage = totalCreditsAvailable > 0 
     ? Math.min((creditsUsedThisMonth / totalCreditsAvailable) * 100, 100) 
     : 0;
+
+  // Calcular percentual de créditos disponíveis
+  const creditsPercentageAvailable = totalCreditsAvailable > 0 
+    ? (creditsAvailable / totalCreditsAvailable) * 100 
+    : 0;
+
+  // Determinar status de alerta
+  const isCreditsLow = creditsPercentageAvailable <= 10 && creditsAvailable > 0;
+  const isCreditsCritical = creditsAvailable === 0;
+  const isCreditsWarning = creditsPercentageAvailable > 10 && creditsPercentageAvailable <= 20;
 
   // Filtrar planos disponíveis para upgrade (apenas planos superiores ao atual)
   const availablePlans = allPlans?.filter(plan => {

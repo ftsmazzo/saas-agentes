@@ -1,8 +1,8 @@
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageSquare, Coins, TrendingUp } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MessageSquare, Coins, TrendingUp, AlertTriangle, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import * as db from "../db";
 import { z } from "zod";
-import { calculateCost, recordUsageTransaction, UsageData } from "../credit-system";
+import { calculateCost, recordUsageTransaction, UsageData, checkCreditsAvailable, getTenantCredits } from "../credit-system";
 
 /**
  * Webhook para receber dados do N8N
@@ -381,10 +381,29 @@ async function handleUsageTracking(tenantId: number, payload: any) {
       return;
     }
 
-    // Calcular custo e créditos
+    // CRÍTICO: Verificar créditos ANTES de processar
+    // Estimar créditos necessários para esta operação
     const costCalculation = await calculateCost(usageData);
+    const estimatedCredits = costCalculation.creditsUsed;
+    
+    const hasCredits = await checkCreditsAvailable(tenantId, estimatedCredits);
+    
+    if (!hasCredits) {
+      const credits = await getTenantCredits(tenantId);
+      const currentCredits = credits.currentCredits || 0;
+      
+      console.warn(`[N8N Webhook] ⚠️ Créditos insuficientes para tenant ${tenantId}:`, {
+        currentCredits,
+        estimatedCredits,
+        operation: usageData.operation,
+        model: usageData.model,
+      });
+      
+      // Lançar erro para N8N tratar (bloquear execução do workflow)
+      throw new Error(`INSUFFICIENT_CREDITS: Saldo insuficiente (${currentCredits} créditos disponíveis, ~${estimatedCredits} necessários para ${usageData.operation} com ${usageData.model})`);
+    }
 
-    // Registrar transação
+    // Registrar transação (já verifica e deduz créditos)
     await recordUsageTransaction(tenantId, usageData, costCalculation);
 
     console.log(`[N8N Webhook] ✅ Uso registrado para tenant ${tenantId}:`, {
@@ -395,8 +414,14 @@ async function handleUsageTracking(tenantId: number, payload: any) {
       creditsUsed: costCalculation.creditsUsed,
     });
   } catch (error: any) {
+    // Se for erro de créditos insuficientes, relançar para N8N tratar
+    if (error.message?.includes('INSUFFICIENT_CREDITS')) {
+      console.error(`[N8N Webhook] ❌ ${error.message}`);
+      throw error; // Relançar para retornar erro HTTP ao N8N
+    }
+    
     console.error(`[N8N Webhook] ❌ Erro ao processar uso para tenant ${tenantId}:`, error);
-    // Não falhar o webhook - apenas logar o erro
+    // Outros erros não bloqueiam o webhook (apenas logam)
   }
 }
 
