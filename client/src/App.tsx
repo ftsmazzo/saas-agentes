@@ -28,6 +28,7 @@ import AgentSettings from "./pages/client/AgentSettings";
 import ClientLogin from "./pages/client/Login";
 import MessagesPage from "./pages/client/Messages";
 import CreateAgentPage from "./pages/client/CreateAgent";
+import AgentsPage from "./pages/client/Agents";
 import ActivateAccount from "./pages/ActivateAccount";
 
 function Router() {
@@ -52,6 +53,10 @@ function Router() {
       
       {/* Client Routes */}
       <Route path={"/client/login"} component={ClientLogin} />
+      <Route path={"/client/agents"} component={AgentsPage} />
+      <Route path={"/client/agents/create"} component={CreateAgentPage} />
+      <Route path={"/client/agents/:agentId/settings"} component={AgentConfigUnifiedPage} />
+      <Route path={"/client/agents/:agentId/whatsapp"} component={WhatsAppQRCode} />
       {/* Redirecionar /client/create-agent para a página unificada com assistente */}
       <Route path={"/client/create-agent"} component={AgentConfigUnifiedPage} />
       <Route path={"/client"} component={WhatsAppQRCode} />

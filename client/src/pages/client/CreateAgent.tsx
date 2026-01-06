@@ -39,7 +39,7 @@ export default function CreateAgentPage() {
     onSuccess: () => {
       toast.success("Agente criado com sucesso! 🎉");
       setTimeout(() => {
-        setLocation("/client/whatsapp");
+        setLocation("/client/agents");
       }, 1000);
     },
     onError: (error) => {
