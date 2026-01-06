@@ -59,6 +59,10 @@ await build({
   // Forçar que todos os arquivos sejam tratados como ES modules
   mainFields: ['module', 'main'],
   conditions: ['import', 'module'],
+  // Garantir que está usando sintaxe ES modules
+  banner: {
+    js: '',
+  },
 }).catch((error) => {
   console.error('Build failed:', error);
   process.exit(1);
