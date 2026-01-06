@@ -7,7 +7,7 @@ import crypto from "crypto";
 import { createEvolutionInstance } from "../evolution-integration";
 import { cloneWorkflowForTenant } from "../n8n-integration";
 import { sendActivationEmail } from "../email";
-import { findChatwootInboxByName, createChatwootAgent } from "../chatwoot-integration";
+import { findChatwootInboxByName, createChatwootAgent, createOrUpdateChatwootAgentBot, connectAgentBotToInbox } from "../chatwoot-integration";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || "sk_test_dummy";
 if (stripeApiKey === "sk_test_dummy") {
@@ -258,6 +258,102 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
         message: `Agente criado automaticamente durante provisionamento: ${agent.name}`,
         metadata: JSON.stringify({ agentId: agent.id, evolutionInstance: evolutionData.instanceName }),
       });
+
+      // 3.6. Criar Agent Bot e Webhook no Chatwoot automaticamente (CRÍTICO)
+      // Isso permite que o agente funcione imediatamente após provisionamento
+      if (agent.chatwootInboxId && workflowData?.workflowId) {
+        try {
+          console.log(`[Provisioning] 🤖 Criando Agent Bot e Webhook no Chatwoot...`);
+          const n8nApiUrl = process.env.N8N_API_URL;
+          if (!n8nApiUrl) {
+            console.warn(`[Provisioning] ⚠️ N8N_API_URL não configurado, pulando criação de webhook`);
+          } else {
+            const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
+            const botName = `Agente ${companyName || `Tenant ${tenant.id}`}`;
+            
+            // Criar Agent Bot
+            const agentBot = await createOrUpdateChatwootAgentBot(
+              botName,
+              tenantWebhookUrl,
+              `Agent bot para ${companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
+            );
+            
+            console.log(`[Provisioning] ✅ Agent Bot criado: ID=${agentBot.id}`);
+            
+            // Salvar no tenant (compartilhado entre agentes)
+            const db = await getDb();
+            await db.update(tenants)
+              .set({
+                chatwootAgentBotId: agentBot.id,
+                chatwootAgentBotToken: agentBot.token || undefined,
+              })
+              .where(eq(tenants.id, tenant.id));
+            
+            console.log(`[Provisioning] ✅ Agent Bot salvo no tenant`);
+            
+            // Conectar Agent Bot ao inbox
+            try {
+              await connectAgentBotToInbox(agent.chatwootInboxId, agentBot.id);
+              console.log(`[Provisioning] ✅ Agent Bot conectado ao inbox ${agent.chatwootInboxId}`);
+            } catch (connectError: any) {
+              console.warn(`[Provisioning] ⚠️ Erro ao conectar Agent Bot ao inbox (não crítico):`, connectError.message);
+            }
+            
+            // Criar webhook no Chatwoot via N8N workflow
+            const createWebhookWorkflowUrl = process.env.N8N_CREATE_WEBHOOK_WORKFLOW_URL;
+            if (createWebhookWorkflowUrl) {
+              try {
+                const axios = (await import('axios')).default;
+                const chatwootUrl = process.env.CHATWOOT_URL;
+                const chatwootToken = process.env.CHATWOOT_API_TOKEN;
+                const chatwootAccountId = process.env.CHATWOOT_ACCOUNT_ID;
+                
+                if (chatwootUrl && chatwootToken && chatwootAccountId) {
+                  await axios.post(createWebhookWorkflowUrl, {
+                    tenantId: tenant.id,
+                    webhookUrl: tenantWebhookUrl,
+                    chatwootAccountId,
+                    chatwootUrl,
+                    chatwootToken,
+                    action: 'activate',
+                    timestamp: new Date().toISOString(),
+                  }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 30000,
+                  });
+                  
+                  console.log(`[Provisioning] ✅ Webhook criado no Chatwoot via N8N workflow`);
+                } else {
+                  console.warn(`[Provisioning] ⚠️ Variáveis do Chatwoot não configuradas, pulando criação de webhook`);
+                }
+              } catch (webhookError: any) {
+                console.warn(`[Provisioning] ⚠️ Erro ao criar webhook (não crítico):`, webhookError.message);
+              }
+            } else {
+              console.warn(`[Provisioning] ⚠️ N8N_CREATE_WEBHOOK_WORKFLOW_URL não configurado, pulando criação de webhook`);
+            }
+            
+            await createPlatformLog({
+              tenantId: tenant.id,
+              eventType: "agent_bot_created",
+              message: `Agent Bot e Webhook criados automaticamente durante provisionamento`,
+              metadata: JSON.stringify({ agentBotId: agentBot.id, inboxId: agent.chatwootInboxId }),
+            });
+          }
+        } catch (error: any) {
+          console.error(`[Provisioning] ❌ Erro ao criar Agent Bot/Webhook:`, error);
+          await createPlatformLog({
+            tenantId: tenant.id,
+            eventType: "agent_bot_creation_failed",
+            message: `Failed to create Agent Bot/Webhook: ${error.message}`,
+            metadata: JSON.stringify({ error: error.message }),
+          });
+          // Não falhar provisionamento, mas logar erro
+        }
+      } else {
+        console.warn(`[Provisioning] ⚠️ Inbox ou Workflow não disponível, pulando criação de Agent Bot/Webhook`);
+        console.warn(`[Provisioning] chatwootInboxId: ${agent.chatwootInboxId}, workflowId: ${workflowData?.workflowId}`);
+      }
     } catch (error: any) {
       console.error(`[Provisioning] ❌❌❌ ERRO CRÍTICO ao criar agente:`, error);
       console.error(`[Provisioning] Stack trace:`, error.stack);
