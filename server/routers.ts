@@ -1146,32 +1146,57 @@ export const appRouter = router({
       }),
 
     // Buscar configuração do agente
-    getConfig: protectedProcedure.query(async ({ ctx }) => {
-      // Se for cliente, usar tenant direto
-      if (ctx.tenant) {
-        const config = await db.getAgentConfig(ctx.tenant.id);
-        return config;
-      }
-      
-      // Se for admin, buscar tenant pelo ownerId (compatibilidade)
-      if (ctx.user) {
-        const tenants = await db.getAllTenants();
-        const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+    getConfig: protectedProcedure
+      .input(z.object({ agentId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        let tenant: db.Tenant | null = null;
         
-        if (!userTenant) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+        // Se for cliente, usar tenant direto
+        if (ctx.tenant) {
+          tenant = ctx.tenant;
+        } else if (ctx.user) {
+          // Se for admin, buscar tenant pelo ownerId (compatibilidade)
+          const tenants = await db.getAllTenants();
+          tenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
+          
+          if (!tenant) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
+          }
+        } else {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
         }
 
-        const config = await db.getAgentConfig(userTenant.id);
-        return config;
-      }
-
-      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
-    }),
+        // Se agentId fornecido, buscar config desse agente específico
+        if (input?.agentId) {
+          const agent = await db.getAgentById(input.agentId);
+          
+          if (!agent) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Agente não encontrado' });
+          }
+          
+          // Validar que agente pertence ao tenant
+          if (agent.tenantId !== tenant.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+          }
+          
+          const config = await db.getAgentConfigByAgentId(agent.id);
+          return { config, agent: { id: agent.id, name: agent.name, isActive: agent.isActive } };
+        }
+        
+        // Compatibilidade: buscar primeiro agente do tenant
+        const agent = await getTenantAgent(tenant.id);
+        if (!agent) {
+          return { config: null, agent: null };
+        }
+        
+        const config = await db.getAgentConfigByAgentId(agent.id);
+        return { config, agent: { id: agent.id, name: agent.name, isActive: agent.isActive } };
+      }),
 
     // Atualizar configuração do agente
     updateConfig: protectedProcedure
       .input(z.object({
+        agentId: z.number().optional(),
         systemPrompt: z.string().optional(),
         companyInfo: z.string().optional(),
         welcomeMessage: z.string().optional(),
@@ -1184,32 +1209,49 @@ export const appRouter = router({
         ragConfig: z.string().optional(), // JSON string
       }))
       .mutation(async ({ input, ctx }) => {
-        let tenantId: number | null = null;
         let tenant: db.Tenant | null = null;
         
         // Se for cliente, usar tenant direto
         if (ctx.tenant) {
           tenant = ctx.tenant;
-          tenantId = ctx.tenant.id;
         } else if (ctx.user) {
           // Se for admin, buscar tenant pelo ownerId (compatibilidade)
           const tenants = await db.getAllTenants();
-          const userTenant = tenants.find(t => t.ownerId === ctx.user!.id);
+          tenant = tenants.find(t => t.ownerId === ctx.user!.id) || null;
           
-          if (!userTenant) {
+          if (!tenant) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Tenant não encontrado' });
           }
-
-          tenant = userTenant;
-          tenantId = userTenant.id;
         } else {
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Não autenticado' });
         }
 
+        let agent: db.Agent | null = null;
+
+        // Se agentId fornecido, buscar e validar agente específico
+        if (input.agentId) {
+          agent = await db.getAgentById(input.agentId);
+          
+          if (!agent) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Agente não encontrado' });
+          }
+          
+          // Validar que agente pertence ao tenant
+          if (agent.tenantId !== tenant.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+          }
+        } else {
+          // Compatibilidade: buscar primeiro agente do tenant
+          agent = await getTenantAgent(tenant.id);
+          if (!agent) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Nenhum agente encontrado. Crie um agente primeiro.' });
+          }
+        }
+
         // Validar modelo se fornecido
-        if (input.openaiModel && tenantId) {
+        if (input.openaiModel) {
           const { validateModelForTenant } = await import("./plan-validation");
-          const validation = await validateModelForTenant(tenantId, input.openaiModel);
+          const validation = await validateModelForTenant(tenant.id, input.openaiModel);
           if (!validation.allowed) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -1219,9 +1261,9 @@ export const appRouter = router({
         }
 
         // Validar features se fornecidas
-        if (input.ragConfig && tenantId) {
+        if (input.ragConfig) {
           const { validateFeatureForTenant } = await import("./plan-validation");
-          const validation = await validateFeatureForTenant(tenantId, 'enableRAG');
+          const validation = await validateFeatureForTenant(tenant.id, 'enableRAG');
           if (!validation.allowed) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -1230,9 +1272,9 @@ export const appRouter = router({
           }
         }
 
-        if (input.schedulingConfig && tenantId) {
+        if (input.schedulingConfig) {
           const { validateFeatureForTenant } = await import("./plan-validation");
-          const validation = await validateFeatureForTenant(tenantId, 'enableScheduling');
+          const validation = await validateFeatureForTenant(tenant.id, 'enableScheduling');
           if (!validation.allowed) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -1241,21 +1283,20 @@ export const appRouter = router({
           }
         }
         
-        await db.updateAgentConfig(tenantId, input);
+        // Atualizar configuração usando agentId específico
+        const { agentId, ...configUpdates } = input;
+        await db.updateAgentConfigByAgentId(agent.id, configUpdates);
 
         // Sincronizar configuração com N8N em background (não bloqueia)
-        if (tenantId) {
+        if (agent.n8nWorkflowId) {
           try {
-            const agent = await getTenantAgent(tenantId);
-            if (agent?.n8nWorkflowId) {
-              // Se o modelo foi alterado, atualizar diretamente no workflow
-              if (input.openaiModel) {
-                await updateModelInWorkflow(agent.n8nWorkflowId, input.openaiModel);
-              }
-              
-              // Sincronizar outras configurações
-              await syncAgentConfigToN8N(agent.n8nWorkflowId, tenantId, input);
+            // Se o modelo foi alterado, atualizar diretamente no workflow
+            if (input.openaiModel) {
+              await updateModelInWorkflow(agent.n8nWorkflowId, input.openaiModel);
             }
+            
+            // Sincronizar outras configurações
+            await syncAgentConfigToN8N(agent.n8nWorkflowId, tenant.id, configUpdates);
           } catch (error: any) {
             console.warn(`[AgentConfig] Erro ao sincronizar com N8N (não bloqueia):`, error.message);
           }

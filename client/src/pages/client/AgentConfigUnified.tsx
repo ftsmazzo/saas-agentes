@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import ClientLayout from "@/components/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,8 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Play
 } from "lucide-react";
 import AgentConfigAssistant from "@/components/AgentConfigAssistant";
 import ModelSelector from "@/components/ModelSelector";
@@ -68,8 +70,54 @@ const AVAILABLE_TOOLS = [
   },
 ];
 
+// Componente para botão de ativar agente
+function ActivateAgentButton({ agentId }: { agentId: number }) {
+  const utils = trpc.useUtils();
+  
+  const activateMutation = trpc.agent.activate.useMutation({
+    onSuccess: () => {
+      toast.success("Agente ativado com sucesso! 🎉");
+      utils.agent.getConfig.invalidate({ agentId });
+      utils.agent.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao ativar agente: ${error.message}`);
+    },
+  });
+
+  return (
+    <Button
+      onClick={() => activateMutation.mutate({ agentId })}
+      disabled={activateMutation.isPending}
+      size="lg"
+      className="bg-green-600 hover:bg-green-700 text-white"
+    >
+      {activateMutation.isPending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Ativando...
+        </>
+      ) : (
+        <>
+          <Play className="mr-2 h-4 w-4" />
+          Ativar Agente
+        </>
+      )}
+    </Button>
+  );
+}
+
 export default function AgentConfigUnifiedPage() {
-  const { data: config, isLoading } = trpc.agent.getConfig.useQuery();
+  const { agentId } = useParams();
+  const agentIdNum = agentId ? parseInt(agentId) : undefined;
+  
+  const { data: configData, isLoading } = trpc.agent.getConfig.useQuery(
+    { agentId: agentIdNum },
+    { enabled: true }
+  );
+  const config = configData?.config;
+  const agent = configData?.agent;
+  
   const { data: subscriptionInfo } = trpc.payment.getSubscriptionInfo.useQuery();
   const utils = trpc.useUtils();
   
@@ -138,7 +186,7 @@ export default function AgentConfigUnifiedPage() {
   const updateMutation = trpc.agent.updateConfig.useMutation({
     onSuccess: () => {
       toast.success("Configurações salvas com sucesso!");
-      utils.agent.getConfig.invalidate();
+      utils.agent.getConfig.invalidate({ agentId: agentIdNum });
     },
     onError: (error) => {
       toast.error(`Erro ao salvar configurações: ${error.message}`);
@@ -147,6 +195,7 @@ export default function AgentConfigUnifiedPage() {
 
   const handleSave = () => {
     updateMutation.mutate({
+      agentId: agentIdNum,
       systemPrompt: formData.systemPrompt,
       welcomeMessage: formData.welcomeMessage,
       companyInfo: formData.companyInfo,
@@ -189,10 +238,26 @@ export default function AgentConfigUnifiedPage() {
     <ClientLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configuração do Agente</h1>
-          <p className="text-muted-foreground">
-            Personalize o comportamento e configure as ferramentas do seu agente de IA
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                Configuração do Agente
+                {agent?.name && (
+                  <span className="ml-3 text-xl font-normal text-muted-foreground">
+                    - {agent.name}
+                  </span>
+                )}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Personalize o comportamento e configure as ferramentas do seu agente de IA
+              </p>
+            </div>
+            {agent && (
+              <Badge variant={agent.isActive ? "default" : "secondary"}>
+                {agent.isActive ? "Ativo" : "Inativo"}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Se não houver configuração OU não houver systemPrompt, mostrar assistente diretamente */}
@@ -706,12 +771,13 @@ export default function AgentConfigUnifiedPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Botão de Salvar */}
-        <div className="flex justify-end">
+        {/* Botões de Ação */}
+        <div className="flex justify-end gap-3">
           <Button
             onClick={handleSave}
             disabled={updateMutation.isPending}
             size="lg"
+            variant="outline"
           >
             {updateMutation.isPending ? (
               <>
@@ -725,6 +791,11 @@ export default function AgentConfigUnifiedPage() {
               </>
             )}
           </Button>
+          
+          {/* Botão Ativar - Mostrar apenas se config estiver completa e agente não estiver ativo */}
+          {config && config.systemPrompt && agent && !agent.isActive && agentIdNum && (
+            <ActivateAgentButton agentId={agentIdNum} />
+          )}
         </div>
         </>
         )}
