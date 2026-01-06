@@ -27,7 +27,9 @@ import {
   Clock,
   Sparkles,
   Play,
-  XCircle
+  XCircle,
+  Eye,
+  X
 } from "lucide-react";
 import AgentConfigAssistant from "@/components/AgentConfigAssistant";
 import ModelSelector from "@/components/ModelSelector";
@@ -202,6 +204,15 @@ export default function AgentConfigUnifiedPage() {
   });
 
   const handleSave = () => {
+    // Validação básica
+    if (!formData.systemPrompt || formData.systemPrompt.trim().length < 10) {
+      toast.error("❌ Prompt do sistema é obrigatório e deve ter pelo menos 10 caracteres", {
+        description: "Configure o prompt do sistema antes de salvar.",
+        duration: 5000,
+      });
+      return;
+    }
+
     updateMutation.mutate({
       agentId: agentIdNum,
       systemPrompt: formData.systemPrompt,
