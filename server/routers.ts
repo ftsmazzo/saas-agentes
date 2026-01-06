@@ -3232,28 +3232,17 @@ ${personalityDescriptions[input.personality || 'professional']}
             additionalInfo: input.additionalInfo || '',
           });
 
-          // Buscar ou criar agente primeiro
-          let agent = await getTenantAgent(tenant.id);
-          if (!agent) {
-            // Se não existe agente, criar um
-            agent = await db.createAgent({
-              tenantId: tenant.id,
-              name: input.businessName || `Agente ${tenant.id}`,
-              status: "active" as const,
-              isActive: false,
-            });
-          }
-
           // Se já existe config, atualizar. Se não, criar.
-          if (isUpdate) {
-            await db.updateAgentConfig(tenant.id, {
+          if (isUpdate && existingConfig && agent) {
+            await db.updateAgentConfigByAgentId(agent.id, {
               systemPrompt: generatedPrompt,
               companyInfo: companyInfo,
               welcomeMessage: `Olá! Sou o assistente virtual da ${input.businessName}. Como posso ajudar você hoje?`,
             });
           } else {
+            // Criar nova configuração usando agentId
             await db.createAgentConfig({
-              agentId: agent.id, // Usar agentId, não tenantId
+              agentId: agent!.id,
               systemPrompt: generatedPrompt,
               companyInfo: companyInfo,
               welcomeMessage: `Olá! Sou o assistente virtual da ${input.businessName}. Como posso ajudar você hoje?`,
