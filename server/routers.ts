@@ -643,18 +643,53 @@ export const appRouter = router({
           
           console.log('✅ [STEP 5] Workflow N8N clonado!');
           
-          // 6. Criar configura\u00e7\u00e3o padr\u00e3o do agente
-          console.log('🔧 [STEP 6] Criando configura\u00e7\u00e3o do agente...');
-          await db.createAgentConfig({
-            tenantId: tenant.id,
-            systemPrompt: 'Você é um assistente virtual prestativo e profissional.',
-            companyInfo: JSON.stringify({ name: input.companyName }),
-            welcomeMessage: 'Olá! Como posso ajudá-lo hoje?',
-          });
-          console.log('✅ [STEP 6] Configura\u00e7\u00e3o criada!');
+          // 6. Criar agente automaticamente para o tenant (CRÍTICO)
+          console.log('🔧 [STEP 6] Criando agente automaticamente...');
+          let agent;
+          try {
+            agent = await db.createAgent({
+              tenantId: tenant.id,
+              name: input.companyName || `Agente ${tenant.id}`,
+              evolutionInstanceName: evolutionInstanceName,
+              evolutionApiKey: evolutionApiKey || null,
+              n8nWorkflowId: workflowResult?.workflowId || null,
+              chatwootInboxId: chatwootInboxId || null,
+              isActive: false, // Cliente ainda não ativou
+              status: "active" as const,
+            });
+            console.log('✅ [STEP 6] Agente criado: ID=', agent.id);
+          } catch (error: any) {
+            console.error('❌ [STEP 6] Erro ao criar agente:', error.message);
+            await db.createPlatformLog({
+              tenantId: tenant.id,
+              eventType: 'agent_creation_failed',
+              severity: 'error',
+              message: `Falha ao criar agente: ${error.message}`,
+            });
+            // Não falhar criação de tenant, mas logar erro
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Erro ao criar agente: ${error.message}`,
+            });
+          }
           
-          // 7. Gerar token de ativação e enviar email
-          console.log('📧 [STEP 7] Gerando token de ativação e enviando email...');
+          // 7. Criar configuração padrão do agente
+          console.log('🔧 [STEP 7] Criando configuração do agente...');
+          try {
+            await db.createAgentConfig({
+              agentId: agent.id, // Usar agentId, não tenantId
+              systemPrompt: 'Você é um assistente virtual prestativo e profissional.',
+              companyInfo: JSON.stringify({ name: input.companyName }),
+              welcomeMessage: 'Olá! Como posso ajudá-lo hoje?',
+            });
+            console.log('✅ [STEP 7] Configuração criada!');
+          } catch (error: any) {
+            console.warn('⚠️ [STEP 7] Erro ao criar configuração (não crítico):', error.message);
+            // Não falhar se não conseguir criar config
+          }
+          
+          // 8. Gerar token de ativação e enviar email
+          console.log('📧 [STEP 8] Gerando token de ativação e enviando email...');
           try {
             const crypto = await import('crypto');
             const activationToken = crypto.randomBytes(32).toString("hex");

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId } from "../db";
+import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId, createAgent } from "../db";
 import { tenants, activationTokens, tenantCredits } from "../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
@@ -200,17 +200,11 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   }
 
   // 3. Provisionar N8N Workflow (só se Evolution foi criado)
+  let workflowData: { workflowId: string } | null = null;
   if (evolutionData?.instanceName) {
     try {
-      const workflowData = await cloneWorkflowForTenant(tenant.id, companyName, evolutionData.instanceName);
+      workflowData = await cloneWorkflowForTenant(tenant.id, companyName, evolutionData.instanceName);
       console.log(`[Provisioning] N8N workflow created: ${workflowData.workflowId}`);
-      
-      // Atualizar tenant com dados N8N
-      await db.update(tenants)
-        .set({
-          n8nWorkflowId: workflowData.workflowId,
-        })
-        .where(eq(tenants.id, tenant.id));
     } catch (error: any) {
       console.error(`[Provisioning] N8N failed:`, error);
       await createPlatformLog({
@@ -222,6 +216,43 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     }
   } else {
     console.warn(`[Provisioning] N8N skipped: Evolution instance not created`);
+  }
+
+  // 3.5. Criar agente automaticamente para o tenant (CRÍTICO)
+  // O sistema agora usa agents, não mais tenant diretamente
+  if (evolutionData?.instanceName) {
+    try {
+      console.log(`[Provisioning] Criando agente automaticamente para tenant ${tenant.id}...`);
+      const agent = await createAgent({
+        tenantId: tenant.id,
+        name: companyName || `Agente ${tenant.id}`,
+        evolutionInstanceName: evolutionData.instanceName,
+        evolutionApiKey: evolutionData.apiKey || null,
+        n8nWorkflowId: workflowData?.workflowId || null,
+        chatwootInboxId: chatwootInboxId || null,
+        isActive: false, // Cliente ainda não ativou a conta
+        status: "active" as const,
+      });
+      console.log(`[Provisioning] ✅ Agente criado automaticamente: ID=${agent.id}, Nome=${agent.name}`);
+      
+      await createPlatformLog({
+        tenantId: tenant.id,
+        eventType: "agent_created",
+        message: `Agente criado automaticamente durante provisionamento: ${agent.name}`,
+        metadata: JSON.stringify({ agentId: agent.id, evolutionInstance: evolutionData.instanceName }),
+      });
+    } catch (error: any) {
+      console.error(`[Provisioning] ❌ Erro ao criar agente:`, error);
+      await createPlatformLog({
+        tenantId: tenant.id,
+        eventType: "agent_creation_failed",
+        message: `Failed to create agent: ${error.message}`,
+        metadata: JSON.stringify({ error: error.message }),
+      });
+      // Não falhar provisionamento, mas logar erro crítico
+    }
+  } else {
+    console.warn(`[Provisioning] ⚠️ Agente não criado: Evolution instance não foi criada`);
   }
 
   // 4. Gerar token de ativação
