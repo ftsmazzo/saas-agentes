@@ -3652,68 +3652,68 @@ ${personalityDescriptions[input.personality || 'professional']}
 
           let tenant = ctx.tenant;
         
-        if (!tenant && ctx.user) {
-          tenant = await db.getTenantByUserId(ctx.user.id);
-        }
-        
-        if (!tenant) {
-          console.error('[ChatWithAssistant] ❌ Tenant não encontrado');
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
-        }
-
-        // Buscar agente específico ou primeiro agente
-        let agent: db.Agent | undefined;
-        if (input.agentId) {
-          console.log('[ChatWithAssistant] 🔍 Buscando agente por ID:', input.agentId);
-          agent = await db.getAgentById(input.agentId);
-          if (!agent || agent.tenantId !== tenant.id) {
-            console.error('[ChatWithAssistant] ❌ Agente não encontrado ou não pertence ao tenant');
-            throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+          if (!tenant && ctx.user) {
+            tenant = await db.getTenantByUserId(ctx.user.id);
           }
-          console.log('[ChatWithAssistant] ✅ Agente encontrado:', agent.id, agent.name);
-        } else {
-          console.log('[ChatWithAssistant] 🔍 Buscando primeiro agente do tenant:', tenant.id);
-          agent = await db.getFirstAgentByTenantId(tenant.id);
-          console.log('[ChatWithAssistant] ✅ Primeiro agente:', agent?.id || 'não encontrado');
-        }
+          
+          if (!tenant) {
+            console.error('[ChatWithAssistant] ❌ Tenant não encontrado');
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
+          }
 
-        // Gerar ou usar conversationId
-        const conversationId = input.conversationId || `conv_${tenant.id}_${agent?.id || 'new'}_${Date.now()}`;
-        console.log('[ChatWithAssistant] 💬 ConversationId:', conversationId);
+          // Buscar agente específico ou primeiro agente
+          let agent: db.Agent | undefined;
+          if (input.agentId) {
+            console.log('[ChatWithAssistant] 🔍 Buscando agente por ID:', input.agentId);
+            agent = await db.getAgentById(input.agentId);
+            if (!agent || agent.tenantId !== tenant.id) {
+              console.error('[ChatWithAssistant] ❌ Agente não encontrado ou não pertence ao tenant');
+              throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+            }
+            console.log('[ChatWithAssistant] ✅ Agente encontrado:', agent.id, agent.name);
+          } else {
+            console.log('[ChatWithAssistant] 🔍 Buscando primeiro agente do tenant:', tenant.id);
+            agent = await db.getFirstAgentByTenantId(tenant.id);
+            console.log('[ChatWithAssistant] ✅ Primeiro agente:', agent?.id || 'não encontrado');
+          }
 
-        // Buscar conversa anterior se conversationId foi fornecido
-        let previousConversation: any = null;
-        if (input.conversationId) {
-          console.log('[ChatWithAssistant] 🔍 Buscando conversa anterior por conversationId');
-          previousConversation = await db.getAssistantConversationByConversationId(input.conversationId);
-        } else if (agent) {
-          console.log('[ChatWithAssistant] 🔍 Buscando última conversa do agente:', agent.id);
-          previousConversation = await db.getAssistantConversationByAgentId(agent.id);
-        }
-        console.log('[ChatWithAssistant] 📋 Conversa anterior:', previousConversation ? 'encontrada' : 'não encontrada');
+          // Gerar ou usar conversationId
+          const conversationId = input.conversationId || `conv_${tenant.id}_${agent?.id || 'new'}_${Date.now()}`;
+          console.log('[ChatWithAssistant] 💬 ConversationId:', conversationId);
 
-        // Buscar configuração existente do agente
-        let existingConfig: any = null;
-        let existingCompanyInfo: any = null;
-        if (agent) {
-          console.log('[ChatWithAssistant] 🔍 Buscando configuração do agente:', agent.id);
-          existingConfig = await db.getAgentConfigByAgentId(agent.id);
-          if (existingConfig?.companyInfo) {
-            try {
-              existingCompanyInfo = JSON.parse(existingConfig.companyInfo);
-              console.log('[ChatWithAssistant] ✅ CompanyInfo carregado');
-            } catch (e) {
-              console.error('[ChatWithAssistant] ⚠️ Erro ao parsear companyInfo:', e);
+          // Buscar conversa anterior se conversationId foi fornecido
+          let previousConversation: any = null;
+          if (input.conversationId) {
+            console.log('[ChatWithAssistant] 🔍 Buscando conversa anterior por conversationId');
+            previousConversation = await db.getAssistantConversationByConversationId(input.conversationId);
+          } else if (agent) {
+            console.log('[ChatWithAssistant] 🔍 Buscando última conversa do agente:', agent.id);
+            previousConversation = await db.getAssistantConversationByAgentId(agent.id);
+          }
+          console.log('[ChatWithAssistant] 📋 Conversa anterior:', previousConversation ? 'encontrada' : 'não encontrada');
+
+          // Buscar configuração existente do agente
+          let existingConfig: any = null;
+          let existingCompanyInfo: any = null;
+          if (agent) {
+            console.log('[ChatWithAssistant] 🔍 Buscando configuração do agente:', agent.id);
+            existingConfig = await db.getAgentConfigByAgentId(agent.id);
+            if (existingConfig?.companyInfo) {
+              try {
+                existingCompanyInfo = JSON.parse(existingConfig.companyInfo);
+                console.log('[ChatWithAssistant] ✅ CompanyInfo carregado');
+              } catch (e) {
+                console.error('[ChatWithAssistant] ⚠️ Erro ao parsear companyInfo:', e);
+              }
             }
           }
-        }
 
-        // Usar informações coletadas da conversa anterior ou do input
-        const collectedInfo = input.collectedInfo || previousConversation?.collectedInfo || existingCompanyInfo || {};
-        console.log('[ChatWithAssistant] 📝 CollectedInfo:', Object.keys(collectedInfo).length, 'campos');
+          // Usar informações coletadas da conversa anterior ou do input
+          const collectedInfo = input.collectedInfo || previousConversation?.collectedInfo || existingCompanyInfo || {};
+          console.log('[ChatWithAssistant] 📝 CollectedInfo:', Object.keys(collectedInfo).length, 'campos');
 
-        // Construir contexto do sistema para o assistente
-        const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.
+          // Construir contexto do sistema para o assistente
+          const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.
 
 **SUA PERSONALIDADE:**
 - Você é inteligente, humanizado e conversacional
@@ -3776,25 +3776,24 @@ ${existingCompanyInfo ? `
 - Você DEVE sempre gerar o prompt ao final (não apenas conversar)
 - Você DEVE entender contexto e permitir adicionar informações a qualquer momento`;
 
-        // Preparar mensagens para OpenAI
-        const openaiMessages = [
-          {
-            role: 'system' as const,
-            content: systemContext,
-          },
-          ...input.messages.slice(-10), // Manter últimas 10 mensagens para contexto
-        ];
+          // Preparar mensagens para OpenAI
+          const openaiMessages = [
+            {
+              role: 'system' as const,
+              content: systemContext,
+            },
+            ...input.messages.slice(-10), // Manter últimas 10 mensagens para contexto
+          ];
 
-        // Chamar OpenAI
-        const openaiApiKey = process.env.OPENAI_API_KEY;
-        if (!openaiApiKey) {
-          throw new TRPCError({ 
-            code: 'INTERNAL_SERVER_ERROR', 
-            message: 'OpenAI API key não configurada no servidor' 
-          });
-        }
+          // Chamar OpenAI
+          const openaiApiKey = process.env.OPENAI_API_KEY;
+          if (!openaiApiKey) {
+            throw new TRPCError({ 
+              code: 'INTERNAL_SERVER_ERROR', 
+              message: 'OpenAI API key não configurada no servidor' 
+            });
+          }
 
-        try {
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
