@@ -504,8 +504,8 @@ export default function AgentConfigAssistantV3({
           </Button>
         </div>
 
-        {/* Botão de gerar prompt (aparece quando assistente sugere ou quando há informações suficientes) */}
-        {(shouldShowGenerateButton || (collectedInfo.businessName && messages.length > 2)) && (
+        {/* Botão de gerar prompt (só aparece quando usuário confirmar explicitamente) */}
+        {shouldShowGenerateButton && (
           <div className="mt-4 pt-4 border-t">
             <Button
               onClick={handleGeneratePrompt}
