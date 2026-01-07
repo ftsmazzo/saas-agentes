@@ -168,25 +168,8 @@ export default function AgentConfigAssistantV3({
           setCollectedInfo((prev) => ({ ...prev, ...data.collectedInfo }));
         }
         
-        // Verificar se o assistente está perguntando se pode gerar o prompt
-        const messageLower = data.message.toLowerCase();
-        const isAskingToGenerate = (messageLower.includes('posso gerar') || 
-                                    messageLower.includes('posso criar') || 
-                                    messageLower.includes('pode gerar') || 
-                                    messageLower.includes('pode criar') ||
-                                    messageLower.includes('gerar o prompt') ||
-                                    messageLower.includes('gerar o sistema') ||
-                                    messageLower.includes('gerar agora')) &&
-                                   (messageLower.includes('prompt') || 
-                                    messageLower.includes('sistema') || 
-                                    messageLower.includes('agora') ||
-                                    messageLower.includes('configuração'));
-        
-        // Se o assistente perguntou E temos nome da empresa, preparar para mostrar botão após confirmação
-        if (isAskingToGenerate && collectedInfo.businessName) {
-          // Não mostrar ainda - só quando usuário confirmar
-          // O botão será mostrado quando o usuário responder "sim", "pode", etc. em handleSendMessage
-        }
+        // Não fazer nada aqui - a detecção do botão será feita em handleSendMessage
+        // quando o usuário confirmar após o assistente perguntar
       } catch (error: any) {
         console.error('[Chat] Erro ao processar resposta:', error);
         toast.error(`Erro: ${error.message || 'Erro desconhecido'}`);
@@ -334,46 +317,54 @@ export default function AgentConfigAssistantV3({
       ? messages[messages.length - 1].content.toLowerCase() 
       : '';
     
-    const assistantAskedToGenerate = (lastAssistantMessage.includes('posso gerar') || 
+    // Verificar se assistente perguntou sobre gerar (mais flexível)
+    const assistantAskedToGenerate = lastAssistantMessage.includes('posso gerar') || 
                                       lastAssistantMessage.includes('posso criar') || 
                                       lastAssistantMessage.includes('pode gerar') || 
                                       lastAssistantMessage.includes('pode criar') ||
                                       lastAssistantMessage.includes('gerar o prompt') ||
                                       lastAssistantMessage.includes('gerar o sistema') ||
                                       lastAssistantMessage.includes('gerar agora') ||
-                                      lastAssistantMessage.includes('vou gerar')) &&
-                                     (lastAssistantMessage.includes('prompt') || 
-                                      lastAssistantMessage.includes('sistema') || 
-                                      lastAssistantMessage.includes('agora') ||
-                                      lastAssistantMessage.includes('configuração'));
+                                      (lastAssistantMessage.includes('prompt') && 
+                                       (lastAssistantMessage.includes('agora') || 
+                                        lastAssistantMessage.includes('posso') || 
+                                        lastAssistantMessage.includes('pode')));
     
-    // Só verificar confirmação se o assistente realmente perguntou sobre gerar
+    // Se o assistente perguntou, verificar se o usuário confirmou
     if (assistantAskedToGenerate) {
-      const userMessageLower = userMessage.toLowerCase();
+      const userMessageLower = userMessage.toLowerCase().trim();
       
-      // Detecção mais específica - só aceitar confirmações explícitas
+      // Detecção de confirmação - aceitar várias formas
       const isConfirmingGenerate = 
-        // Confirmações diretas
-        (userMessageLower === 'sim' || 
-         userMessageLower === 'pode' || 
-         userMessageLower === 'ok' || 
-         userMessageLower === 'claro' ||
-         userMessageLower === 'pode sim' ||
-         userMessageLower === 'sim pode' ||
-         userMessageLower === 'vamos' ||
-         userMessageLower === 'vamos lá') ||
-        // Frases completas de confirmação
+        // Confirmações diretas e curtas
+        userMessageLower === 'sim' || 
+        userMessageLower === 'pode' || 
+        userMessageLower === 'ok' || 
+        userMessageLower === 'claro' ||
+        userMessageLower === 'pode sim' ||
+        userMessageLower === 'sim pode' ||
+        userMessageLower === 'vamos' ||
+        userMessageLower === 'vamos lá' ||
+        userMessageLower === 'pode gerar' ||
+        userMessageLower === 'pode criar' ||
+        userMessageLower === 'vamos gerar' ||
+        userMessageLower === 'gerar' ||
+        // Frases que incluem confirmação
         userMessageLower.includes('pode gerar') ||
         userMessageLower.includes('pode criar') ||
         userMessageLower.includes('vamos gerar') ||
         userMessageLower.includes('pode gerar o prompt') ||
-        userMessageLower.includes('pode criar o prompt') ||
         userMessageLower.includes('gerar o prompt') ||
         userMessageLower.includes('gerar agora');
       
-      // Se o usuário confirmou E tem nome da empresa, mostrar o botão
+      // Se o usuário confirmou E tem nome da empresa, mostrar o botão IMEDIATAMENTE
       if (isConfirmingGenerate && collectedInfo.businessName) {
+        console.log('[Chat] ✅ Usuário confirmou geração. Mostrando botão...');
         setShouldShowGenerateButton(true);
+        // Adicionar mensagem confirmando que o botão apareceu
+        setTimeout(() => {
+          addMessage('assistant', 'Perfeito! O botão "Gerar e Salvar Configurações" apareceu abaixo. Clique nele para finalizar a configuração do seu agente.');
+        }, 500);
       }
     }
     
