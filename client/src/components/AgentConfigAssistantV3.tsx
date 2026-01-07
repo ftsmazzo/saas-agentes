@@ -131,6 +131,14 @@ export default function AgentConfigAssistantV3({
 
   const chatMutation = trpc.clientPanel.chatWithAssistant.useMutation({
     onSuccess: (data) => {
+      if (!data || !data.message) {
+        console.error('[Chat] Resposta inválida:', data);
+        toast.error('Erro: Resposta inválida do servidor');
+        setIsProcessing(false);
+        addMessage('assistant', `Desculpe, ocorreu um erro. Por favor, tente novamente.`);
+        return;
+      }
+
       addMessage('assistant', data.message);
       setIsProcessing(false);
       
