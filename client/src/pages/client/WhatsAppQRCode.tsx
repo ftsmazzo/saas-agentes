@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,28 +9,38 @@ import ClientLayout from "@/components/ClientLayout";
 
 export default function WhatsAppQRCode() {
   const [, setLocation] = useLocation();
+  const params = useParams();
+  const agentId = params.agentId ? parseInt(params.agentId) : undefined;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [forceQRCode, setForceQRCode] = useState(false);
   
   // Buscar lista de agentes para redirecionamento
   const { data: agents } = trpc.agent.list.useQuery();
   
+  // Buscar agente específico se agentId fornecido
+  const { data: agent } = trpc.agent.getById.useQuery(
+    { agentId: agentId! },
+    { enabled: !!agentId }
+  );
+  
   // Verificar se o agente existe
-  const { data: agentConfig, isLoading: agentLoading } = trpc.agent.getConfig.useQuery();
+  const { data: agentConfig, isLoading: agentLoading } = trpc.agent.getConfig.useQuery(
+    agentId ? { agentId } : undefined
+  );
   
   // Verificar se o agente está ativado
   const { data: agentStatus, isLoading: agentStatusLoading, refetch: refetchAgentStatus } = trpc.clientPanel.getAgentStatus.useQuery();
   
   // Buscar QR Code se não estiver conectado ou se forçar
   const { data: qrData, isLoading: qrLoading, refetch: refetchQR } = trpc.clientPanel.getQRCode.useQuery(
-    undefined,
+    agentId ? { agentId } : undefined,
     {
       enabled: !forceQRCode, // Buscar sempre (não precisa de agente para conectar WhatsApp)
       refetchOnWindowFocus: false,
     }
   );
   const { data: status, isLoading: statusLoading, refetch: refetchStatus } = trpc.clientPanel.getWhatsAppStatus.useQuery(
-    undefined,
+    agentId ? { agentId } : undefined,
     {
       refetchInterval: (query) => {
         // Auto-refresh a cada 3 segundos se não estiver conectado
@@ -159,9 +169,14 @@ export default function WhatsAppQRCode() {
           </Alert>
         )}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Conectar WhatsApp</h1>
+        <h1 className="text-3xl font-bold">
+          {agent ? `Conectar WhatsApp - ${agent.name}` : "Conectar WhatsApp"}
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Conecte sua conta do WhatsApp para começar a usar o agente de IA
+          {agent 
+            ? `Conecte sua conta do WhatsApp para o agente "${agent.name}"`
+            : "Conecte sua conta do WhatsApp para começar a usar o agente de IA"
+          }
         </p>
       </div>
 

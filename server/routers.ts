@@ -1285,8 +1285,50 @@ export const appRouter = router({
           }
         }
 
-        // 4. Atualizar agente com dados dos recursos provisionados
-        if (evolutionData || workflowData || chatwootInboxId) {
+        // 4. Criar Agent Bot no Chatwoot (específico para este agente)
+        let agentBotId: number | null = null;
+        if (chatwootInboxId && workflowData?.workflowId) {
+          try {
+            console.log(`[CreateAgent] 🤖 Criando Agent Bot no Chatwoot para agente ${agent.id}...`);
+            const n8nApiUrl = process.env.N8N_API_URL;
+            if (n8nApiUrl) {
+              const agentWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}/agent_${agent.id}`;
+              const botName = `Agente ${input.agentName} - ${agent.id}`;
+              
+              const { createOrUpdateChatwootAgentBot, connectAgentBotToInbox } = await import("./chatwoot-integration");
+              const agentBot = await createOrUpdateChatwootAgentBot(
+                botName,
+                agentWebhookUrl,
+                `Agent bot para ${input.agentName} (Agente ${agent.id}) - gerado automaticamente`
+              );
+              
+              agentBotId = agentBot.id;
+              console.log(`[CreateAgent] ✅ Agent Bot criado: ID=${agentBot.id}`);
+              
+              // Conectar Agent Bot ao inbox
+              try {
+                await connectAgentBotToInbox(chatwootInboxId, agentBot.id);
+                console.log(`[CreateAgent] ✅ Agent Bot conectado ao inbox ${chatwootInboxId}`);
+              } catch (connectError: any) {
+                console.warn(`[CreateAgent] ⚠️ Erro ao conectar Agent Bot ao inbox (não crítico):`, connectError.message);
+              }
+            } else {
+              console.warn(`[CreateAgent] ⚠️ N8N_API_URL não configurado, pulando criação de Agent Bot`);
+            }
+          } catch (error: any) {
+            console.error(`[CreateAgent] ❌ Erro ao criar Agent Bot:`, error);
+            await db.createPlatformLog({
+              tenantId: tenant.id,
+              eventType: 'agent_bot_failed',
+              severity: 'error',
+              message: `Falha ao criar Agent Bot para agente ${agent.id}: ${error.message}`,
+            });
+            // Continuar mesmo se Agent Bot falhar
+          }
+        }
+
+        // 5. Atualizar agente com dados dos recursos provisionados
+        if (evolutionData || workflowData || chatwootInboxId || agentBotId) {
           try {
             await db.update(agents)
               .set({
@@ -1294,6 +1336,8 @@ export const appRouter = router({
                 evolutionApiKey: evolutionData?.apiKey || null,
                 n8nWorkflowId: workflowData?.workflowId || null,
                 chatwootInboxId: chatwootInboxId || null,
+                // TODO: Adicionar campo chatwootAgentBotId na tabela agents se necessário
+                // Por enquanto, vamos salvar no tenant para compatibilidade
               })
               .where(eq(agents.id, agent.id));
             console.log(`[CreateAgent] ✅ Agente atualizado com recursos provisionados`);
@@ -2649,7 +2693,9 @@ export const appRouter = router({
      * Gera QR Code para conectar WhatsApp
      * Só retorna QR Code se a instância não estiver conectada
      */
-    getQRCode: protectedProcedure.query(async ({ ctx }) => {
+    getQRCode: protectedProcedure
+      .input(z.object({ agentId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
     // Se for cliente, usar tenant direto
     let tenant = ctx.tenant;
     
@@ -2665,8 +2711,19 @@ export const appRouter = router({
       });
     }
 
-    // Buscar agente do tenant
-    let agent = await getTenantAgent(tenant.id);
+    // Buscar agente específico se agentId fornecido, senão buscar primeiro agente
+    let agent: db.Agent | null = null;
+    if (input?.agentId) {
+      agent = await db.getAgentById(input.agentId);
+      if (!agent || agent.tenantId !== tenant.id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Agente não encontrado ou não pertence ao seu tenant',
+        });
+      }
+    } else {
+      agent = await getTenantAgent(tenant.id);
+    }
     
     // Se não existir agente, criar um automaticamente (compatibilidade)
     if (!agent) {
@@ -2756,7 +2813,9 @@ export const appRouter = router({
     /**
      * Verifica status da conexão WhatsApp
      */
-    getWhatsAppStatus: protectedProcedure.query(async ({ ctx }) => {
+    getWhatsAppStatus: protectedProcedure
+      .input(z.object({ agentId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
     // Se for cliente, usar tenant direto
     let tenant = ctx.tenant;
     
@@ -2769,8 +2828,16 @@ export const appRouter = router({
       return { status: 'not_provisioned' };
     }
 
-    // Buscar agente do tenant
-    const agent = await getTenantAgent(tenant.id);
+    // Buscar agente específico se agentId fornecido, senão buscar primeiro agente
+    let agent: db.Agent | null = null;
+    if (input?.agentId) {
+      agent = await db.getAgentById(input.agentId);
+      if (!agent || agent.tenantId !== tenant.id) {
+        return { status: 'not_provisioned' };
+      }
+    } else {
+      agent = await getTenantAgent(tenant.id);
+    }
     if (!agent || !agent.evolutionInstanceName) {
       return { status: 'not_provisioned' };
     }
