@@ -43,10 +43,11 @@ export default function CreateAgentPage() {
   // Inicializar: criar agente básico automaticamente
   useEffect(() => {
     if (!agentId && !createAgentMutation.isPending && !createAgentMutation.isSuccess) {
-      // Criar agente com nome temporário e prompt mínimo
+      // Criar agente com nome temporário e prompt temporário (será substituído pelo assistente)
+      // Prompt precisa ter no mínimo 50 caracteres para passar na validação
       createAgentMutation.mutate({
         agentName: "Novo Agente",
-        systemPrompt: "Você é um assistente virtual prestativo.",
+        systemPrompt: "Você é um assistente virtual prestativo e profissional. Este prompt será substituído pelo assistente de configuração.",
         welcomeMessage: "",
         companyInfo: "",
         enableHumanHandoff: true,
