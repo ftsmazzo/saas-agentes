@@ -3641,6 +3641,14 @@ ${personalityDescriptions[input.personality || 'professional']}
         collectedInfo: z.record(z.any()).optional(), // Informações coletadas
       }))
       .mutation(async ({ ctx, input }) => {
+        console.log('[ChatWithAssistant] 📥 Recebida requisição:', {
+          agentId: input.agentId,
+          conversationId: input.conversationId,
+          messagesCount: input.messages?.length || 0,
+          userName: input.userName,
+          hasCollectedInfo: !!input.collectedInfo,
+        });
+
         let tenant = ctx.tenant;
         
         if (!tenant && ctx.user) {
@@ -3648,6 +3656,7 @@ ${personalityDescriptions[input.personality || 'professional']}
         }
         
         if (!tenant) {
+          console.error('[ChatWithAssistant] ❌ Tenant não encontrado');
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
         }
 
