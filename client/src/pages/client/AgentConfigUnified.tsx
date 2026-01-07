@@ -33,6 +33,7 @@ import {
   X
 } from "lucide-react";
 import AgentConfigAssistant from "@/components/AgentConfigAssistant";
+import AgentConfigAssistantV2 from "@/components/AgentConfigAssistantV2";
 import ModelSelector from "@/components/ModelSelector";
 
 // Tools disponíveis baseados no workflow N8N
@@ -299,7 +300,7 @@ export default function AgentConfigUnifiedPage() {
         {/* Se não houver configuração OU não houver systemPrompt, mostrar assistente diretamente */}
         {(!config || !config.systemPrompt) && (
           <div className="mb-6">
-            <AgentConfigAssistant
+            <AgentConfigAssistantV2
               agentId={agentIdNum}
               existingConfig={config}
               onComplete={() => {
@@ -350,12 +351,13 @@ export default function AgentConfigUnifiedPage() {
         {/* Assistente de IA (quando usuário clica para editar) */}
         {showAssistant && !assistantComplete && (
           <div className="mb-6">
-            <AgentConfigAssistant
+            <AgentConfigAssistantV2
+              agentId={agentIdNum}
               existingConfig={config}
               onComplete={() => {
                 setShowAssistant(false);
                 setAssistantComplete(true);
-                utils.agent.getConfig.invalidate();
+                utils.agent.getConfig.invalidate({ agentId: agentIdNum });
                 toast.success('Configuração atualizada! Você pode revisar e ajustar abaixo.');
               }}
             />

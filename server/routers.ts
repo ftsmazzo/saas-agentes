@@ -3305,6 +3305,7 @@ export const appRouter = router({
      */
     generateSystemPrompt: protectedProcedure
       .input(z.object({
+        agentId: z.number().optional(),
         businessName: z.string().min(1, "Nome da empresa é obrigatório"),
         businessType: z.string().optional(),
         // Endereço completo
@@ -3602,7 +3603,161 @@ ${personalityDescriptions[input.personality || 'professional']}
           });
         }
       }),
-  }),
+
+    /**
+     * Assistente conversacional inteligente para configuração do agente
+     * Usa OpenAI para conversação livre, sem roteiro fixo
+     */
+    chatWithAssistant: protectedProcedure
+      .input(z.object({
+        agentId: z.number().optional(),
+        messages: z.array(z.object({
+          role: z.enum(['user', 'assistant', 'system']),
+          content: z.string(),
+        })),
+        userName: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        let tenant = ctx.tenant;
+        
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
+        }
+
+        // Buscar agente específico ou primeiro agente
+        let agent: db.Agent | undefined;
+        if (input.agentId) {
+          agent = await db.getAgentById(input.agentId);
+          if (!agent || agent.tenantId !== tenant.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+          }
+        } else {
+          agent = await db.getFirstAgentByTenantId(tenant.id);
+        }
+
+        // Buscar configuração existente do agente
+        let existingConfig: any = null;
+        let existingCompanyInfo: any = null;
+        if (agent) {
+          existingConfig = await db.getAgentConfigByAgentId(agent.id);
+          if (existingConfig?.companyInfo) {
+            try {
+              existingCompanyInfo = JSON.parse(existingConfig.companyInfo);
+            } catch (e) {
+              console.error('Erro ao parsear companyInfo:', e);
+            }
+          }
+        }
+
+        // Construir contexto do sistema para o assistente
+        const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.
+
+**SUA PERSONALIDADE:**
+- Você é inteligente, humanizado e conversacional
+- Você conhece o usuário pelo nome (${input.userName || 'amigo'})
+- Você é um expert em engenharia de prompts
+- Você adapta sua abordagem baseado no que o usuário precisa
+- Você não segue roteiros fixos - você conversa naturalmente
+- Você faz perguntas inteligentes quando necessário
+- Você oferece sugestões e melhorias proativamente
+
+**SUA FUNÇÃO:**
+Você ajuda o usuário a configurar um agente de IA para sua empresa. Você pode:
+1. Coletar informações sobre o negócio de forma conversacional
+2. Entender o propósito e público do agente
+3. Criar um prompt de sistema robusto e profissional
+4. Revisar e melhorar prompts existentes
+5. Discutir melhorias e otimizações
+6. Responder dúvidas sobre configuração
+
+**CONTEXTO ATUAL:**
+${agent ? `- Agente: ${agent.name} (ID: ${agent.id})` : '- Novo agente (ainda não criado)'}
+${existingConfig ? `- Já existe uma configuração para este agente` : '- Este é um agente novo, sem configuração ainda'}
+${existingCompanyInfo ? `
+**INFORMAÇÕES JÁ COLETADAS:**
+- Nome da empresa: ${existingCompanyInfo.name || 'Não informado'}
+- Ramo: ${existingCompanyInfo.type || 'Não informado'}
+- Endereço: ${existingCompanyInfo.fullAddress || existingCompanyInfo.street || 'Não informado'}
+- Telefone: ${existingCompanyInfo.phone || 'Não informado'}
+- Horário: ${existingCompanyInfo.businessHours || 'Não informado'}
+- Formas de pagamento: ${existingCompanyInfo.paymentMethods?.join(', ') || 'Não informado'}
+` : ''}
+
+**DIRETRIZES:**
+- Seja natural e conversacional, como um ChatGPT
+- Não faça perguntas em lista ou formato de questionário
+- Adapte suas perguntas baseado nas respostas do usuário
+- Se o usuário já tem configuração, ofereça revisar e melhorar
+- Seja proativo em sugerir melhorias
+- Use o nome do usuário quando apropriado
+- Seja empático e compreensivo
+- Se o usuário quiser pular etapas, respeite isso
+- Quando tiver informações suficientes, ofereça gerar o prompt
+
+**IMPORTANTE:**
+- Você NÃO deve seguir um roteiro fixo de perguntas
+- Você deve ser flexível e adaptável
+- Você deve lembrar informações já coletadas
+- Você deve ser um consultor, não um formulário`;
+
+        // Preparar mensagens para OpenAI
+        const openaiMessages = [
+          {
+            role: 'system' as const,
+            content: systemContext,
+          },
+          ...input.messages.slice(-10), // Manter últimas 10 mensagens para contexto
+        ];
+
+        // Chamar OpenAI
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        if (!openaiApiKey) {
+          throw new TRPCError({ 
+            code: 'INTERNAL_SERVER_ERROR', 
+            message: 'OpenAI API key não configurada no servidor' 
+          });
+        }
+
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiApiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: openaiMessages,
+              temperature: 0.8, // Mais criativo e natural
+              max_tokens: 1500,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('[OpenAI Chat] Erro na API:', error);
+            throw new Error(error.error?.message || `Erro HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          const assistantMessage = data.choices[0].message.content.trim();
+
+          return {
+            message: assistantMessage,
+            success: true,
+          };
+        } catch (error: any) {
+          console.error('[OpenAI Chat] Erro ao conversar:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao conversar com assistente: ${error.message}`,
+          });
+        }
+      }),
 
   // ========== ROTAS DE INTERAÇÕES E ANÁLISE ==========
   
