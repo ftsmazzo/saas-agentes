@@ -2512,6 +2512,7 @@ export const appRouter = router({
           client_reference_id: tenantId.toString(),
           metadata: {
             tenant_id: tenantId.toString(),
+            planId: input.planId.toString(), // Incluir planId no metadata para upgrade
             user_id: ctx.user?.id?.toString() || '',
             customer_email: tenant.email,
             customer_name: tenant.companyName,

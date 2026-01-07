@@ -89,19 +89,63 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         });
       }
     } else {
-      // Provisionamento normal de tenant
-      try {
-        await provisionTenantFromCheckout(session);
-        console.log("[Stripe Webhook] Tenant provisioned successfully");
-      } catch (error: any) {
-        console.error("[Stripe Webhook] Failed to provision tenant:", error);
-        await createPlatformLog({
-          eventType: "provisioning_failed",
-          message: `Failed to provision tenant from Stripe checkout: ${error.message}`,
-          metadata: JSON.stringify({ sessionId: session.id, error: error.message }),
-        });
-        // Still return 200 to acknowledge receipt
+      // Verificar se é upgrade de plano (tenant já existe)
+      const tenantId = session.metadata?.tenant_id;
+      if (tenantId) {
+        try {
+          await handlePlanUpgrade(session);
+          console.log("[Stripe Webhook] ✅ Upgrade de plano processado com sucesso");
+        } catch (error: any) {
+          console.error("[Stripe Webhook] ❌ Erro ao processar upgrade:", error);
+          // Tentar provisionamento normal como fallback
+          try {
+            await provisionTenantFromCheckout(session);
+            console.log("[Stripe Webhook] Tenant provisioned successfully (fallback)");
+          } catch (fallbackError: any) {
+            console.error("[Stripe Webhook] Failed to provision tenant:", fallbackError);
+            await createPlatformLog({
+              eventType: "provisioning_failed",
+              message: `Failed to provision tenant from Stripe checkout: ${fallbackError.message}`,
+              metadata: JSON.stringify({ sessionId: session.id, error: fallbackError.message }),
+            });
+          }
+        }
+      } else {
+        // Provisionamento normal de tenant (novo)
+        try {
+          await provisionTenantFromCheckout(session);
+          console.log("[Stripe Webhook] Tenant provisioned successfully");
+        } catch (error: any) {
+          console.error("[Stripe Webhook] Failed to provision tenant:", error);
+          await createPlatformLog({
+            eventType: "provisioning_failed",
+            message: `Failed to provision tenant from Stripe checkout: ${error.message}`,
+            metadata: JSON.stringify({ sessionId: session.id, error: error.message }),
+          });
+        }
       }
+    }
+  }
+
+  // Processar atualização de assinatura (upgrade/downgrade)
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object as Stripe.Subscription;
+    console.log("[Stripe Webhook] Processing customer.subscription.updated", {
+      subscriptionId: subscription.id,
+      customerId: subscription.customer,
+      status: subscription.status,
+    });
+    
+    try {
+      await handleSubscriptionUpdated(subscription);
+      console.log("[Stripe Webhook] ✅ Assinatura atualizada com sucesso");
+    } catch (error: any) {
+      console.error("[Stripe Webhook] ❌ Erro ao atualizar assinatura:", error);
+      await createPlatformLog({
+        eventType: "subscription_update_failed",
+        message: `Failed to update subscription: ${error.message}`,
+        metadata: JSON.stringify({ subscriptionId: subscription.id, error: error.message }),
+      });
     }
   }
 
@@ -486,6 +530,198 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   }
 
   return tenant;
+}
+
+/**
+ * Processa upgrade/downgrade de plano
+ */
+async function handlePlanUpgrade(session: Stripe.Checkout.Session) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const tenantId = session.metadata?.tenant_id;
+  if (!tenantId) {
+    throw new Error("No tenant_id in checkout session metadata");
+  }
+
+  // Buscar tenant
+  const tenantResult = await db.select().from(tenants).where(eq(tenants.id, parseInt(tenantId))).limit(1);
+  if (!tenantResult[0]) {
+    throw new Error(`Tenant not found: ${tenantId}`);
+  }
+
+  const tenant = tenantResult[0];
+
+  // Buscar plano pelo planId no metadata ou pelo priceId da subscription
+  let plan;
+  if (session.metadata?.planId) {
+    plan = await db.getPlanById(parseInt(session.metadata.planId));
+  } else {
+    // Buscar subscription no Stripe para pegar o priceId atual
+    const subscriptionId = session.subscription as string;
+    if (subscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const priceId = subscription.items.data[0]?.price?.id;
+      if (priceId) {
+        plan = await getPlanByStripePriceId(priceId);
+      }
+    }
+  }
+
+  if (!plan) {
+    throw new Error("Plan not found in metadata or subscription");
+  }
+
+  console.log(`[Plan Upgrade] Atualizando tenant ${tenantId} para plano ${plan.name} (ID: ${plan.id})`);
+
+  // Atualizar tenant com novo plano
+  const subscriptionId = session.subscription as string;
+  await db.update(tenants)
+    .set({
+      currentPlanId: plan.id,
+      stripeSubscriptionId: subscriptionId || tenant.stripeSubscriptionId || undefined,
+      subscriptionStatus: subscriptionId ? 'active' as const : tenant.subscriptionStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, parseInt(tenantId)));
+
+  // Atualizar créditos se necessário (diferença entre planos)
+  const existingCredits = await db
+    .select()
+    .from(tenantCredits)
+    .where(eq(tenantCredits.tenantId, parseInt(tenantId)))
+    .limit(1);
+
+  if (existingCredits[0] && plan.monthlyCredits) {
+    // Calcular diferença de créditos (novo plano - plano antigo)
+    const oldPlan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+    const oldMonthlyCredits = oldPlan?.monthlyCredits || 0;
+    const creditDifference = plan.monthlyCredits - oldMonthlyCredits;
+
+    if (creditDifference !== 0) {
+      console.log(`[Plan Upgrade] Ajustando créditos: ${oldMonthlyCredits} → ${plan.monthlyCredits} (diferença: ${creditDifference})`);
+      
+      await db
+        .update(tenantCredits)
+        .set({
+          currentCredits: sql`${tenantCredits.currentCredits} + ${creditDifference}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(tenantCredits.tenantId, parseInt(tenantId)));
+    }
+  }
+
+  await createPlatformLog({
+    tenantId: parseInt(tenantId),
+    eventType: "plan_upgraded",
+    severity: "info",
+    message: `Plano atualizado para ${plan.name} (ID: ${plan.id})`,
+    metadata: JSON.stringify({
+      oldPlanId: tenant.currentPlanId,
+      newPlanId: plan.id,
+      subscriptionId: subscriptionId,
+    }),
+  });
+
+  console.log(`[Plan Upgrade] ✅ Tenant ${tenantId} atualizado para plano ${plan.name}`);
+}
+
+/**
+ * Processa atualização de assinatura (webhook customer.subscription.updated)
+ */
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar tenant pela subscription ID
+  const tenantResult = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.stripeSubscriptionId, subscription.id))
+    .limit(1);
+
+  if (!tenantResult[0]) {
+    console.warn(`[Subscription Updated] Tenant not found for subscription: ${subscription.id}`);
+    return;
+  }
+
+  const tenant = tenantResult[0];
+
+  // Buscar priceId atual da subscription
+  const priceId = subscription.items.data[0]?.price?.id;
+  if (!priceId) {
+    console.warn(`[Subscription Updated] No price ID in subscription: ${subscription.id}`);
+    return;
+  }
+
+  // Buscar plano pelo priceId
+  const plan = await getPlanByStripePriceId(priceId);
+  if (!plan) {
+    console.warn(`[Subscription Updated] Plan not found for price ID: ${priceId}`);
+    return;
+  }
+
+  // Verificar se o plano mudou
+  const planChanged = tenant.currentPlanId !== plan.id;
+
+  console.log(`[Subscription Updated] Atualizando tenant ${tenant.id}`, {
+    subscriptionId: subscription.id,
+    oldPlanId: tenant.currentPlanId,
+    newPlanId: plan.id,
+    planChanged,
+    status: subscription.status,
+  });
+
+  // Atualizar tenant
+  await db.update(tenants)
+    .set({
+      currentPlanId: plan.id,
+      subscriptionStatus: subscription.status as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, tenant.id));
+
+  // Se o plano mudou, ajustar créditos
+  if (planChanged && plan.monthlyCredits) {
+    const existingCredits = await db
+      .select()
+      .from(tenantCredits)
+      .where(eq(tenantCredits.tenantId, tenant.id))
+      .limit(1);
+
+    if (existingCredits[0]) {
+      const oldPlan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+      const oldMonthlyCredits = oldPlan?.monthlyCredits || 0;
+      const creditDifference = plan.monthlyCredits - oldMonthlyCredits;
+
+      if (creditDifference !== 0) {
+        console.log(`[Subscription Updated] Ajustando créditos: ${oldMonthlyCredits} → ${plan.monthlyCredits} (diferença: ${creditDifference})`);
+        
+        await db
+          .update(tenantCredits)
+          .set({
+            currentCredits: sql`${tenantCredits.currentCredits} + ${creditDifference}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(tenantCredits.tenantId, tenant.id));
+      }
+    }
+  }
+
+  await createPlatformLog({
+    tenantId: tenant.id,
+    eventType: "subscription_updated",
+    severity: "info",
+    message: `Assinatura atualizada. Plano: ${plan.name} (ID: ${plan.id}), Status: ${subscription.status}`,
+    metadata: JSON.stringify({
+      subscriptionId: subscription.id,
+      oldPlanId: tenant.currentPlanId,
+      newPlanId: plan.id,
+      status: subscription.status,
+    }),
+  });
+
+  console.log(`[Subscription Updated] ✅ Tenant ${tenant.id} atualizado`);
 }
 
 /**
