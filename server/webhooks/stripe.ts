@@ -453,6 +453,13 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
           lastReset.getFullYear() === now.getFullYear() && 
           lastReset.getMonth() === now.getMonth();
         
+        // IMPORTANTE: Se o registro já existe, pode ter sido criado por uso anterior (com saldo negativo)
+        // Neste caso, SEMPRE adicionar créditos mensais ao saldo atual, independente do mês
+        // Isso corrige o problema de saldo negativo quando uso acontece antes da atribuição de créditos
+        
+        const currentBalance = existingCredits[0].currentCredits || 0;
+        const newBalance = currentBalance + plan.monthlyCredits;
+        
         if (!isSameMonth) {
           // Se não recebeu créditos este mês, adicionar ao currentCredits
           await db
@@ -465,18 +472,35 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
             })
             .where(eq(tenantCredits.tenantId, tenant.id));
           
-          console.log(`[Provisioning] ✅ Créditos mensais adicionados. Novo saldo: ${existingCredits[0].currentCredits + plan.monthlyCredits}`);
+          console.log(`[Provisioning] ✅ Créditos mensais adicionados. Saldo anterior: ${currentBalance}, Novo saldo: ${newBalance}`);
         } else {
-          // Já recebeu créditos este mês, apenas atualizar totalCreditsPurchased para histórico
-          await db
-            .update(tenantCredits)
-            .set({
-              totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(tenantCredits.tenantId, tenant.id));
-          
-          console.log(`[Provisioning] ✅ Créditos mensais já atribuídos este mês. Apenas atualizado histórico.`);
+          // Já recebeu créditos este mês, mas pode ter sido criado com saldo negativo por uso anterior
+          // Verificar se o saldo está negativo ou muito baixo (indicando que foi criado por uso)
+          if (currentBalance < 0 || currentBalance < plan.monthlyCredits) {
+            // Se está negativo ou muito baixo, adicionar créditos mensais mesmo assim
+            await db
+              .update(tenantCredits)
+              .set({
+                currentCredits: sql`${tenantCredits.currentCredits} + ${plan.monthlyCredits}`,
+                totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+                lastResetDate: now, // Atualizar data para refletir nova atribuição
+                updatedAt: new Date(),
+              })
+              .where(eq(tenantCredits.tenantId, tenant.id));
+            
+            console.log(`[Provisioning] ✅ Créditos mensais adicionados (correção de saldo negativo). Saldo anterior: ${currentBalance}, Novo saldo: ${newBalance}`);
+          } else {
+            // Saldo normal, apenas atualizar histórico
+            await db
+              .update(tenantCredits)
+              .set({
+                totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(tenantCredits.tenantId, tenant.id));
+            
+            console.log(`[Provisioning] ✅ Créditos mensais já atribuídos este mês. Apenas atualizado histórico.`);
+          }
         }
       } else {
         // Criar registro inicial com créditos mensais
