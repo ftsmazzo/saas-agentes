@@ -4182,7 +4182,7 @@ ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir a
 **FORMATO DE RESPOSTA:**
 Sua resposta deve ter duas partes SEPARADAS claramente:
 1. **Mensagem para o usuário**: Continue a conversa naturalmente (esta parte será mostrada ao usuário)
-2. **PROMPT_ATUALIZADO**: [Aqui você coloca o prompt completo atualizado com as novas informações]
+2. **PROMPT_ATUALIZADO**: (Aqui você coloca o prompt completo atualizado com as novas informações)
 
 **IMPORTANTE SOBRE O PROMPT_ATUALIZADO:**
 - Deve ser o prompt COMPLETO, não apenas fragmentos
