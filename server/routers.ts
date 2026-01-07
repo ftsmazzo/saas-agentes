@@ -3591,6 +3591,26 @@ ${personalityDescriptions[input.personality || 'professional']}
             message: `Configuração do agente ${isUpdate ? 'atualizada' : 'criada'} via Assistente de IA`,
           });
 
+          // Marcar conversa como completa e prompt gerado
+          if (input.conversationId && agent) {
+            try {
+              const conversation = await db.getAssistantConversationByConversationId(input.conversationId);
+              if (conversation) {
+                await db.createOrUpdateAssistantConversation({
+                  tenantId: tenant.id,
+                  agentId: agent.id,
+                  conversationId: input.conversationId,
+                  messages: conversation.messages as any[],
+                  collectedInfo: conversation.collectedInfo as any,
+                  isComplete: true,
+                  promptGenerated: true,
+                });
+              }
+            } catch (error: any) {
+              console.warn(`[GeneratePrompt] ⚠️ Erro ao atualizar conversa (não crítico):`, error.message);
+            }
+          }
+
           return {
             systemPrompt: generatedPrompt,
             success: true,
