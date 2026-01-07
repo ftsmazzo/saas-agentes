@@ -56,24 +56,23 @@ export default function MetricsPage() {
     );
   }
 
-  // Calcular percentual de uso de créditos
+  // Dados do backend (já calculados corretamente)
   const monthlyCredits = credits?.monthlyCredits || 0;
-  const currentCredits = credits?.currentCredits || 0;
-  const totalUsed = credits?.totalCreditsUsed || 0;
-  
-  // Créditos disponíveis (saldo atual)
-  const creditsAvailable = currentCredits;
-  
-  // Uso deste mês (vem do backend, calculado somando transações do mês)
+  const creditsAvailable = credits?.currentCredits || 0; // Já é (mensais + extras - usados)
   const creditsUsedThisMonth = credits?.creditsUsedThisMonth || 0;
+  const extrasPurchased = credits?.extrasPurchased || 0;
   
-  // Total de créditos disponíveis no início do mês (mensais + comprados)
-  // Se currentCredits + creditsUsedThisMonth > monthlyCredits, há créditos extras comprados
-  const totalCreditsAvailable = Math.max(monthlyCredits, currentCredits + creditsUsedThisMonth);
+  // Total de créditos disponíveis no início do mês (mensais + extras comprados)
+  const totalCreditsAvailable = monthlyCredits + extrasPurchased;
   
   // Percentual de uso (baseado no total de créditos disponíveis: mensais + comprados)
   const usagePercentage = totalCreditsAvailable > 0 
     ? Math.min((creditsUsedThisMonth / totalCreditsAvailable) * 100, 100) 
+    : 0;
+  
+  // Percentual de créditos disponíveis (quanto ainda tem)
+  const creditsPercentageAvailable = totalCreditsAvailable > 0
+    ? Math.max(0, (creditsAvailable / totalCreditsAvailable) * 100)
     : 0;
 
   return (
@@ -122,20 +121,29 @@ export default function MetricsPage() {
 
               {/* Barra de Progresso */}
               {totalCreditsAvailable > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">Uso Mensal</span>
-                    <span className="text-muted-foreground">
-                      {creditsUsedThisMonth.toLocaleString('pt-BR')} / {totalCreditsAvailable.toLocaleString('pt-BR')} créditos
-                      ({usagePercentage.toFixed(1)}%)
-                    </span>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Uso Mensal</span>
+                      <span className="text-muted-foreground">
+                        {creditsUsedThisMonth.toLocaleString('pt-BR')} / {totalCreditsAvailable.toLocaleString('pt-BR')} créditos
+                        ({usagePercentage.toFixed(1)}%)
+                      </span>
+                    </div>
+                    <Progress value={usagePercentage} className="h-3" />
+                    {usagePercentage > 80 && (
+                      <p className="text-xs text-orange-600 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Você está usando mais de 80% dos seus créditos disponíveis
+                      </p>
+                    )}
                   </div>
-                  <Progress value={usagePercentage} className="h-3" />
-                  {usagePercentage > 80 && (
-                    <p className="text-xs text-orange-600 flex items-center gap-1">
-                      <TrendingUp className="h-3 w-3" />
-                      Você está usando mais de 80% dos seus créditos disponíveis
-                    </p>
+                  
+                  {/* Informações adicionais */}
+                  {extrasPurchased > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      💰 Créditos extras comprados: {extrasPurchased.toLocaleString('pt-BR')}
+                    </div>
                   )}
                 </div>
               )}
