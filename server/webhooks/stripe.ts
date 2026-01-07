@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId, getPlanById, createAgent } from "../db";
+import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId, getPlanById, createAgent, getAgentById, updateAgent } from "../db";
 import { tenants, activationTokens, tenantCredits } from "../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
@@ -255,7 +255,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     console.log(`[Provisioning] ✅ Evolution criado: ${evolutionData.instanceName}`);
     
     // Atualizar agente com Evolution
-    await db.updateAgent(agent.id, {
+    await updateAgent(agent.id, {
       evolutionInstanceName: evolutionData.instanceName,
       evolutionApiKey: evolutionData.apiKey,
     });
@@ -266,7 +266,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
       chatwootInboxId = await findChatwootInboxByName(agent.name);
       if (chatwootInboxId) {
         console.log(`[Provisioning] ✅ Chatwoot inbox encontrado: ${chatwootInboxId}`);
-        await db.updateAgent(agent.id, {
+        await updateAgent(agent.id, {
           chatwootInboxId: chatwootInboxId,
         });
       }
@@ -299,7 +299,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
       );
       
       // Atualizar agente com workflow
-      await db.updateAgent(agent.id, {
+      await updateAgent(agent.id, {
         n8nWorkflowId: workflowData.workflowId,
       });
       
@@ -319,7 +319,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
       
   // 5. Criar Agent Bot e Webhook no Chatwoot (CRÍTICO)
   // Buscar agente atualizado com todos os dados
-  const finalAgent = await db.getAgentById(agent.id);
+  const finalAgent = await getAgentById(agent.id);
   
   if (finalAgent?.chatwootInboxId && workflowData?.workflowId) {
     try {
@@ -403,7 +403,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   }
   
   // Log final do agente criado
-  const finalAgentCheck = await db.getAgentById(agent.id);
+  const finalAgentCheck = await getAgentById(agent.id);
   await createPlatformLog({
     tenantId: tenant.id,
     eventType: "agent_created",
@@ -416,17 +416,41 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     }),
   });
 
-  // 6. Gerar token de ativação
-  const activationToken = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-  
-  await db.insert(activationTokens).values({
-    tenantId: tenant.id,
-    token: activationToken,
-    expiresAt,
-  });
-  
-  console.log(`[Provisioning] Activation token created: ${activationToken}`);
+  // 6. Gerar token de ativação e enviar email PRIMEIRO (antes de recursos externos)
+  // Isso garante que o cliente receba o email mesmo se outras coisas falharem
+  let activationToken: string | null = null;
+  try {
+    activationToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+    
+    await db.insert(activationTokens).values({
+      tenantId: tenant.id,
+      token: activationToken,
+      expiresAt,
+    });
+    
+    console.log(`[Provisioning] Activation token created: ${activationToken}`);
+    
+    // Enviar email IMEDIATAMENTE após criar token
+    await sendActivationEmail(email, activationToken, companyName);
+    console.log(`[Provisioning] ✅ Activation email sent to ${email}`);
+    
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "tenant_created",
+      message: `Tenant created and activation email sent to ${email}`,
+      metadata: JSON.stringify({ email, planId }),
+    });
+  } catch (error: any) {
+    console.error(`[Provisioning] ❌ Erro ao criar token/enviar email:`, error);
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "email_failed",
+      message: `Failed to create token/send activation email: ${error.message}`,
+      metadata: JSON.stringify({ error: error.message }),
+    });
+    // Continuar mesmo se email falhar - não bloquear provisionamento
+  }
 
   // 7. Atribuir créditos mensais do plano
   try {
@@ -510,26 +534,6 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     });
   }
 
-  // 6. Enviar email de ativação
-  try {
-    await sendActivationEmail(email, activationToken, companyName);
-    console.log(`[Provisioning] Activation email sent to ${email}`);
-    
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "tenant_created",
-      message: `Tenant created and activation email sent to ${email}`,
-      metadata: JSON.stringify({ email, planId }),
-    });
-  } catch (error: any) {
-    console.error(`[Provisioning] Email failed:`, error);
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "email_failed",
-      message: `Failed to send activation email: ${error.message}`,
-      metadata: JSON.stringify({ error: error.message }),
-    });
-  }
 
   return tenant;
 }
