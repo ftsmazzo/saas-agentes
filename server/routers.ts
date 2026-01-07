@@ -3611,11 +3611,13 @@ ${personalityDescriptions[input.personality || 'professional']}
     chatWithAssistant: protectedProcedure
       .input(z.object({
         agentId: z.number().optional(),
+        conversationId: z.string().optional(), // ID único da conversa
         messages: z.array(z.object({
           role: z.enum(['user', 'assistant', 'system']),
           content: z.string(),
         })),
         userName: z.string().optional(),
+        collectedInfo: z.record(z.any()).optional(), // Informações coletadas
       }))
       .mutation(async ({ ctx, input }) => {
         let tenant = ctx.tenant;
@@ -3639,6 +3641,18 @@ ${personalityDescriptions[input.personality || 'professional']}
           agent = await db.getFirstAgentByTenantId(tenant.id);
         }
 
+        // Gerar ou usar conversationId
+        const conversationId = input.conversationId || `conv_${tenant.id}_${agent?.id || 'new'}_${Date.now()}`;
+
+        // Buscar conversa anterior se conversationId foi fornecido
+        let previousConversation: any = null;
+        if (input.conversationId) {
+          previousConversation = await db.getAssistantConversationByConversationId(input.conversationId);
+        } else if (agent) {
+          // Tentar buscar última conversa do agente
+          previousConversation = await db.getAssistantConversationByAgentId(agent.id);
+        }
+
         // Buscar configuração existente do agente
         let existingConfig: any = null;
         let existingCompanyInfo: any = null;
@@ -3652,6 +3666,9 @@ ${personalityDescriptions[input.personality || 'professional']}
             }
           }
         }
+
+        // Usar informações coletadas da conversa anterior ou do input
+        const collectedInfo = input.collectedInfo || previousConversation?.collectedInfo || existingCompanyInfo || {};
 
         // Construir contexto do sistema para o assistente
         const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.

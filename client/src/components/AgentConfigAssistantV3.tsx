@@ -73,46 +73,102 @@ export default function AgentConfigAssistantV3({
 
   const userName = (user?.name || tenant?.companyName || '').split(' ')[0] || '';
 
-  // Carregar configuração existente
+  // Carregar conversa anterior ou configuração existente
   useEffect(() => {
-    if (existingConfig?.companyInfo && !hasStarted) {
-      try {
-        const companyInfo = JSON.parse(existingConfig.companyInfo);
-        setCollectedInfo({
-          businessName: companyInfo.name || '',
-          businessType: companyInfo.type || '',
-          street: companyInfo.street || '',
-          streetNumber: companyInfo.streetNumber || '',
-          neighborhood: companyInfo.neighborhood || '',
-          city: companyInfo.city || '',
-          state: companyInfo.state || '',
-          zipCode: companyInfo.zipCode || '',
-          phone: companyInfo.phone || '',
-          businessHours: companyInfo.businessHours || '',
-          paymentMethods: companyInfo.paymentMethods || [],
-          personality: companyInfo.personality || '',
-          additionalInfo: companyInfo.additionalInfo || '',
-        });
-      } catch (e) {
-        console.error('Erro ao carregar config existente:', e);
+    if (!hasStarted && agentId) {
+      // Tentar carregar conversa anterior do banco
+      trpc.clientPanel.getAssistantConversation.query({ agentId })
+        .then((data) => {
+          if (data?.conversation) {
+            const conv = data.conversation;
+            setConversationId(conv.conversationId);
+            if (conv.messages && Array.isArray(conv.messages)) {
+              setMessages(conv.messages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp || Date.now()),
+              })));
+            }
+            if (conv.collectedInfo) {
+              setCollectedInfo(conv.collectedInfo);
+            }
+            setHasStarted(true);
+            return;
+          }
+          
+          // Se não tem conversa, carregar config existente
+          if (existingConfig?.companyInfo) {
+            try {
+              const companyInfo = JSON.parse(existingConfig.companyInfo);
+              setCollectedInfo({
+                businessName: companyInfo.name || '',
+                businessType: companyInfo.type || '',
+                street: companyInfo.street || '',
+                streetNumber: companyInfo.streetNumber || '',
+                neighborhood: companyInfo.neighborhood || '',
+                city: companyInfo.city || '',
+                state: companyInfo.state || '',
+                zipCode: companyInfo.zipCode || '',
+                phone: companyInfo.phone || '',
+                businessHours: companyInfo.businessHours || '',
+                paymentMethods: companyInfo.paymentMethods || [],
+                personality: companyInfo.personality || '',
+                additionalInfo: companyInfo.additionalInfo || '',
+              });
+            } catch (e) {
+              console.error('Erro ao carregar config existente:', e);
+            }
+          }
+          setHasStarted(true);
+        })();
+      } else {
+        // Se não tem conversa, carregar config existente
+        if (existingConfig?.companyInfo) {
+          try {
+            const companyInfo = JSON.parse(existingConfig.companyInfo);
+            setCollectedInfo({
+              businessName: companyInfo.name || '',
+              businessType: companyInfo.type || '',
+              street: companyInfo.street || '',
+              streetNumber: companyInfo.streetNumber || '',
+              neighborhood: companyInfo.neighborhood || '',
+              city: companyInfo.city || '',
+              state: companyInfo.state || '',
+              zipCode: companyInfo.zipCode || '',
+              phone: companyInfo.phone || '',
+              businessHours: companyInfo.businessHours || '',
+              paymentMethods: companyInfo.paymentMethods || [],
+              personality: companyInfo.personality || '',
+              additionalInfo: companyInfo.additionalInfo || '',
+            });
+          } catch (e) {
+            console.error('Erro ao carregar config existente:', e);
+          }
+        }
+        setHasStarted(true);
       }
+    } else if (!hasStarted && !agentId) {
+      setHasStarted(true);
     }
-  }, [existingConfig, hasStarted]);
+  }, [existingConfig, hasStarted, agentId, getConversationQuery.data]);
 
   const chatMutation = trpc.clientPanel.chatWithAssistant.useMutation({
     onSuccess: (data) => {
       addMessage('assistant', data.message);
       setIsProcessing(false);
       
-      // Verificar se o assistente sugeriu gerar o prompt
-      const messageLower = data.message.toLowerCase();
-      if (messageLower.includes('gerar') || messageLower.includes('criar') || messageLower.includes('configurar')) {
-        // Verificar se temos informações suficientes
-        if (collectedInfo.businessName) {
-          setTimeout(() => {
-            handleGeneratePrompt();
-          }, 1000);
-        }
+      // Atualizar conversationId se retornado
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
+      }
+      
+      // Atualizar informações coletadas se retornadas
+      if (data.collectedInfo) {
+        setCollectedInfo((prev) => ({ ...prev, ...data.collectedInfo }));
+      }
+      
+      // Mostrar botão de gerar se o assistente sugeriu
+      if (data.shouldShowGenerateButton) {
+        setShouldShowGenerateButton(true);
       }
     },
     onError: (error) => {
@@ -246,8 +302,10 @@ export default function AgentConfigAssistantV3({
     // Chamar API de chat com informações coletadas
     chatMutation.mutate({
       agentId: agentId,
+      conversationId: conversationId || undefined,
       messages: messageHistory,
       userName: userName,
+      collectedInfo: collectedInfo,
     });
   };
 
@@ -409,8 +467,8 @@ export default function AgentConfigAssistantV3({
           </Button>
         </div>
 
-        {/* Botão de gerar prompt (aparece quando há informações suficientes) */}
-        {collectedInfo.businessName && messages.length > 2 && (
+        {/* Botão de gerar prompt (aparece quando assistente sugere ou quando há informações suficientes) */}
+        {(shouldShowGenerateButton || (collectedInfo.businessName && messages.length > 2)) && (
           <div className="mt-4 pt-4 border-t">
             <Button
               onClick={handleGeneratePrompt}

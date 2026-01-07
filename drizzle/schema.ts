@@ -507,3 +507,34 @@ export const creditConfig = pgTable("creditConfig", {
 
 export type CreditConfig = typeof creditConfig.$inferSelect;
 export type InsertCreditConfig = typeof creditConfig.$inferInsert;
+
+/**
+ * Conversas do Assistente de Configuração
+ * Armazena histórico de conversas do assistente para cada agente/tenant
+ */
+export const assistantConversations = pgTable("assistantConversations", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  agentId: integer("agentId"), // Agente específico (opcional)
+  
+  // Identificador único da conversa (para continuidade)
+  conversationId: varchar("conversationId", { length: 255 }).notNull().unique(),
+  
+  // Histórico de mensagens
+  messages: jsonb("messages").notNull(), // Array de { role, content, timestamp }
+  
+  // Informações coletadas
+  collectedInfo: jsonb("collectedInfo"), // Objeto com informações coletadas
+  
+  // Estado da conversa
+  isComplete: boolean("isComplete").default(false), // Se já gerou o prompt
+  promptGenerated: boolean("promptGenerated").default(false), // Se o prompt foi gerado
+  
+  // Timestamps
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completedAt", { withTimezone: true }),
+});
+
+export type AssistantConversation = typeof assistantConversations.$inferSelect;
+export type InsertAssistantConversation = typeof assistantConversations.$inferInsert;

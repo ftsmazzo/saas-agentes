@@ -28,7 +28,10 @@ import {
   chatMessages,
   ChatMessage,
   contacts,
-  Contact
+  Contact,
+  assistantConversations,
+  AssistantConversation,
+  InsertAssistantConversation
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
