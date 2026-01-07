@@ -3754,7 +3754,7 @@ ${existingCompanyInfo ? `
 - Endereço: ${existingCompanyInfo.fullAddress || existingCompanyInfo.street || 'Não informado'}
 - Telefone: ${existingCompanyInfo.phone || 'Não informado'}
 - Horário: ${existingCompanyInfo.businessHours || 'Não informado'}
-- Formas de pagamento: ${existingCompanyInfo.paymentMethods?.join(', ') || 'Não informado'}
+- Formas de pagamento: ${Array.isArray(existingCompanyInfo.paymentMethods) ? existingCompanyInfo.paymentMethods.join(', ') : (existingCompanyInfo.paymentMethods || 'Não informado')}
 ` : ''}
 
 **DIRETRIZES IMPORTANTES:**
