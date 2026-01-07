@@ -43,10 +43,10 @@ export default function AgentConfigAssistantV2({
   onComplete: () => void;
   existingConfig?: any;
 }) {
-  const { user } = useAuth();
+  const { user, tenant } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [state, setState] = useState<AssistantState>({
-    userName: user?.name?.split(' ')[0] || '',
+    userName: (user?.name || tenant?.companyName || '').split(' ')[0] || '',
     collectedInfo: {},
   });
   const [userInput, setUserInput] = useState('');
