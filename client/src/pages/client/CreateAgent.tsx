@@ -134,7 +134,7 @@ export default function CreateAgentPage() {
             </CardContent>
           </Card>
         ) : (
-          <AgentConfigAssistantV3
+          <AgentConfigAssistant
             agentId={agentId}
             onComplete={handleAssistantComplete}
             existingConfig={agentConfig}
