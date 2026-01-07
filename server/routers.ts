@@ -1736,13 +1736,13 @@ export const appRouter = router({
             }
           }
 
-          // 2. Criar webhook no Chatwoot usando agentId (NOVO)
+          // 2. Criar webhook no Chatwoot usando formato padronizado: tenant_${tenantId}/agent_${agentId}
           const n8nApiUrl = process.env.N8N_API_URL;
           const createWebhookWorkflowUrl = process.env.N8N_CREATE_WEBHOOK_WORKFLOW_URL;
           
           if (n8nApiUrl && createWebhookWorkflowUrl) {
-            // URL do webhook usando agentId
-            const agentWebhookUrl = `${n8nApiUrl}/webhook/agent_${agent.id}`;
+            // URL do webhook no formato padronizado: tenant_${tenantId}/agent_${agentId}
+            const agentWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}/agent_${agent.id}`;
             
             try {
               const axios = (await import('axios')).default;
@@ -1786,8 +1786,8 @@ export const appRouter = router({
             tenantId: tenant.id,
             eventType: 'agent_activated',
             severity: 'info',
-            message: `Agente "${agent.name}" (ID: ${agent.id}) foi ativado. Webhook: agent_${agent.id}`,
-            metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name, webhookPath: `agent_${agent.id}` }),
+            message: `Agente "${agent.name}" (ID: ${agent.id}) foi ativado. Webhook: tenant_${tenant.id}/agent_${agent.id}`,
+            metadata: JSON.stringify({ agentId: agent.id, tenantId: tenant.id, agentName: agent.name, webhookPath: `tenant_${tenant.id}/agent_${agent.id}` }),
           });
 
           return {

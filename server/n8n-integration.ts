@@ -33,8 +33,9 @@ export async function cloneWorkflowForTenant(
     throw new Error("N8N_API_URL, N8N_API_KEY e N8N_TEMPLATE_WORKFLOW_ID devem estar configurados no .env");
   }
   
-  // Determinar webhook path: usar agentId se disponível, senão usar tenantId (compatibilidade)
-  const webhookPath = agentId ? `agent_${agentId}` : `tenant_${tenantId}`;
+  // FORMATO PADRONIZADO: tenant_${tenantId}/agent_${agentId}
+  // Isso agrega empresa e agente, facilitando identificação e segurança
+  const webhookPath = agentId ? `tenant_${tenantId}/agent_${agentId}` : `tenant_${tenantId}`; // Fallback para compatibilidade
   const baseWorkflowName = workflowNamePrefix || tenantName;
   const expectedWorkflowName = agentId ? `${baseWorkflowName} - Agente ${agentId}` : `${baseWorkflowName} - Agente`;
   

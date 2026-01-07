@@ -7,6 +7,13 @@ O workflow do N8N tem um **filtro de segurança** no início que verifica se o w
 1. ❌ Buscando `evolutionInstanceName` na tabela `tenants` (campo não existe mais lá)
 2. ❌ Comparando com formato antigo `tenant_${tenantId}`
 3. ❌ Não funciona com múltiplos agentes
+4. ❌ **NOVO PROBLEMA:** Webhook no Chatwoot usa `agent_14`, N8N usa `tenant_52`, Evolution usa `tenant_52` - tudo desalinhado!
+
+## ✅ Formato Padronizado
+
+**Agora todos os webhooks usam:** `/webhook/tenant_${tenantId}/agent_${agentId}`
+
+Isso agrega empresa e agente, facilitando identificação e segurança.
 
 ## ✅ Solução
 
@@ -169,56 +176,74 @@ O workflow do N8N tem um **filtro de segurança** no início que verifica se o w
 1. Abra o node `Edit Fields2`
 2. Adicione/Atualize os campos:
 
-   **Campo `webhookPath` (novo ou atualizar):**
+   **Campo `webhookPath` (extrair path completo):**
    - **Name:** `webhookPath`
-   - **Value:** `={{$json.webhookUrl.split('/').pop().replace(/\\s+/g, '') }}`
+   - **Value:** `={{$json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() }}`
    - **Type:** String
+   - **Exemplo:** `tenant_52/agent_14`
 
-   **Campo `agentId` (novo):**
-   - **Name:** `agentId`
-   - **Value:** `={{$json.webhookUrl ? ($json.webhookUrl.split('/').pop().match(/^agent_(\\d+)$/i) ? parseInt($json.webhookUrl.split('/').pop().replace(/^agent_/i, '')) : null) : null}}`
+   **Campo `tenantId` (extrair do path):**
+   - **Name:** `tenantId`
+   - **Value:** `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/tenant_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
    - **Type:** Number
 
-   **Campo `tenantId` (atualizar):**
-   - **Name:** `tenantId`
-   - **Value:** `={{$json.webhookUrl ? parseInt($json.webhookUrl.split('/').pop().replace(/\\s+/g, '').replace(/^(tenant_|agent_)/i, '')) || null : null}}`
+   **Campo `agentId` (extrair do path):**
+   - **Name:** `agentId`
+   - **Value:** `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/agent_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
    - **Type:** Number
 
 ### Passo 2: Atualizar "Select rows from a table"
 
 1. Abra o node `Select rows from a table`
 2. **Mude a Table:** De `tenants` para `agents`
-3. **Atualize o Where:**
-   - **Column:** `evolutionInstanceName`
-   - **Value:** `={{ $json.webhookPath }}`
-   
-   **OU** (se quiser buscar por agentId quando disponível):
-   
-   - **Column:** `id` (quando `agentId` existe)
+3. **Atualize o Where (RECOMENDADO - buscar por agentId):**
+   - **Column:** `id`
    - **Value:** `={{ $json.agentId }}`
    
-   **OU** usar query SQL direta (mais flexível):
+   **OU** (se quiser buscar por evolutionInstanceName):
+   - **Column:** `evolutionInstanceName`
+   - **Value:** `={{ $json.webhookPath.split('/').pop() }}` (pegar apenas a parte do agent)
+   
+   **OU** usar query SQL direta (mais robusta):
    ```sql
    SELECT * FROM agents 
-   WHERE (id = {{ $json.agentId }} AND {{ $json.agentId }} IS NOT NULL)
-      OR evolutionInstanceName = '{{ $json.webhookPath }}'
+   WHERE id = {{ $json.agentId }}
+      AND "tenantId" = {{ $json.tenantId }}
    LIMIT 1;
    ```
+   
+   **Nota:** O `evolutionInstanceName` no banco é `agent_${agentId}`, não o path completo do webhook.
 
 ### Passo 3: Atualizar "Filter"
 
 1. Abra o node `Filter`
-2. **Atualize a condição:**
-   - **Left Value:** `={{ $('Edit Fields2').item.json.webhookPath }}`
-   - **Right Value:** `={{ $('Select rows from a table').item.json.evolutionInstanceName }}`
-   - **Operator:** `equals`
-
-   **OU** (validação mais robusta):
+2. **Atualize a condição (validação dupla - mais segura):**
+   
+   **Opção 1 - Validar agentId:**
    ```json
    {
      "conditions": [
        {
-         "leftValue": "={{ $('Edit Fields2').item.json.webhookPath }}",
+         "leftValue": "={{ $('Edit Fields2').item.json.agentId }}",
+         "rightValue": "={{ $('Select rows from a table').item.json.id }}",
+         "operator": "equals"
+       },
+       {
+         "leftValue": "={{ $('Edit Fields2').item.json.tenantId }}",
+         "rightValue": "={{ $('Select rows from a table').item.json.tenantId }}",
+         "operator": "equals"
+       }
+     ],
+     "combinator": "and"
+   }
+   ```
+   
+   **Opção 2 - Validar evolutionInstanceName:**
+   ```json
+   {
+     "conditions": [
+       {
+         "leftValue": "={{ $('Edit Fields2').item.json.webhookPath.split('/').pop() }}",
          "rightValue": "={{ $('Select rows from a table').item.json.evolutionInstanceName }}",
          "operator": "equals"
        }
@@ -226,6 +251,8 @@ O workflow do N8N tem um **filtro de segurança** no início que verifica se o w
      "combinator": "and"
    }
    ```
+   
+   **Recomendado:** Usar Opção 1 (validação dupla de agentId e tenantId) para máxima segurança.
 
 ## ✅ Resultado Esperado
 

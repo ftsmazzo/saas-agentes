@@ -57,15 +57,20 @@ async function startServer() {
   
   // N8N webhook - recebe dados do workflow
   // IMPORTANTE: Registrar ANTES do body parser global para garantir que seja processado
-  // Rota atualizada para aceitar tanto agent_${agentId} quanto tenant_${tenantId}
-  app.post("/api/webhooks/n8n/:identifier", express.json({ limit: "50mb" }), (req, res, next) => {
+  // Rota principal: /webhook/tenant_${tenantId}/agent_${agentId} (formato padronizado)
+  app.post("/api/webhooks/n8n/tenant/:tenantId/agent/:agentId", express.json({ limit: "50mb" }), (req, res, next) => {
     console.log(`[N8N Route] 🎯 ROTA CHAMADA: ${req.method} ${req.originalUrl}`);
     console.log(`[N8N Route] 📍 Params:`, req.params);
-    console.log(`[N8N Route] 📦 Body recebido:`, JSON.stringify(req.body, null, 2));
-    console.log(`[N8N Route] 📦 Body.data (tipo: ${typeof req.body?.data}):`, req.body?.data);
     handleN8NWebhook(req, res, next);
   });
-  console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/:identifier (aceita agent_X ou tenant_X)");
+  
+  // Rotas de compatibilidade (formato antigo)
+  app.post("/api/webhooks/n8n/:identifier", express.json({ limit: "50mb" }), (req, res, next) => {
+    console.log(`[N8N Route] 🎯 ROTA CHAMADA (compatibilidade): ${req.method} ${req.originalUrl}`);
+    console.log(`[N8N Route] 📍 Params:`, req.params);
+    handleN8NWebhook(req, res, next);
+  });
+  console.log("✅ [Routes] Rota N8N webhook registrada: POST /api/webhooks/n8n/tenant/:tenantId/agent/:agentId (padrão) e /api/webhooks/n8n/:identifier (compatibilidade)");
   
   // Endpoint de teste para N8N (aceita qualquer método)
   app.all("/api/webhooks/n8n/test", (req, res) => {
