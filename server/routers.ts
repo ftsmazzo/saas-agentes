@@ -4162,7 +4162,7 @@ ${promptTemplate}
 **PROMPT ATUAL EM CONSTRUÇÃO:**
 ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir agora)'}
 
-**REGRAS CRÍTICAS:**
+**REGRAS CRÍTICAS - LEIA COM MUITA ATENÇÃO:**
 1. **SEMPRE use o template acima** - NUNCA crie sua própria estrutura
 2. **Mantenha TODAS as 8 seções** - mesmo que algumas estejam incompletas
 3. **Valide informações** - use as informações coletadas para preencher o template
@@ -4170,6 +4170,7 @@ ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir a
 5. **Construção Incremental**: A cada interação, ATUALIZE o prompt completo seguindo o template
 6. **Flexibilidade**: Se faltar informação, use "(a definir)" mas mantenha a estrutura completa
 7. **NUNCA retorne apenas a primeira seção** - sempre retorne o prompt COMPLETO com todas as 8 seções
+8. **OBRIGATÓRIO**: Você DEVE sempre incluir "PROMPT_ATUALIZADO:" seguido do prompt COMPLETO em TODAS as suas respostas
 
 **IMPORTANTE:**
 - Você NÃO deve seguir um roteiro fixo de perguntas
@@ -4178,11 +4179,13 @@ ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir a
 - Você DEVE aceitar respostas como "não sei", "depois", etc.
 - Você DEVE sempre retornar o prompt atualizado em construção
 
-**FORMATO DE RESPOSTA OBRIGATÓRIO:**
+**FORMATO DE RESPOSTA OBRIGATÓRIO - CRÍTICO:**
 Sua resposta DEVE ter EXATAMENTE duas partes separadas por uma linha em branco:
 
-1. **Mensagem conversacional** (será mostrada ao usuário)
-2. **PROMPT_ATUALIZADO:** seguido do prompt COMPLETO
+1. **Mensagem conversacional** (será mostrada ao usuário) - pode ser curta
+2. **PROMPT_ATUALIZADO:** seguido do prompt COMPLETO com TODAS as 8 seções
+
+**IMPORTANTE**: Você DEVE incluir "PROMPT_ATUALIZADO:" em TODAS as suas respostas, mesmo que o prompt ainda esteja em construção. Sempre retorne o prompt completo atualizado.
 
 **EXEMPLO EXATO DO FORMATO:**
 \`\`\`
