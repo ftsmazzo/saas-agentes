@@ -3306,6 +3306,7 @@ export const appRouter = router({
     generateSystemPrompt: protectedProcedure
       .input(z.object({
         agentId: z.number().optional(),
+        conversationId: z.string().optional(), // ID da conversa para atualizar
         businessName: z.string().min(1, "Nome da empresa é obrigatório"),
         businessType: z.string().optional(),
         // Endereço completo
