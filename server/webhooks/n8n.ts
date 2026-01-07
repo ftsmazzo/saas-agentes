@@ -36,6 +36,12 @@ export async function handleN8NWebhook(req: Request, res: Response) {
       
       tenantId = agent.tenantId;
       console.log(`[N8N Webhook] ✅ Identificado como agente ${agentId} do tenant ${tenantId}`);
+      
+      // VALIDAÇÃO DE SEGURANÇA: Garantir que o agente existe e está ativo
+      if (agent.status === 'deleted' || !agent.isActive) {
+        console.error(`[N8N Webhook] 🚨 SEGURANÇA: Agente ${agentId} está deletado ou inativo! Bloqueando webhook.`);
+        return res.status(403).json({ error: "Agente não está ativo" });
+      }
     } else if (identifier.startsWith('tenant_')) {
       // Formato antigo: tenant_${tenantId} (compatibilidade)
       tenantId = parseInt(identifier.replace('tenant_', ''));
@@ -219,7 +225,24 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         break;
 
       case "usage_tracking":
-        await handleUsageTracking(tenantId, payload);
+        // VALIDAÇÃO DE SEGURANÇA: Se agentId foi identificado na URL, usar ele (não confiar no payload)
+        let trackingAgentId = agentId; // Priorizar agentId da URL (mais seguro)
+        
+        if (!trackingAgentId) {
+          // Se não tem agentId na URL, tentar do payload mas validar
+          const payloadAgentId = payload.data?.metadata?.agentId || payload.data?.agentId;
+          if (payloadAgentId) {
+            // Validar que o agentId do payload pertence ao tenantId
+            const payloadAgent = await db.getAgentById(payloadAgentId);
+            if (payloadAgent && payloadAgent.tenantId === tenantId) {
+              trackingAgentId = payloadAgentId;
+            } else {
+              console.warn(`[N8N Webhook] ⚠️ agentId ${payloadAgentId} do payload não pertence ao tenant ${tenantId}. Ignorando.`);
+            }
+          }
+        }
+        
+        await handleUsageTracking(tenantId, payload, trackingAgentId);
         break;
 
       case "usage_tracking_batch":
@@ -323,18 +346,38 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         if (Array.isArray(dataArray)) {
           console.log(`[N8N Webhook] 📦 Processando ${dataArray.length} itens em lote`);
           for (const usageDataItem of dataArray) {
-            // Garantir que agentId está disponível (no metadata ou direto)
-            if (!usageDataItem.agentId && !usageDataItem.metadata?.agentId && defaultAgentId) {
+            // VALIDAÇÃO DE SEGURANÇA: Se agentId foi identificado na URL, usar ele (não confiar no payload)
+            // Se não foi identificado na URL mas veio no payload, validar que pertence ao tenant
+            let itemAgentId = agentId; // Priorizar agentId da URL (mais seguro)
+            
+            if (!itemAgentId) {
+              // Se não tem agentId na URL, tentar do payload mas validar
+              const payloadAgentId = usageDataItem.metadata?.agentId || usageDataItem.agentId;
+              if (payloadAgentId) {
+                // Validar que o agentId do payload pertence ao tenantId
+                const payloadAgent = await db.getAgentById(payloadAgentId);
+                if (payloadAgent && payloadAgent.tenantId === tenantId) {
+                  itemAgentId = payloadAgentId;
+                } else {
+                  console.warn(`[N8N Webhook] ⚠️ agentId ${payloadAgentId} do payload não pertence ao tenant ${tenantId}. Usando default.`);
+                  itemAgentId = defaultAgentId || null;
+                }
+              } else {
+                // Sem agentId, usar default do tenant
+                itemAgentId = defaultAgentId || null;
+              }
+            }
+            
+            // Garantir que agentId está no metadata
+            if (itemAgentId) {
               if (!usageDataItem.metadata) {
                 usageDataItem.metadata = {};
               }
-              usageDataItem.metadata.agentId = defaultAgentId;
+              usageDataItem.metadata.agentId = itemAgentId;
+              usageDataItem.agentId = itemAgentId;
             }
-            // Também colocar agentId direto no objeto se estiver no metadata
-            if (usageDataItem.metadata?.agentId && !usageDataItem.agentId) {
-              usageDataItem.agentId = usageDataItem.metadata.agentId;
-            }
-            await handleUsageTracking(tenantId, { data: usageDataItem });
+            
+            await handleUsageTracking(tenantId, { data: usageDataItem }, itemAgentId);
           }
         } else {
           console.warn(`[N8N Webhook] ⚠️ usage_tracking_batch espera um array, recebeu:`, typeof dataArray, dataArray);
@@ -418,8 +461,11 @@ async function handleMetricsEvent(tenantId: number, payload: any) {
 
 /**
  * Processa eventos de rastreamento de uso (consumo OpenAI)
+ * @param tenantId - ID do tenant (validado pela URL)
+ * @param payload - Payload do webhook
+ * @param validatedAgentId - agentId validado (opcional, se fornecido será usado em vez do payload)
  */
-async function handleUsageTracking(tenantId: number, payload: any) {
+async function handleUsageTracking(tenantId: number, payload: any, validatedAgentId?: number | null) {
   try {
     const usageData: UsageData = payload.data;
 
@@ -448,8 +494,26 @@ async function handleUsageTracking(tenantId: number, payload: any) {
       console.warn(`[N8N Webhook] ⚠️ Processando mesmo assim para registrar o consumo (saldo ficará negativo)`);
     }
 
-    // Extrair agentId do metadata se disponível
-    const agentId = usageData.metadata?.agentId || usageData.agentId || null;
+    // VALIDAÇÃO DE SEGURANÇA: Usar agentId validado (da URL) em vez do payload
+    // Isso previne que alguém envie um webhook com agentId diferente no payload
+    let agentId = validatedAgentId || null;
+    
+    // Se não tem agentId validado, tentar do payload mas validar
+    if (!agentId) {
+      agentId = usageData.metadata?.agentId || usageData.agentId || null;
+      
+      // VALIDAÇÃO DE SEGURANÇA: Se agentId foi fornecido no payload, validar que pertence ao tenantId
+      if (agentId) {
+        const agent = await db.getAgentById(agentId);
+        if (!agent) {
+          console.warn(`[N8N Webhook] ⚠️ Agente ${agentId} não encontrado no banco. Ignorando agentId do payload.`);
+          agentId = null; // Ignorar agentId inválido
+        } else if (agent.tenantId !== tenantId) {
+          console.error(`[N8N Webhook] 🚨 SEGURANÇA: Agente ${agentId} não pertence ao tenant ${tenantId}! Bloqueando transação.`);
+          throw new Error(`Agente ${agentId} não pertence ao tenant ${tenantId}. Possível tentativa de fraude.`);
+        }
+      }
+    }
 
     // Registrar transação (sempre registra, mesmo sem créditos)
     await recordUsageTransaction(tenantId, usageData, costCalculation, agentId);
