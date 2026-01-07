@@ -30,6 +30,7 @@ export interface UsageData {
   totalTokens?: number;
   audioDurationSeconds?: number; // Para Whisper
   metadata?: any; // JSON com detalhes adicionais
+  agentId?: number; // ID do agente (pode vir direto ou no metadata)
 }
 
 /**

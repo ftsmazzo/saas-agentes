@@ -292,12 +292,16 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         if (Array.isArray(dataArray)) {
           console.log(`[N8N Webhook] 📦 Processando ${dataArray.length} itens em lote`);
           for (const usageDataItem of dataArray) {
-            // Garantir que agentId está no metadata se não estiver
-            if (!usageDataItem.metadata?.agentId && defaultAgentId) {
-              usageDataItem.metadata = {
-                ...usageDataItem.metadata,
-                agentId: defaultAgentId,
-              };
+            // Garantir que agentId está disponível (no metadata ou direto)
+            if (!usageDataItem.agentId && !usageDataItem.metadata?.agentId && defaultAgentId) {
+              if (!usageDataItem.metadata) {
+                usageDataItem.metadata = {};
+              }
+              usageDataItem.metadata.agentId = defaultAgentId;
+            }
+            // Também colocar agentId direto no objeto se estiver no metadata
+            if (usageDataItem.metadata?.agentId && !usageDataItem.agentId) {
+              usageDataItem.agentId = usageDataItem.metadata.agentId;
             }
             await handleUsageTracking(tenantId, { data: usageDataItem });
           }
@@ -394,47 +398,43 @@ async function handleUsageTracking(tenantId: number, payload: any) {
       return;
     }
 
-    // CRÍTICO: Verificar créditos ANTES de processar
-    // Estimar créditos necessários para esta operação
+    // Calcular custo e créditos necessários
     const costCalculation = await calculateCost(usageData);
     const estimatedCredits = costCalculation.creditsUsed;
     
-    const hasCredits = await checkCreditsAvailable(tenantId, estimatedCredits);
+    // Verificar créditos disponíveis (apenas para log, não bloqueia)
+    const credits = await getTenantCredits(tenantId);
+    const currentCredits = credits.currentCredits || 0;
+    const hasCredits = currentCredits >= estimatedCredits;
     
     if (!hasCredits) {
-      const credits = await getTenantCredits(tenantId);
-      const currentCredits = credits.currentCredits || 0;
-      
       console.warn(`[N8N Webhook] ⚠️ Créditos insuficientes para tenant ${tenantId}:`, {
         currentCredits,
         estimatedCredits,
         operation: usageData.operation,
         model: usageData.model,
       });
-      
-      // Lançar erro para N8N tratar (bloquear execução do workflow)
-      throw new Error(`INSUFFICIENT_CREDITS: Saldo insuficiente (${currentCredits} créditos disponíveis, ~${estimatedCredits} necessários para ${usageData.operation} com ${usageData.model})`);
+      console.warn(`[N8N Webhook] ⚠️ Processando mesmo assim para registrar o consumo (saldo ficará negativo)`);
     }
 
-    // Registrar transação (já verifica e deduz créditos)
-    await recordUsageTransaction(tenantId, usageData, costCalculation);
+    // Extrair agentId do metadata se disponível
+    const agentId = usageData.metadata?.agentId || usageData.agentId || null;
 
-    console.log(`[N8N Webhook] ✅ Uso registrado para tenant ${tenantId}:`, {
+    // Registrar transação (sempre registra, mesmo sem créditos)
+    await recordUsageTransaction(tenantId, usageData, costCalculation, agentId);
+
+    console.log(`[N8N Webhook] ✅ Uso registrado para tenant ${tenantId}${agentId ? `, agente ${agentId}` : ''}:`, {
       operation: usageData.operation,
       model: usageData.model,
       tokens: usageData.totalTokens || (usageData.tokensInput || 0) + (usageData.tokensOutput || 0),
       costUSD: costCalculation.costUSD.toFixed(6),
       creditsUsed: costCalculation.creditsUsed,
+      currentCreditsAfter: (currentCredits - estimatedCredits).toFixed(2),
     });
   } catch (error: any) {
-    // Se for erro de créditos insuficientes, relançar para N8N tratar
-    if (error.message?.includes('INSUFFICIENT_CREDITS')) {
-      console.error(`[N8N Webhook] ❌ ${error.message}`);
-      throw error; // Relançar para retornar erro HTTP ao N8N
-    }
-    
     console.error(`[N8N Webhook] ❌ Erro ao processar uso para tenant ${tenantId}:`, error);
-    // Outros erros não bloqueiam o webhook (apenas logam)
+    // Não relançar erro - permite que o workflow continue mesmo com erro no registro
+    // O erro será logado mas não bloqueará o workflow
   }
 }
 
