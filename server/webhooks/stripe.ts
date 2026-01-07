@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId, createAgent } from "../db";
+import { getDb, createTenant, createPlatformLog, getPlanByStripePriceId, getPlanById, createAgent } from "../db";
 import { tenants, activationTokens, tenantCredits } from "../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
@@ -594,7 +594,7 @@ async function handlePlanUpgrade(session: Stripe.Checkout.Session) {
 
   if (existingCredits[0] && plan.monthlyCredits) {
     // Calcular diferença de créditos (novo plano - plano antigo)
-    const oldPlan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+    const oldPlan = tenant.currentPlanId ? await getPlanById(tenant.currentPlanId) : null;
     const oldMonthlyCredits = oldPlan?.monthlyCredits || 0;
     const creditDifference = plan.monthlyCredits - oldMonthlyCredits;
 
@@ -690,7 +690,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       .limit(1);
 
     if (existingCredits[0]) {
-      const oldPlan = tenant.currentPlanId ? await db.getPlanById(tenant.currentPlanId) : null;
+      const oldPlan = tenant.currentPlanId ? await getPlanById(tenant.currentPlanId) : null;
       const oldMonthlyCredits = oldPlan?.monthlyCredits || 0;
       const creditDifference = plan.monthlyCredits - oldMonthlyCredits;
 
