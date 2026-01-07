@@ -133,32 +133,48 @@ export default function AgentConfigAssistantV3({
 
   const chatMutation = trpc.clientPanel.chatWithAssistant.useMutation({
     onSuccess: (data) => {
-      if (!data || !data.message) {
-        console.error('[Chat] Resposta inválida:', data);
-        toast.error('Erro: Resposta inválida do servidor');
+      try {
+        if (!data) {
+          console.error('[Chat] Resposta vazia do servidor');
+          toast.error('Erro: Resposta vazia do servidor');
+          setIsProcessing(false);
+          addMessage('assistant', `Desculpe, ocorreu um erro. Por favor, tente novamente.`);
+          return;
+        }
+
+        if (!data.message || typeof data.message !== 'string') {
+          console.error('[Chat] Resposta inválida:', data);
+          toast.error('Erro: Resposta inválida do servidor');
+          setIsProcessing(false);
+          addMessage('assistant', `Desculpe, ocorreu um erro. Por favor, tente novamente.`);
+          return;
+        }
+
+        addMessage('assistant', data.message);
+        setIsProcessing(false);
+        
+        // Atualizar conversationId se retornado
+        if (data.conversationId) {
+          setConversationId(data.conversationId);
+        }
+        
+        // Atualizar informações coletadas se retornadas
+        if (data.collectedInfo && typeof data.collectedInfo === 'object') {
+          setCollectedInfo((prev) => ({ ...prev, ...data.collectedInfo }));
+        }
+        
+        // Não mostrar botão automaticamente - só quando usuário confirmar
+        // O botão será mostrado quando o usuário responder "sim", "pode", etc. em handleSendMessage
+      } catch (error: any) {
+        console.error('[Chat] Erro ao processar resposta:', error);
+        toast.error(`Erro: ${error.message || 'Erro desconhecido'}`);
         setIsProcessing(false);
         addMessage('assistant', `Desculpe, ocorreu um erro. Por favor, tente novamente.`);
-        return;
       }
-
-      addMessage('assistant', data.message);
-      setIsProcessing(false);
-      
-      // Atualizar conversationId se retornado
-      if (data.conversationId) {
-        setConversationId(data.conversationId);
-      }
-      
-      // Atualizar informações coletadas se retornadas
-      if (data.collectedInfo) {
-        setCollectedInfo((prev) => ({ ...prev, ...data.collectedInfo }));
-      }
-      
-      // Não mostrar botão automaticamente - só quando usuário confirmar
-      // O botão será mostrado quando o usuário responder "sim", "pode", etc. em handleSendMessage
     },
     onError: (error) => {
-      toast.error(`Erro: ${error.message}`);
+      console.error('[Chat] Erro na mutation:', error);
+      toast.error(`Erro: ${error.message || 'Erro desconhecido'}`);
       setIsProcessing(false);
       addMessage('assistant', `Desculpe, ocorreu um erro. Por favor, tente novamente.`);
     },
@@ -351,13 +367,20 @@ export default function AgentConfigAssistantV3({
     }));
 
     // Chamar API de chat com informações coletadas ATUALIZADAS
-    chatMutation.mutate({
-      agentId: agentId,
-      conversationId: conversationId || undefined,
-      messages: messageHistory,
-      userName: userName,
-      collectedInfo: updatedInfo, // Usar updatedInfo que tem o número incluído
-    });
+    try {
+      chatMutation.mutate({
+        agentId: agentId,
+        conversationId: conversationId || undefined,
+        messages: messageHistory,
+        userName: userName,
+        collectedInfo: updatedInfo || {}, // Garantir que sempre seja um objeto
+      });
+    } catch (error: any) {
+      console.error('[Chat] Erro ao chamar mutation:', error);
+      toast.error(`Erro: ${error.message || 'Erro ao enviar mensagem'}`);
+      setIsProcessing(false);
+      addMessage('assistant', `Desculpe, ocorreu um erro ao enviar sua mensagem. Por favor, tente novamente.`);
+    }
   };
 
   const handleGeneratePrompt = () => {

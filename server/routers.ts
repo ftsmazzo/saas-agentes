@@ -3925,7 +3925,17 @@ ${existingCompanyInfo ? `
             messageLength: assistantMessage.length,
             conversationId: conversationId,
             shouldShowGenerateButton: shouldShowGenerateButton,
+            collectedInfoKeys: Object.keys(collectedInfo || {}).length,
           });
+
+          // Garantir que sempre retornamos um objeto válido
+          if (!result.message || typeof result.message !== 'string') {
+            console.error('[ChatWithAssistant] ❌ Resultado inválido antes de retornar:', result);
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Erro ao processar resposta do assistente',
+            });
+          }
 
           return result;
         } catch (error: any) {
