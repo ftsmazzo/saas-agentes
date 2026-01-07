@@ -17,7 +17,21 @@ export default function Home() {
   const { data: plans, isLoading: plansLoading } = trpc.plans.list.useQuery();
   const createPublicCheckout = trpc.payment.createPublicCheckoutSession.useMutation();
 
-  // Removido redirecionamento automático - deixar usuário escolher
+  // Tratar retorno do checkout do Stripe
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const checkoutStatus = searchParams.get('checkout');
+    
+    if (checkoutStatus === 'success') {
+      toast.success('Pagamento realizado com sucesso! Você receberá um email com instruções para ativar sua conta.');
+      // Limpar parâmetro da URL
+      window.history.replaceState({}, '', '/');
+    } else if (checkoutStatus === 'canceled') {
+      toast.info('Checkout cancelado. Você pode tentar novamente quando quiser.');
+      // Limpar parâmetro da URL
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   const handleSubscribe = async (planId: number) => {
     // Abrir modal para coletar dados
