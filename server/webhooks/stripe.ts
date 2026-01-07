@@ -396,23 +396,50 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
         .limit(1);
       
       if (existingCredits[0]) {
-        // Adicionar créditos mensais ao saldo atual
-        await db
-          .update(tenantCredits)
-          .set({
-            currentCredits: sql`${tenantCredits.currentCredits} + ${plan.monthlyCredits}`,
-            totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(tenantCredits.tenantId, tenant.id));
+        // IMPORTANTE: Não adicionar créditos mensais ao currentCredits se já foram atribuídos antes
+        // Os créditos mensais são resetados mensalmente, não acumulados
+        // Se o tenant já tem créditos, apenas atualizar totalCreditsPurchased para histórico
+        // Mas NÃO adicionar ao currentCredits (para evitar duplicação)
         
-        console.log(`[Provisioning] ✅ Créditos atualizados. Novo saldo: ${existingCredits[0].currentCredits + plan.monthlyCredits}`);
+        // Verificar se já recebeu créditos mensais este mês (via lastResetDate)
+        const lastReset = existingCredits[0].lastResetDate;
+        const now = new Date();
+        const isSameMonth = lastReset && 
+          lastReset.getFullYear() === now.getFullYear() && 
+          lastReset.getMonth() === now.getMonth();
+        
+        if (!isSameMonth) {
+          // Se não recebeu créditos este mês, adicionar ao currentCredits
+          await db
+            .update(tenantCredits)
+            .set({
+              currentCredits: sql`${tenantCredits.currentCredits} + ${plan.monthlyCredits}`,
+              totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+              lastResetDate: now,
+              updatedAt: new Date(),
+            })
+            .where(eq(tenantCredits.tenantId, tenant.id));
+          
+          console.log(`[Provisioning] ✅ Créditos mensais adicionados. Novo saldo: ${existingCredits[0].currentCredits + plan.monthlyCredits}`);
+        } else {
+          // Já recebeu créditos este mês, apenas atualizar totalCreditsPurchased para histórico
+          await db
+            .update(tenantCredits)
+            .set({
+              totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${plan.monthlyCredits}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(tenantCredits.tenantId, tenant.id));
+          
+          console.log(`[Provisioning] ✅ Créditos mensais já atribuídos este mês. Apenas atualizado histórico.`);
+        }
       } else {
-        // Criar registro inicial
+        // Criar registro inicial com créditos mensais
         await db.insert(tenantCredits).values({
           tenantId: tenant.id,
           currentCredits: plan.monthlyCredits,
           totalCreditsPurchased: plan.monthlyCredits,
+          lastResetDate: new Date(),
         });
         
         console.log(`[Provisioning] ✅ Registro de créditos criado. Saldo inicial: ${plan.monthlyCredits}`);

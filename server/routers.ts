@@ -1775,39 +1775,56 @@ export const appRouter = router({
       const creditsUsedThisMonth = monthlyUsageResult[0]?.total || 0;
       const monthlyCredits = plan?.monthlyCredits || 0;
       const currentCreditsFromDb = credits.currentCredits || 0;
+      const totalCreditsPurchased = credits.totalCreditsPurchased || 0;
+      const totalCreditsUsed = credits.totalCreditsUsed || 0;
 
-      // Calcular créditos disponíveis dinamicamente baseado nos dados do banco
-      // O problema: o currentCredits no banco pode não estar atualizado com o uso recente
-      // Solução: recalcular baseado nos dados reais gravados no banco
+      // LÓGICA CORRIGIDA:
+      // 1. Créditos mensais do plano são SEMPRE disponíveis (mesmo sem registro na tabela)
+      // 2. Créditos comprados (extras) são adicionados ao currentCredits
+      // 3. Créditos usados são subtraídos do currentCredits quando há uso
+      // 4. Disponíveis = mensais + extras - usados
       
-      // Se o currentCredits do banco não foi atualizado com o uso, então:
-      // currentCreditsFromDb = monthlyCredits + extras (sem subtrair o uso)
-      // Então: calculatedCurrentCredits = currentCreditsFromDb - creditsUsedThisMonth
+      // Se não há registro na tabela, mas há plano com créditos mensais:
+      // - Créditos disponíveis = monthlyCredits - creditsUsedThisMonth
+      // - Extras comprados = 0
       
-      // Se o currentCredits foi atualizado, então:
-      // currentCreditsFromDb = monthlyCredits + extras - creditsUsedThisMonth
-      // Então: calculatedCurrentCredits = currentCreditsFromDb (já está correto)
+      // Se há registro na tabela:
+      // - O currentCredits já tem (mensais + extras - usados) OU apenas (extras - usados)
+      // - Precisamos garantir que os mensais estejam incluídos
       
-      // Para garantir que está correto, vamos sempre recalcular:
-      // Se currentCreditsFromDb + creditsUsedThisMonth >= monthlyCredits, há extras
-      // Então: extras = currentCreditsFromDb + creditsUsedThisMonth - monthlyCredits
-      // E: calculatedCurrentCredits = monthlyCredits + extras - creditsUsedThisMonth
-      // Simplificando: calculatedCurrentCredits = currentCreditsFromDb
+      // Calcular créditos extras comprados (não mensais)
+      // Se totalCreditsPurchased > monthlyCredits, há extras
+      // Mas isso não funciona porque totalCreditsPurchased inclui os mensais também
       
-      // Mas se o currentCredits NÃO foi atualizado:
-      // currentCreditsFromDb = monthlyCredits + extras (sem subtrair uso)
-      // Então: calculatedCurrentCredits = currentCreditsFromDb - creditsUsedThisMonth
+      // MELHOR ABORDAGEM: Recalcular tudo baseado no que realmente temos
+      // 1. Créditos mensais do plano (sempre disponíveis)
+      // 2. Créditos extras = totalCreditsPurchased - monthlyCredits (se positivo)
+      // 3. Créditos usados = creditsUsedThisMonth (do mês atual)
+      // 4. Disponíveis = mensais + extras - usados
       
-      // Vamos sempre recalcular assumindo que o currentCredits não foi atualizado com o uso:
-      const calculatedCurrentCredits = Math.max(0, currentCreditsFromDb - creditsUsedThisMonth);
+      // Calcular extras comprados (créditos além dos mensais)
+      // Se o tenant tem registro e totalCreditsPurchased > monthlyCredits, há extras
+      const extrasPurchased = Math.max(0, totalCreditsPurchased - monthlyCredits);
+      
+      // Créditos disponíveis = mensais + extras - usados
+      const creditsAvailable = Math.max(0, monthlyCredits + extrasPurchased - creditsUsedThisMonth);
+      
+      // Se não há registro na tabela, mas há plano, criar registro virtual
+      // Mas não vamos criar, apenas calcular corretamente
+      
+      // Se há registro e currentCredits está diferente do calculado, pode ser que:
+      // - O uso não foi subtraído corretamente
+      // - Ou os mensais não foram adicionados corretamente
+      // Vamos usar o valor calculado para garantir consistência
 
       return {
-        currentCredits: calculatedCurrentCredits,
-        totalCreditsPurchased: credits.totalCreditsPurchased || 0,
-        totalCreditsUsed: credits.totalCreditsUsed || 0,
+        currentCredits: creditsAvailable, // Créditos disponíveis agora
+        totalCreditsPurchased: totalCreditsPurchased,
+        totalCreditsUsed: totalCreditsUsed,
         totalCreditsBonus: credits.totalCreditsBonus || 0,
         monthlyCredits: monthlyCredits,
         creditsUsedThisMonth: creditsUsedThisMonth,
+        extrasPurchased: extrasPurchased, // Créditos extras comprados (além dos mensais)
         lastResetDate: credits.lastResetDate,
       };
     }),
