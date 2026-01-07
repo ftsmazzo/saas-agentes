@@ -3308,21 +3308,21 @@ export const appRouter = router({
         agentId: z.number().optional(),
         conversationId: z.string().optional(), // ID da conversa para atualizar
         businessName: z.string().min(1, "Nome da empresa é obrigatório"),
-        businessType: z.string().optional(),
+        businessType: z.string().optional().nullable(),
         // Endereço completo
-        street: z.string().optional(),
-        neighborhood: z.string().optional(),
-        city: z.string().optional(),
-        state: z.string().optional(),
-        zipCode: z.string().optional(),
+        street: z.string().optional().nullable(),
+        neighborhood: z.string().optional().nullable(),
+        city: z.string().optional().nullable(),
+        state: z.string().optional().nullable(),
+        zipCode: z.string().optional().nullable(),
         // Área de atendimento
-        serviceArea: z.enum(['city', 'state', 'country']).optional(),
+        serviceArea: z.enum(['city', 'state', 'country']).optional().nullable(),
         // Telefone formatado
-        phone: z.string().optional(),
+        phone: z.string().optional().nullable(),
         // Horário de funcionamento
-        businessHours: z.string().optional(),
+        businessHours: z.string().optional().nullable(),
         // Formas de pagamento
-        paymentMethods: z.array(z.string()).optional(),
+        paymentMethods: z.array(z.string()).optional().nullable(),
         // Personalidade do agente
         personality: z.enum([
           'professional', 
@@ -3333,9 +3333,9 @@ export const appRouter = router({
           'empathetic',
           'energetic',
           'calm'
-        ]).optional(),
+        ]).optional().nullable(),
         // Informações adicionais
-        additionalInfo: z.string().optional(),
+        additionalInfo: z.string().optional().nullable(),
       }))
       .mutation(async ({ ctx, input }) => {
         let tenant = ctx.tenant;
