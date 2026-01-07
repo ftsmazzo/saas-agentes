@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { 
   Save, 
@@ -132,6 +133,7 @@ export default function AgentConfigUnifiedPage() {
   
   const [showAssistant, setShowAssistant] = useState(false);
   const [assistantComplete, setAssistantComplete] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const [formData, setFormData] = useState({
     systemPrompt: "",
@@ -842,6 +844,148 @@ export default function AgentConfigUnifiedPage() {
 
         {/* Botões de Ação */}
         <div className="flex justify-end gap-3">
+          {/* Preview Button */}
+          <Dialog open={showPreview} onOpenChange={setShowPreview}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={updateMutation.isPending}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Visualizar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Preview da Configuração</DialogTitle>
+                <DialogDescription>
+                  Revise todas as configurações antes de salvar
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                {/* Informações Básicas */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Informações Básicas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Prompt do Sistema</Label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap bg-muted p-3 rounded-md max-h-40 overflow-y-auto">
+                        {formData.systemPrompt || <span className="text-muted-foreground italic">Não configurado</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Mensagem de Boas-vindas</Label>
+                      <p className="text-sm mt-1">{formData.welcomeMessage || <span className="text-muted-foreground italic">Não configurado</span>}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Informações da Empresa</Label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{formData.companyInfo || <span className="text-muted-foreground italic">Não configurado</span>}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Modelo e Recursos */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Modelo e Recursos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Modelo OpenAI</Label>
+                      <p className="text-sm mt-1">{formData.openaiModel}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Transferência para Humano:</Label>
+                      <Badge variant={formData.enableHumanHandoff ? "default" : "secondary"}>
+                        {formData.enableHumanHandoff ? "Ativado" : "Desativado"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Transcrição de Áudio:</Label>
+                      <Badge variant={formData.enableAudioTranscription ? "default" : "secondary"}>
+                        {formData.enableAudioTranscription ? "Ativado" : "Desativado"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Processamento de Imagens:</Label>
+                      <Badge variant={formData.enableImageProcessing ? "default" : "secondary"}>
+                        {formData.enableImageProcessing ? "Ativado" : "Desativado"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Ferramentas */}
+                {formData.toolsConfig && formData.toolsConfig.enabledTools && formData.toolsConfig.enabledTools.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Ferramentas Ativadas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.toolsConfig.enabledTools.map((tool: string) => (
+                          <Badge key={tool} variant="outline">{tool}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Validação */}
+                <Card className={!formData.systemPrompt ? "border-red-200 bg-red-50/50" : "border-green-200 bg-green-50/50"}>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {formData.systemPrompt ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      )}
+                      Status da Configuração
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {formData.systemPrompt ? (
+                      <p className="text-sm text-green-700">
+                        ✅ Configuração completa! Você pode salvar e ativar o agente.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-red-700">
+                        ⚠️ Prompt do sistema é obrigatório. Configure antes de salvar.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowPreview(false);
+                    handleSave();
+                  }}
+                  disabled={!formData.systemPrompt || updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Salvar e Fechar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Button
             onClick={handleSave}
             disabled={updateMutation.isPending}
