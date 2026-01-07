@@ -69,6 +69,8 @@ export default function AgentConfigAssistantV3({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingCEP, setIsLoadingCEP] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [shouldShowGenerateButton, setShouldShowGenerateButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const userName = (user?.name || tenant?.companyName || '').split(' ')[0] || '';
