@@ -21,7 +21,22 @@ WHERE "tenantId" = {{ $('Edit Fields2').item.json.tenantId }}
 LIMIT 1;
 ```
 
-### DEPOIS (✅ CORRETO):
+### DEPOIS (✅ CORRETO - Filtrar por agentId):
+
+**Opção 1 - Filtrar diretamente por agentId (RECOMENDADO):**
+```sql
+SELECT 
+  ac."systemPrompt",
+  ac."companyInfo",
+  ac."welcomeMessage",
+  ac."toolsConfig",
+  ac."ragConfig"
+FROM "agentConfigs" ac
+WHERE ac."agentId" = {{ $('Edit Fields2').item.json.agentId }}
+LIMIT 1;
+```
+
+**Opção 2 - Filtrar por tenantId E agentId (mais seguro):**
 ```sql
 SELECT 
   ac."systemPrompt",
@@ -32,8 +47,11 @@ SELECT
 FROM "agentConfigs" ac
 INNER JOIN "agents" a ON ac."agentId" = a.id
 WHERE a."tenantId" = {{ $('Edit Fields2').item.json.tenantId }}
+  AND a.id = {{ $('Edit Fields2').item.json.agentId }}
 LIMIT 1;
 ```
+
+**⚠️ IMPORTANTE:** A Opção 1 é mais simples e eficiente, mas requer que o `agentId` esteja disponível no `Edit Fields2`. Se não estiver, use a Opção 2.
 
 **OU** (se você tiver o `agentId` diretamente):
 ```sql

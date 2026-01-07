@@ -212,6 +212,19 @@ Isso agrega empresa e agente, facilitando identificação e segurança.
    LIMIT 1;
    ```
    
+   **IMPORTANTE:** Depois de buscar o agente, use o `agentId` para buscar a configuração:
+   ```sql
+   SELECT 
+     ac."systemPrompt",
+     ac."companyInfo",
+     ac."welcomeMessage",
+     ac."toolsConfig",
+     ac."ragConfig"
+   FROM "agentConfigs" ac
+   WHERE ac."agentId" = {{ $('Select rows from a table').item.json.id }}
+   LIMIT 1;
+   ```
+   
    **Nota:** O `evolutionInstanceName` no banco é `agent_${agentId}`, não o path completo do webhook.
 
 ### Passo 3: Atualizar "Filter"
