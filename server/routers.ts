@@ -3626,6 +3626,38 @@ ${personalityDescriptions[input.personality || 'professional']}
       }),
 
     /**
+     * Buscar conversa anterior do assistente por agentId
+     */
+    getAssistantConversation: protectedProcedure
+      .input(z.object({
+        agentId: z.number(),
+      }))
+      .query(async ({ ctx, input }) => {
+        let tenant = ctx.tenant;
+        
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
+        }
+
+        // Buscar agente e validar que pertence ao tenant
+        const agent = await db.getAgentById(input.agentId);
+        if (!agent || agent.tenantId !== tenant.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+        }
+
+        // Buscar última conversa do agente
+        const conversation = await db.getAssistantConversationByAgentId(input.agentId);
+        
+        return {
+          conversation: conversation || null,
+        };
+      }),
+
+    /**
      * Assistente conversacional inteligente para configuração do agente
      * Usa OpenAI para conversação livre, sem roteiro fixo
      */
