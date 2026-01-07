@@ -193,6 +193,41 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
 
   console.log(`[Provisioning] Tenant created with ID: ${tenant.id}`);
 
+  // 1.5. Gerar token de ativação e enviar email IMEDIATAMENTE (antes de tudo)
+  // Isso garante que o cliente receba o email mesmo se outras coisas falharem
+  const activationToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+  
+  try {
+    await db.insert(activationTokens).values({
+      tenantId: tenant.id,
+      token: activationToken,
+      expiresAt,
+    });
+    
+    console.log(`[Provisioning] Activation token created: ${activationToken}`);
+    
+    // Enviar email IMEDIATAMENTE
+    await sendActivationEmail(email, activationToken, companyName);
+    console.log(`[Provisioning] ✅ Activation email sent to ${email}`);
+    
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "tenant_created",
+      message: `Tenant created and activation email sent to ${email}`,
+      metadata: JSON.stringify({ email, planId }),
+    });
+  } catch (error: any) {
+    console.error(`[Provisioning] ❌ Erro ao criar token/enviar email:`, error);
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "email_failed",
+      message: `Failed to create token/send activation email: ${error.message}`,
+      metadata: JSON.stringify({ error: error.message }),
+    });
+    // Continuar mesmo se email falhar - não bloquear provisionamento
+  }
+
   // 2. Criar agente PRIMEIRO (sem Evolution ainda)
   console.log(`[Provisioning] 🚀 Criando agente para tenant ${tenant.id}...`);
   let agent;
@@ -416,43 +451,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     }),
   });
 
-  // 6. Gerar token de ativação e enviar email PRIMEIRO (antes de recursos externos)
-  // Isso garante que o cliente receba o email mesmo se outras coisas falharem
-  let activationToken: string | null = null;
-  try {
-    activationToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-    
-    await db.insert(activationTokens).values({
-      tenantId: tenant.id,
-      token: activationToken,
-      expiresAt,
-    });
-    
-    console.log(`[Provisioning] Activation token created: ${activationToken}`);
-    
-    // Enviar email IMEDIATAMENTE após criar token
-    await sendActivationEmail(email, activationToken, companyName);
-    console.log(`[Provisioning] ✅ Activation email sent to ${email}`);
-    
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "tenant_created",
-      message: `Tenant created and activation email sent to ${email}`,
-      metadata: JSON.stringify({ email, planId }),
-    });
-  } catch (error: any) {
-    console.error(`[Provisioning] ❌ Erro ao criar token/enviar email:`, error);
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "email_failed",
-      message: `Failed to create token/send activation email: ${error.message}`,
-      metadata: JSON.stringify({ error: error.message }),
-    });
-    // Continuar mesmo se email falhar - não bloquear provisionamento
-  }
-
-  // 7. Atribuir créditos mensais do plano
+  // 6. Atribuir créditos mensais do plano
   try {
     const plan = await getPlanByStripePriceId(session.price?.id as string || "");
     if (plan?.monthlyCredits) {
