@@ -193,41 +193,6 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
 
   console.log(`[Provisioning] Tenant created with ID: ${tenant.id}`);
 
-  // 1.5. Gerar token de ativação e enviar email IMEDIATAMENTE (antes de tudo)
-  // Isso garante que o cliente receba o email mesmo se outras coisas falharem
-  const activationToken = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-  
-  try {
-    await db.insert(activationTokens).values({
-      tenantId: tenant.id,
-      token: activationToken,
-      expiresAt,
-    });
-    
-    console.log(`[Provisioning] Activation token created: ${activationToken}`);
-    
-    // Enviar email IMEDIATAMENTE
-    await sendActivationEmail(email, activationToken, companyName);
-    console.log(`[Provisioning] ✅ Activation email sent to ${email}`);
-    
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "tenant_created",
-      message: `Tenant created and activation email sent to ${email}`,
-      metadata: JSON.stringify({ email, planId }),
-    });
-  } catch (error: any) {
-    console.error(`[Provisioning] ❌ Erro ao criar token/enviar email:`, error);
-    await createPlatformLog({
-      tenantId: tenant.id,
-      eventType: "email_failed",
-      message: `Failed to create token/send activation email: ${error.message}`,
-      metadata: JSON.stringify({ error: error.message }),
-    });
-    // Continuar mesmo se email falhar - não bloquear provisionamento
-  }
-
   // 2. Criar agente PRIMEIRO (sem Evolution ainda)
   console.log(`[Provisioning] 🚀 Criando agente para tenant ${tenant.id}...`);
   let agent;
@@ -397,23 +362,48 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
           console.warn(`[Provisioning] ⚠️ Erro ao conectar Agent Bot ao inbox (não crítico):`, connectError.message);
         }
         
-        // Criar webhook no Chatwoot DIRETAMENTE via API (não depender do N8N)
-        try {
-          const webhookName = `Webhook ${companyName || `Tenant ${tenant.id}`} - Agente ${agent.id}`;
-          const webhookId = await createChatwootWebhook(agentWebhookUrl, webhookName);
-          console.log(`[Provisioning] ✅ Webhook criado no Chatwoot diretamente: ID=${webhookId}, URL=${agentWebhookUrl}`);
-          
-          // Salvar webhookId no agente (se houver campo para isso no futuro)
-          // Por enquanto, apenas logar
-        } catch (webhookError: any) {
-          console.error(`[Provisioning] ❌ Erro ao criar webhook no Chatwoot:`, webhookError.message);
-          // Não falhar provisionamento, mas logar erro
-          await createPlatformLog({
-            tenantId: tenant.id,
-            eventType: "webhook_creation_failed",
-            message: `Failed to create webhook in Chatwoot: ${webhookError.message}`,
-            metadata: JSON.stringify({ error: webhookError.message, agentId: agent.id, webhookUrl: agentWebhookUrl }),
-          });
+        // Criar webhook no Chatwoot via N8N workflow (método que funcionava antes)
+        const createWebhookWorkflowUrl = process.env.N8N_CREATE_WEBHOOK_WORKFLOW_URL;
+        if (createWebhookWorkflowUrl) {
+          try {
+            const axios = (await import('axios')).default;
+            const chatwootUrl = process.env.CHATWOOT_URL;
+            const chatwootToken = process.env.CHATWOOT_API_TOKEN;
+            const chatwootAccountId = process.env.CHATWOOT_ACCOUNT_ID;
+            
+            if (chatwootUrl && chatwootToken && chatwootAccountId) {
+              await axios.post(createWebhookWorkflowUrl, {
+                tenantId: tenant.id,
+                agentId: agent.id,
+                webhookUrl: agentWebhookUrl,
+                chatwootAccountId,
+                chatwootUrl,
+                chatwootToken,
+                action: 'activate',
+                timestamp: new Date().toISOString(),
+              }, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000,
+              });
+              
+              console.log(`[Provisioning] ✅ Webhook criado no Chatwoot via N8N workflow: ${agentWebhookUrl}`);
+            } else {
+              console.warn(`[Provisioning] ⚠️ Variáveis do Chatwoot não configuradas, pulando criação de webhook`);
+            }
+          } catch (webhookError: any) {
+            console.error(`[Provisioning] ❌ Erro ao criar webhook via N8N workflow:`, webhookError.message);
+            console.error(`[Provisioning] URL chamada: ${createWebhookWorkflowUrl}`);
+            console.error(`[Provisioning] Erro completo:`, webhookError.response?.data || webhookError.message);
+            // Não falhar provisionamento, mas logar erro
+            await createPlatformLog({
+              tenantId: tenant.id,
+              eventType: "webhook_creation_failed",
+              message: `Failed to create webhook in Chatwoot via N8N: ${webhookError.message}`,
+              metadata: JSON.stringify({ error: webhookError.message, agentId: agent.id, webhookUrl: agentWebhookUrl }),
+            });
+          }
+        } else {
+          console.warn(`[Provisioning] ⚠️ N8N_CREATE_WEBHOOK_WORKFLOW_URL não configurado, pulando criação de webhook`);
         }
         
         await createPlatformLog({
