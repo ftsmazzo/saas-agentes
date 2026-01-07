@@ -31,28 +31,6 @@ interface CollectedInfo {
   additionalInfo?: string;
 }
 
-// Função para buscar CEP via ViaCEP
-async function fetchCEP(cep: string): Promise<{
-  logradouro?: string;
-  bairro?: string;
-  localidade?: string;
-  uf?: string;
-  erro?: boolean;
-} | null> {
-  const cleanCEP = cep.replace(/\D/g, '');
-  if (cleanCEP.length !== 8) return null;
-
-  try {
-    const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
-    const data = await response.json();
-    if (data.erro) return { erro: true };
-    return data;
-  } catch (error) {
-    console.error('Erro ao buscar CEP:', error);
-    return null;
-  }
-}
-
 export default function AgentConfigAssistantV3({ 
   agentId,
   onComplete,
@@ -67,7 +45,6 @@ export default function AgentConfigAssistantV3({
   const [collectedInfo, setCollectedInfo] = useState<CollectedInfo>({});
   const [userInput, setUserInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoadingCEP, setIsLoadingCEP] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [shouldShowGenerateButton, setShouldShowGenerateButton] = useState(false);
@@ -502,16 +479,6 @@ export default function AgentConfigAssistantV3({
               </div>
             </div>
           )}
-          {isLoadingCEP && (
-            <div className="flex gap-2 justify-start">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Loader2 className="h-4 w-4 text-primary animate-pulse" />
-              </div>
-              <div className="bg-background border rounded-lg p-3">
-                <p className="text-sm">Buscando endereço pelo CEP...</p>
-              </div>
-            </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -527,12 +494,12 @@ export default function AgentConfigAssistantV3({
               }
             }}
             placeholder="Digite sua mensagem..."
-            disabled={isProcessing || isLoadingCEP}
+            disabled={isProcessing}
             className="flex-1"
           />
           <Button
             onClick={handleSendMessage}
-            disabled={isProcessing || isLoadingCEP || !userInput.trim()}
+            disabled={isProcessing || !userInput.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>
