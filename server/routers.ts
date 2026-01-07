@@ -4185,12 +4185,13 @@ Sua resposta deve ter duas partes SEPARADAS claramente:
 2. **PROMPT_ATUALIZADO**: (Aqui você coloca o prompt completo atualizado com as novas informações)
 
 **IMPORTANTE SOBRE O PROMPT_ATUALIZADO:**
-- Deve ser o prompt COMPLETO, não apenas fragmentos
-- Deve seguir o template fornecido acima
+- Deve ser o prompt COMPLETO seguindo TODAS as 8 seções do template
+- Deve incluir TODAS as seções: 1. Identidade, 2. Contexto, 3. Responsabilidades, 4. Diretrizes, 5. Regras, 6. Fluxo, 7. Casos Especiais, 8. Formato
 - Deve incluir TODAS as informações coletadas até agora
-- Se faltar informação, use "(a definir)" ou "(informação pendente)"
-- NUNCA retorne apenas "**" ou markdown vazio
-- O prompt deve ter pelo menos 200 caracteres para ser válido
+- Se faltar informação, use "(a definir)" ou "(informação pendente)" mas mantenha TODAS as seções
+- NUNCA retorne apenas a primeira seção - SEMPRE retorne o prompt COMPLETO
+- O prompt deve ter pelo menos 1000 caracteres para ser válido
+- SEMPRE termine com a seção 8 (Formato de Saída)
 
 **EXEMPLO DE FORMATO:**
 \`\`\`
@@ -4323,20 +4324,37 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
             promptGenerated: false,
           });
 
-          // Verificar se a IA está perguntando se pode finalizar
+          // Verificar se a IA está perguntando se pode finalizar OU se o prompt está completo
           const messageLower = userMessage.toLowerCase();
           const isAskingToFinalize = (messageLower.includes('posso finalizar') || 
                                       messageLower.includes('posso gerar') || 
                                       messageLower.includes('pode finalizar') ||
-                                      messageLower.includes('finalizar o prompt')) &&
+                                      messageLower.includes('finalizar o prompt') ||
+                                      messageLower.includes('finalizar') ||
+                                      messageLower.includes('pronto para finalizar') ||
+                                      messageLower.includes('pode salvar')) &&
                                      (messageLower.includes('prompt') || 
-                                      messageLower.includes('agora'));
+                                      messageLower.includes('agora') ||
+                                      messageLower.includes('configuração') ||
+                                      true); // Se mencionar finalizar, mostrar botão
+          
+          // Também mostrar botão se o prompt draft estiver completo (tem todas as seções)
+          const promptIsComplete = updatedPromptDraft && 
+                                    updatedPromptDraft.length > 1000 &&
+                                    updatedPromptDraft.includes('**1. Identidade') &&
+                                    updatedPromptDraft.includes('**2. Contexto') &&
+                                    updatedPromptDraft.includes('**3. Responsabilidades') &&
+                                    updatedPromptDraft.includes('**4. Diretrizes') &&
+                                    updatedPromptDraft.includes('**5. Regras') &&
+                                    updatedPromptDraft.includes('**6. Fluxo') &&
+                                    updatedPromptDraft.includes('**7. Tratamento') &&
+                                    updatedPromptDraft.includes('**8. Formato');
 
           return {
             message: userMessage,
             conversationId: conversationId,
             promptDraft: updatedPromptDraft,
-            shouldShowFinalizeButton: isAskingToFinalize,
+            shouldShowFinalizeButton: isAskingToFinalize || promptIsComplete,
           };
         } catch (error: any) {
           console.error('[BuildPromptIncrementally] ❌ Erro:', error);
