@@ -16,7 +16,7 @@ import { activationTokens } from "../drizzle/schema";
 import Stripe from 'stripe';
 import axios from 'axios';
 import { getTenantCredits } from "./credit-system";
-import { usageTransactions, tenantCredits } from "../drizzle/schema";
+import { usageTransactions, tenantCredits, agents } from "../drizzle/schema";
 import { desc, and, gte, lte, eq, sql } from "drizzle-orm";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || 'sk_test_dummy';
@@ -1163,11 +1163,117 @@ export const appRouter = router({
           });
         }
 
+        // PROVISIONAR RECURSOS EXTERNOS (Evolution, Chatwoot, N8N)
+        console.log(`[CreateAgent] 🚀 Iniciando provisionamento de recursos externos para agente ${agent.id}...`);
+        
+        // 1. Criar instância Evolution (nome único por agente)
+        let evolutionData: { instanceName: string; apiKey: string } | null = null;
+        const evolutionInstanceName = `agent_${agent.id}`;
+        try {
+          console.log(`[CreateAgent] 📱 Criando instância Evolution: ${evolutionInstanceName}...`);
+          // Criar instância Evolution diretamente com nome único por agente
+          const axios = (await import('axios')).default;
+          const evolutionApi = axios.create({
+            baseURL: process.env.EVOLUTION_API_URL || "",
+            headers: {
+              "apikey": process.env.EVOLUTION_API_KEY || ""
+            },
+            timeout: 30000,
+          });
+          
+          const response = await evolutionApi.post("/instance/create", {
+            instanceName: evolutionInstanceName,
+            integration: "WHATSAPP-BAILEYS",
+            qrcode: true,
+            chatwootAccountId: process.env.CHATWOOT_ACCOUNT_ID || "1",
+            chatwootToken: process.env.CHATWOOT_API_TOKEN,
+            chatwootUrl: process.env.CHATWOOT_URL,
+            chatwootSignMsg: true,
+            chatwootReopenConversation: true,
+            chatwootConversationPending: false,
+            chatwootImportContacts: true,
+            chatwootNameInbox: input.agentName,
+            groupsIgnore: true,
+            alwaysOnline: false,
+            readMessages: false,
+            readStatus: false
+          });
+          
+          evolutionData = {
+            instanceName: response.data.instance.instanceName || evolutionInstanceName,
+            apiKey: response.data.hash || "",
+          };
+          console.log(`[CreateAgent] ✅ Evolution criado: ${evolutionData.instanceName}`);
+        } catch (error: any) {
+          console.error(`[CreateAgent] ❌ Erro ao criar Evolution:`, error);
+          await db.createPlatformLog({
+            tenantId: tenant.id,
+            eventType: 'evolution_failed',
+            severity: 'error',
+            message: `Falha ao criar Evolution para agente ${agent.id}: ${error.message}`,
+          });
+          // Continuar mesmo se Evolution falhar
+        }
+
+        // 2. Buscar inbox Chatwoot criado pelo Evolution
+        let chatwootInboxId: number | null = null;
+        if (evolutionData?.instanceName) {
+          try {
+            // Aguardar um pouco para o Evolution criar o inbox
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const { findChatwootInboxByName } = await import("./chatwoot-integration");
+            chatwootInboxId = await findChatwootInboxByName(input.agentName);
+            if (chatwootInboxId) {
+              console.log(`[CreateAgent] ✅ Chatwoot inbox encontrado: ${chatwootInboxId}`);
+            } else {
+              console.log(`[CreateAgent] ⚠️ Chatwoot inbox não encontrado imediatamente`);
+            }
+          } catch (error: any) {
+            console.warn(`[CreateAgent] ⚠️ Erro ao buscar inbox (não crítico):`, error.message);
+          }
+        }
+
+        // 3. Clonar workflow N8N (nome único por agente)
+        let workflowData: { workflowId: string } | null = null;
+        if (evolutionData?.instanceName) {
+          try {
+            console.log(`[CreateAgent] 🔄 Clonando workflow N8N para agente ${agent.id}...`);
+            workflowData = await cloneWorkflowForTenant(agent.id, input.agentName, evolutionData.instanceName);
+            console.log(`[CreateAgent] ✅ Workflow N8N clonado: ${workflowData.workflowId}`);
+          } catch (error: any) {
+            console.error(`[CreateAgent] ❌ Erro ao clonar workflow:`, error);
+            await db.createPlatformLog({
+              tenantId: tenant.id,
+              eventType: 'workflow_failed',
+              severity: 'error',
+              message: `Falha ao clonar workflow para agente ${agent.id}: ${error.message}`,
+            });
+            // Continuar mesmo se workflow falhar
+          }
+        }
+
+        // 4. Atualizar agente com dados dos recursos provisionados
+        if (evolutionData || workflowData || chatwootInboxId) {
+          try {
+            await db.update(agents)
+              .set({
+                evolutionInstanceName: evolutionData?.instanceName || null,
+                evolutionApiKey: evolutionData?.apiKey || null,
+                n8nWorkflowId: workflowData?.workflowId || null,
+                chatwootInboxId: chatwootInboxId || null,
+              })
+              .where(eq(agents.id, agent.id));
+            console.log(`[CreateAgent] ✅ Agente atualizado com recursos provisionados`);
+          } catch (error: any) {
+            console.error(`[CreateAgent] ⚠️ Erro ao atualizar agente (não crítico):`, error.message);
+          }
+        }
+
         await db.createPlatformLog({
           tenantId: tenant.id,
-          eventType: 'config_updated',
+          eventType: 'agent_created',
           severity: 'info',
-          message: `Agente "${input.agentName}" criado com sucesso`,
+          message: `Agente "${input.agentName}" criado com sucesso. Evolution: ${evolutionData?.instanceName || 'não criado'}, N8N: ${workflowData?.workflowId || 'não criado'}, Chatwoot: ${chatwootInboxId || 'não encontrado'}`,
         });
 
         console.log(`[CreateAgent] ✅✅✅ Agente criado com sucesso! ID=${agent.id}, Nome=${agent.name}`);
