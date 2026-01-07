@@ -427,21 +427,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     console.warn(`[Provisioning] chatwootInboxId: ${finalAgent?.chatwootInboxId}, workflowId: ${workflowData?.workflowId}`);
   }
   
-  // Log final do agente criado
-  const finalAgentCheck = await getAgentById(agent.id);
-  await createPlatformLog({
-    tenantId: tenant.id,
-    eventType: "agent_created",
-    message: `Agente criado automaticamente durante provisionamento: ${finalAgentCheck?.name || agent.name}`,
-    metadata: JSON.stringify({ 
-      agentId: agent.id, 
-      evolutionInstance: finalAgentCheck?.evolutionInstanceName,
-      n8nWorkflow: finalAgentCheck?.n8nWorkflowId,
-      chatwootInbox: finalAgentCheck?.chatwootInboxId,
-    }),
-  });
-
-  // 6. Atribuir créditos mensais do plano
+  // 6. Atribuir créditos mensais do plano PRIMEIRO (antes de qualquer uso)
   try {
     const plan = await getPlanByStripePriceId(session.price?.id as string || "");
     if (plan?.monthlyCredits) {
@@ -535,9 +521,22 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
   
   console.log(`[Provisioning] Activation token created: ${activationToken}`);
 
-  // 8. Enviar email de ativação APENAS se tudo estiver funcionando
-  // Verificar se recursos críticos foram criados
+  // 8. Log final do agente criado e verificar recursos
   const finalAgentCheck = await getAgentById(agent.id);
+  await createPlatformLog({
+    tenantId: tenant.id,
+    eventType: "agent_created",
+    message: `Agente criado automaticamente durante provisionamento: ${finalAgentCheck?.name || agent.name}`,
+    metadata: JSON.stringify({ 
+      agentId: agent.id, 
+      evolutionInstance: finalAgentCheck?.evolutionInstanceName,
+      n8nWorkflow: finalAgentCheck?.n8nWorkflowId,
+      chatwootInbox: finalAgentCheck?.chatwootInboxId,
+    }),
+  });
+
+  // 9. Enviar email de ativação APENAS se tudo estiver funcionando
+  // Verificar se recursos críticos foram criados
   const hasEvolution = finalAgentCheck?.evolutionInstanceName && finalAgentCheck?.evolutionInstanceName.startsWith('agent_');
   const hasWorkflow = finalAgentCheck?.n8nWorkflowId;
   const hasInbox = finalAgentCheck?.chatwootInboxId;
