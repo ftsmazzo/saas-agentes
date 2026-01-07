@@ -4188,19 +4188,19 @@ Sua resposta deve ter duas partes SEPARADAS claramente:
 - Deve ser o prompt COMPLETO, não apenas fragmentos
 - Deve seguir o template fornecido acima
 - Deve incluir TODAS as informações coletadas até agora
-- Se faltar informação, use "[a definir]" ou "[informação pendente]"
+- Se faltar informação, use "(a definir)" ou "(informação pendente)"
 - NUNCA retorne apenas "**" ou markdown vazio
 - O prompt deve ter pelo menos 200 caracteres para ser válido
 
 **EXEMPLO DE FORMATO:**
-```
-[Mensagem conversacional para o usuário aqui]
+\`\`\`
+Mensagem conversacional para o usuário aqui
 
 PROMPT_ATUALIZADO:
 # **1. Identidade e Propósito**
-Você é **[Nome do Agente]**, agente de IA da **[Nome da Empresa]**...
-[resto do prompt completo]
-```
+Você é Nome do Agente, agente de IA da Nome da Empresa...
+resto do prompt completo
+\`\`\`
 
 Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.`;
 
