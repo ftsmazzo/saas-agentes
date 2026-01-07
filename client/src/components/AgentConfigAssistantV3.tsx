@@ -321,11 +321,9 @@ export default function AgentConfigAssistantV3({
       }
     }
 
-    // Extrair informações da mensagem primeiro
-    let updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
+    // Extrair informações da mensagem
+    const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
     
-    // Número do endereço removido - deixar o assistente lidar com isso na conversa
-
     // Atualizar estado com todas as informações coletadas
     setCollectedInfo(updatedInfo);
 
