@@ -4185,34 +4185,34 @@ Sua resposta DEVE ter EXATAMENTE duas partes separadas por uma linha em branco:
 2. **PROMPT_ATUALIZADO:** seguido do prompt COMPLETO
 
 **EXEMPLO EXATO DO FORMATO:**
-```
-Ótimo! Vou atualizar o prompt com essas informações.
+\`\`\`
+Mensagem conversacional para o usuário
 
 PROMPT_ATUALIZADO:
 # **1. Identidade e Propósito**
-Você é [nome], agente de IA da [empresa]...
+Você é nome do agente, agente de IA da nome da empresa...
 
 ## **2. Contexto e Conhecimento**
-[conteúdo completo]
+conteúdo completo da seção 2
 
 ## **3. Responsabilidades e Tarefas**
-[conteúdo completo]
+conteúdo completo da seção 3
 
 ## **4. Diretrizes de Comportamento**
-[conteúdo completo]
+conteúdo completo da seção 4
 
 ## **5. Regras e Restrições**
-[conteúdo completo]
+conteúdo completo da seção 5
 
 ## **6. Fluxo de Trabalho**
-[conteúdo completo]
+conteúdo completo da seção 6
 
 ## **7. Tratamento de Casos Especiais**
-[conteúdo completo]
+conteúdo completo da seção 7
 
 ## **8. Formato de Saída**
-[conteúdo completo]
-```
+conteúdo completo da seção 8
+\`\`\`
 
 **REGRAS CRÍTICAS SOBRE O PROMPT_ATUALIZADO:**
 - Você DEVE usar EXATAMENTE o template fornecido acima
