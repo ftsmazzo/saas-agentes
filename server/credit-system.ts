@@ -132,8 +132,9 @@ export async function costToCredits(costUSD: number): Promise<number> {
   const creditValueUSD = creditValueUSDStr ? parseFloat(creditValueUSDStr) : 0.002; // Padrão: $0.002 por crédito
 
   // Buscar multiplicador de margem
+  // 200% de margem = 3x o custo (custo + 200% = 3x)
   const markupStr = await getCreditConfig('markupMultiplier');
-  const markup = markupStr ? parseFloat(markupStr) : 1.5; // Padrão: 50% de margem
+  const markup = markupStr ? parseFloat(markupStr) : 3.0; // Padrão: 200% de margem (3x o custo)
 
   // Buscar mínimo de créditos
   const minCreditsStr = await getCreditConfig('minCreditsPerTransaction');
@@ -156,15 +157,17 @@ export async function costToCredits(costUSD: number): Promise<number> {
 export async function recordUsageTransaction(
   tenantId: number,
   usageData: UsageData,
-  costCalculation: CostCalculation
+  costCalculation: CostCalculation,
+  agentId?: number
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   // 1. Criar transação detalhada
-  console.log(`[CreditSystem] 💾 Gravando transação no banco para tenant ${tenantId}...`);
+  console.log(`[CreditSystem] 💾 Gravando transação no banco para tenant ${tenantId}${agentId ? `, agente ${agentId}` : ''}...`);
   const transactionResult = await db.insert(usageTransactions).values({
     tenantId,
+    agentId: agentId || null, // Associar transação ao agente específico
     operation: usageData.operation,
     model: usageData.model,
     tokensInput: usageData.tokensInput || 0,

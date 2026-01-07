@@ -195,6 +195,11 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         // Processar múltiplos usos em lote
         let dataArray = payload.data;
         
+        // Buscar primeiro agente do tenant para associar transações (se não tiver agentId no metadata)
+        const { getFirstAgentByTenantId } = await import("../db");
+        const defaultAgent = await getFirstAgentByTenantId(tenantId);
+        const defaultAgentId = defaultAgent?.id;
+        
         console.log(`[N8N Webhook] 🔍 Data recebido (tipo: ${typeof dataArray}):`, dataArray);
         
         // Se data não é array, pode ser que o N8N enviou campos individuais
@@ -214,6 +219,7 @@ export async function handleN8NWebhook(req: Request, res: Response) {
                 textLength: payload.textLegength || payload.textLength || 0,
                 workflowId: payload.WorkFlowId || payload.workflowId || payload.idWorkflow,
                 executionId: payload.ExecutionId || payload.executionId,
+                agentId: defaultAgentId, // Adicionar agentId ao metadata
               }
             };
             dataArray = [usageItem];

@@ -3587,18 +3587,34 @@ PROMPT MELHORADO:`;
       
       // Filtrar conversas do Evolution e do sistema
       const filteredConversations = conversations.filter((conv: any) => {
-        // Filtrar conversas com nome "Evolution" (são conversas do sistema)
+        // Filtrar conversas com nome "Evolution" ou "123456@whatsapp" (são conversas do sistema)
         const contactName = conv.meta?.sender?.name || 
                            conv.contact?.name || 
                            conv.meta?.sender?.identifier ||
+                           conv.contact?.identifier ||
                            '';
+        const contactPhone = conv.meta?.sender?.phone_number ||
+                            conv.contact?.phone_number ||
+                            conv.contact?.identifier ||
+                            '';
         const nameLower = contactName.toLowerCase();
+        const phoneLower = contactPhone.toLowerCase();
         
+        // Filtrar Evolution e sistema
         if (nameLower === 'evolution' || 
             nameLower.includes('evolution') ||
             nameLower === 'system' ||
             nameLower.includes('sistema')) {
           console.log(`[Chatwoot Router] 🚫 Filtrando conversa do Evolution: ${contactName}`);
+          return false;
+        }
+        
+        // Filtrar 123456@whatsapp (conexão da Evolution)
+        if (phoneLower.includes('123456@whatsapp') ||
+            phoneLower === '123456' ||
+            contactPhone === '123456@whatsapp' ||
+            contactName === '123456@whatsapp') {
+          console.log(`[Chatwoot Router] 🚫 Filtrando conversa da Evolution (123456@whatsapp): ${contactPhone || contactName}`);
           return false;
         }
         
