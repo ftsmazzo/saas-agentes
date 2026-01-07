@@ -4297,7 +4297,11 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
           let updatedPromptDraft = currentPromptDraft;
           
           // Tentar extrair o prompt de diferentes formatos
-          let promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:\n\n|$)/i);
+          let promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*\n?([\s\S]*)$/i);
+          if (!promptMatch) {
+            // Tentar formato com linha após PROMPT_ATUALIZADO:
+            promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*\n([\s\S]*?)(?:\n\n|$)/i);
+          }
           if (!promptMatch) {
             // Tentar formato alternativo com --- ou ```
             promptMatch = assistantMessage.match(/---\s*PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:---|$)/i);
@@ -4307,17 +4311,50 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
             promptMatch = assistantMessage.match(/```[\s\S]*?PROMPT_ATUALIZADO:\s*([\s\S]*?)```/i);
           }
           
-          if (promptMatch && promptMatch[1]) {
-            const extractedPrompt = promptMatch[1].trim();
-            // Validar que não é apenas markdown vazio ou caracteres especiais
-            if (extractedPrompt.length > 10 && !extractedPrompt.match(/^[\*\-\s]+$/)) {
-              updatedPromptDraft = extractedPrompt;
+          // Se não encontrou PROMPT_ATUALIZADO, tentar extrair o prompt completo diretamente da mensagem
+          // (quando a IA retorna o prompt completo na mensagem sem o marcador)
+          if (!promptMatch) {
+            // Procurar por um prompt completo que comece com "# **1. Identidade e Propósito"
+            const fullPromptMatch = assistantMessage.match(/#\s*\*\*1\.\s*Identidade e Propósito\*\*([\s\S]*?)(?:\n\n(?:Se precisar|Se quiser|Digite|$)|$)/i);
+            if (fullPromptMatch) {
+              const potentialPrompt = fullPromptMatch[0].trim();
+              // Validar que tem pelo menos 3 seções
+              const sectionCount = (potentialPrompt.match(/##?\s*\*\*/g) || []).length;
+              if (sectionCount >= 3 && potentialPrompt.length > 500) {
+                updatedPromptDraft = potentialPrompt;
+                console.log('[BuildPrompt] ✅ Prompt extraído diretamente da mensagem com', sectionCount, 'seções');
+                promptMatch = { 1: potentialPrompt }; // Simular match para pular validação abaixo
+              }
             }
           }
           
+          if (promptMatch && promptMatch[1]) {
+            const extractedPrompt = promptMatch[1].trim();
+            // Validar que não é apenas markdown vazio ou caracteres especiais
+            // E que tem pelo menos 500 caracteres (prompt completo)
+            if (extractedPrompt.length > 500 && !extractedPrompt.match(/^[\*\-\s]+$/)) {
+              // Validar que tem pelo menos 3 seções (não só a primeira)
+              const sectionCount = (extractedPrompt.match(/##?\s*\*\*/g) || []).length;
+              if (sectionCount >= 3) {
+                updatedPromptDraft = extractedPrompt;
+                console.log('[BuildPrompt] ✅ Prompt extraído com', sectionCount, 'seções, tamanho:', extractedPrompt.length);
+              } else {
+                console.log('[BuildPrompt] ⚠️ Prompt extraído tem apenas', sectionCount, 'seções - muito curto');
+              }
+            } else {
+              console.log('[BuildPrompt] ⚠️ Prompt extraído inválido - tamanho:', extractedPrompt.length);
+            }
+          } else {
+            console.log('[BuildPrompt] ⚠️ Não foi possível extrair PROMPT_ATUALIZADO da resposta');
+            console.log('[BuildPrompt] Primeiros 500 chars da resposta:', assistantMessage.substring(0, 500));
+          }
+          
           // Se o prompt draft ainda está vazio ou inválido, manter o anterior
-          if (!updatedPromptDraft || updatedPromptDraft.length < 10) {
-            updatedPromptDraft = currentPromptDraft;
+          if (!updatedPromptDraft || updatedPromptDraft.length < 500) {
+            if (currentPromptDraft && currentPromptDraft.length > 500) {
+              updatedPromptDraft = currentPromptDraft;
+              console.log('[BuildPrompt] Mantendo prompt anterior (tamanho:', currentPromptDraft.length, ')');
+            }
           }
 
           // Remover a marcação do prompt da mensagem para o usuário
