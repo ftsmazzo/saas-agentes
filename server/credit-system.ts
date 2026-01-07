@@ -229,15 +229,37 @@ export async function recordUsageTransaction(
       }
     }
   } else {
-    // Criar registro inicial (assumindo que créditos já foram adicionados via plano)
-    console.log(`[CreditSystem] 💾 Criando registro de créditos para tenant ${tenantId}...`);
+    // Criar registro inicial
+    // IMPORTANTE: Se não há registro, significa que créditos mensais ainda não foram atribuídos
+    // Neste caso, vamos criar com 0 e deduzir, permitindo saldo negativo temporariamente
+    // Mas vamos buscar o plano para ver se deveria ter créditos
+    console.log(`[CreditSystem] ⚠️ Registro de créditos não encontrado para tenant ${tenantId}. Criando...`);
+    
+    // Tentar buscar plano do tenant para verificar se deveria ter créditos
+    const { getTenantById } = await import("./db");
+    const tenant = await getTenantById(tenantId);
+    let initialCredits = 0;
+    
+    if (tenant?.currentPlanId) {
+      const { getPlanById } = await import("./db");
+      const plan = await getPlanById(tenant.currentPlanId);
+      if (plan?.monthlyCredits) {
+        initialCredits = plan.monthlyCredits;
+        console.log(`[CreditSystem] 📋 Plano encontrado: ${plan.name} com ${plan.monthlyCredits} créditos mensais. Atribuindo...`);
+      }
+    }
+    
+    // Criar registro: créditos iniciais - créditos usados
+    const finalCredits = initialCredits - costCalculation.creditsUsed;
     const insertResult = await db.insert(tenantCredits).values({
       tenantId,
-      currentCredits: -costCalculation.creditsUsed, // Negativo pois está deduzindo
+      currentCredits: finalCredits,
+      totalCreditsPurchased: initialCredits,
       totalCreditsUsed: costCalculation.creditsUsed,
+      lastResetDate: initialCredits > 0 ? new Date() : null,
     }).returning();
     
-    console.log(`[CreditSystem] ✅ Registro de créditos criado. Saldo inicial: ${insertResult[0]?.currentCredits || 'N/A'}`);
+    console.log(`[CreditSystem] ✅ Registro de créditos criado. Saldo inicial: ${finalCredits} (${initialCredits} créditos do plano - ${costCalculation.creditsUsed} usados)`);
   }
 
   // 3. Atualizar métricas agregadas do mês atual

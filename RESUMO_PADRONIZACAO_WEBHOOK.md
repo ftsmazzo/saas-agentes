@@ -67,8 +67,8 @@
 
 **Adicionar campos:**
 - `webhookPath`: `={{$json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() }}`
-- `tenantId`: `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/tenant_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
-- `agentId`: `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/agent_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
+- `tenantId`: `={{$json.webhookUrl ? parseInt(($json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() || '').split('/')[0].replace(/^tenant_/i, '')) || null : null}}`
+- `agentId`: `={{$json.webhookUrl ? parseInt(($json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() || '').split('/').pop().replace(/^agent_/i, '')) || null : null}}`
 
 ### 3. Atualizar "Select rows from a table"
 

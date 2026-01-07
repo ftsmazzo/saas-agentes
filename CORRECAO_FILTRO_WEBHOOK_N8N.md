@@ -184,12 +184,12 @@ Isso agrega empresa e agente, facilitando identificação e segurança.
 
    **Campo `tenantId` (extrair do path):**
    - **Name:** `tenantId`
-   - **Value:** `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/tenant_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
+   - **Value:** `={{$json.webhookUrl ? parseInt(($json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() || '').split('/')[0].replace(/^tenant_/i, '')) || null : null}}`
    - **Type:** Number
 
    **Campo `agentId` (extrair do path):**
    - **Name:** `agentId`
-   - **Value:** `={{const path = $json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop(); const match = path.match(/agent_(\\d+)/i); return match ? parseInt(match[1]) : null;}}`
+   - **Value:** `={{$json.webhookUrl ? parseInt(($json.webhookUrl.split('/webhook/')[1] || $json.webhookUrl.split('/').pop() || '').split('/').pop().replace(/^agent_/i, '')) || null : null}}`
    - **Type:** Number
 
 ### Passo 2: Atualizar "Select rows from a table"
