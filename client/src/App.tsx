@@ -28,7 +28,6 @@ import ClientLogin from "./pages/client/Login";
 import MessagesPage from "./pages/client/Messages";
 import CreateAgentPage from "./pages/client/CreateAgent";
 import AgentsPage from "./pages/client/Agents";
-import AgentsPage from "./pages/client/Agents";
 import ActivateAccount from "./pages/ActivateAccount";
 
 function Router() {
