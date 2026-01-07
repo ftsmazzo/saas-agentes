@@ -3798,14 +3798,15 @@ ${existingCompanyInfo ? `
 - Se o usuário tiver dúvidas sobre alternativas, explique de forma clara
 - Use o nome do usuário quando apropriado
 - Seja empático e compreensivo
-- Quando coletar TODAS as informações necessárias (especialmente nome da empresa), SEMPRE ofereça gerar o prompt dizendo algo como: "Perfeito! Tenho todas as informações. Posso gerar o prompt do sistema agora?"
-- NUNCA se despeça sem gerar o prompt se ainda não foi gerado
+- **CRÍTICO:** Quando coletar TODAS as informações necessárias (especialmente nome da empresa), você DEVE perguntar explicitamente: "Perfeito! Tenho todas as informações necessárias. Posso gerar o prompt do sistema agora?" ou "Tenho tudo que preciso. Posso gerar o prompt agora?" ou variações similares. NUNCA assuma que pode gerar sem perguntar primeiro.
+- Aguarde a confirmação do usuário (sim, pode, gerar, ok, etc.) antes de sugerir que o prompt será gerado
 - Se o usuário já tem configuração, ofereça atualizar ou revisar
 
 **IMPORTANTE:**
 - Você DEVE seguir o roteiro, mas de forma humanizada
-- Você DEVE coletar TODAS as informações antes de finalizar
-- Você DEVE sempre gerar o prompt ao final (não apenas conversar)
+- Você DEVE coletar TODAS as informações antes de perguntar se pode gerar
+- Você DEVE SEMPRE perguntar explicitamente se pode gerar o prompt - NUNCA assuma
+- Você DEVE aguardar confirmação do usuário antes de finalizar
 - Você DEVE entender contexto e permitir adicionar informações a qualquer momento`;
 
           // Preparar mensagens para OpenAI
@@ -3895,10 +3896,15 @@ ${existingCompanyInfo ? `
             // Não falhar a requisição se não conseguir salvar
           }
 
-          // Verificar se o assistente está oferecendo gerar o prompt
+          // Verificar se o assistente está PERGUNTANDO se pode gerar o prompt
+          // O botão só deve aparecer quando o usuário confirmar (detectado no frontend)
           const messageLower = assistantMessage.toLowerCase();
-          const shouldShowGenerateButton = (messageLower.includes('gerar') || messageLower.includes('criar') || messageLower.includes('configurar')) && 
+          const isAskingToGenerate = (messageLower.includes('posso gerar') || messageLower.includes('posso criar') || messageLower.includes('pode gerar') || messageLower.includes('pode criar')) && 
             (messageLower.includes('prompt') || messageLower.includes('sistema') || messageLower.includes('agora'));
+          
+          // shouldShowGenerateButton será true apenas quando o assistente perguntar E o usuário confirmar
+          // Por enquanto, retornamos false aqui - o frontend detectará a confirmação do usuário
+          const shouldShowGenerateButton = false;
 
           const result = {
             message: assistantMessage,

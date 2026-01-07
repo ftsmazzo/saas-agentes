@@ -154,10 +154,8 @@ export default function AgentConfigAssistantV3({
         setCollectedInfo((prev) => ({ ...prev, ...data.collectedInfo }));
       }
       
-      // Mostrar botão de gerar se o assistente sugeriu
-      if (data.shouldShowGenerateButton) {
-        setShouldShowGenerateButton(true);
-      }
+      // Não mostrar botão automaticamente - só quando usuário confirmar
+      // O botão será mostrado quando o usuário responder "sim", "pode", etc. em handleSendMessage
     },
     onError: (error) => {
       toast.error(`Erro: ${error.message}`);
@@ -243,6 +241,24 @@ export default function AgentConfigAssistantV3({
 
     const userMessage = userInput.trim();
     addMessage('user', userMessage);
+    
+    // Verificar se o usuário está confirmando que pode gerar o prompt
+    const userMessageLower = userMessage.toLowerCase();
+    const isConfirmingGenerate = userMessageLower.includes('sim') || 
+                                  userMessageLower.includes('pode') || 
+                                  userMessageLower.includes('gerar') || 
+                                  userMessageLower.includes('ok') || 
+                                  userMessageLower.includes('pode gerar') ||
+                                  userMessageLower.includes('pode criar') ||
+                                  userMessageLower.includes('vamos') ||
+                                  userMessageLower.includes('pode sim') ||
+                                  userMessageLower.includes('claro') ||
+                                  userMessageLower.includes('pode');
+    
+    // Se o usuário confirmou, mostrar o botão de gerar
+    if (isConfirmingGenerate && collectedInfo.businessName) {
+      setShouldShowGenerateButton(true);
+    }
     
     // Extrair informações da mensagem
     const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
