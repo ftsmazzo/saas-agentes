@@ -3744,13 +3744,77 @@ ${personalityDescriptions[input.personality || 'professional']}
           // Garantir que sempre seja um objeto válido
           let collectedInfo: any = {};
           if (input.collectedInfo && typeof input.collectedInfo === 'object') {
-            collectedInfo = input.collectedInfo;
+            collectedInfo = { ...input.collectedInfo };
           } else if (previousConversation?.collectedInfo && typeof previousConversation.collectedInfo === 'object') {
-            collectedInfo = previousConversation.collectedInfo;
+            collectedInfo = { ...previousConversation.collectedInfo };
           } else if (existingCompanyInfo && typeof existingCompanyInfo === 'object') {
-            collectedInfo = existingCompanyInfo;
+            collectedInfo = { ...existingCompanyInfo };
           }
-          console.log('[ChatWithAssistant] 📝 CollectedInfo:', Object.keys(collectedInfo).length, 'campos');
+          
+          // Extrair informações das últimas mensagens do usuário
+          const userMessages = input.messages.filter((msg: any) => msg.role === 'user').slice(-3);
+          for (const userMsg of userMessages) {
+            const msg = userMsg.content || '';
+            
+            // Extrair nome da empresa
+            if (!collectedInfo.businessName) {
+              const nameMatch = msg.match(/(?:empresa|negócio|nome|chama)[\s:]+(.+?)(?:\.|$|,|é|será)/i);
+              if (nameMatch) {
+                const name = nameMatch[1].trim();
+                if (name.length > 2) {
+                  collectedInfo.businessName = name;
+                }
+              }
+              const nameMatch2 = msg.match(/(.+?)\s+(?:é|será|chama)\s+(?:minha|meu|o|a)\s+(?:empresa|negócio)/i);
+              if (nameMatch2 && !collectedInfo.businessName) {
+                collectedInfo.businessName = nameMatch2[1].trim();
+              }
+            }
+            
+            // Extrair tipo de negócio
+            if (!collectedInfo.businessType) {
+              const typeMatch = msg.match(/(?:ramo|tipo|atividade|setor|área|atua)[\s:]+(.+?)(?:\.|$|,)/i);
+              if (typeMatch) {
+                collectedInfo.businessType = typeMatch[1].trim();
+              }
+            }
+            
+            // Extrair endereço completo
+            const addressMatch = msg.match(/(?:rua|avenida|av\.|r\.)[\s:]+([^,]+)[,\s]+(?:n[úu]mero|n[º°]|#)?[\s:]*(\d+)?[,\s]+([^,]+)?[,\s]+([^,]+)?[,\s]+([A-Z]{2})?/i);
+            if (addressMatch) {
+              if (!collectedInfo.street) collectedInfo.street = addressMatch[1]?.trim();
+              if (!collectedInfo.streetNumber && addressMatch[2]) collectedInfo.streetNumber = addressMatch[2].trim();
+              if (!collectedInfo.neighborhood && addressMatch[3]) collectedInfo.neighborhood = addressMatch[3].trim();
+              if (!collectedInfo.city && addressMatch[4]) collectedInfo.city = addressMatch[4].trim();
+              if (!collectedInfo.state && addressMatch[5]) collectedInfo.state = addressMatch[5].trim();
+            }
+            
+            // Extrair CEP
+            const cepMatch = msg.match(/\b\d{5}-?\d{3}\b/);
+            if (cepMatch && !collectedInfo.zipCode) {
+              collectedInfo.zipCode = cepMatch[0].replace(/\D/g, '');
+            }
+            
+            // Extrair telefone
+            const phoneMatch = msg.match(/(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}/);
+            if (phoneMatch && !collectedInfo.phone) {
+              collectedInfo.phone = phoneMatch[0].replace(/\D/g, '');
+            }
+            
+            // Extrair horário
+            const hoursMatch = msg.match(/(?:horário|funcionamento|atende)[\s:]+(.+?)(?:\.|$|,)/i);
+            if (hoursMatch && !collectedInfo.businessHours) {
+              collectedInfo.businessHours = hoursMatch[1].trim();
+            }
+            
+            // Extrair personalidade
+            const personalityMatch = msg.match(/(?:tom|personalidade|tom de voz|ser|quero que seja)[\s:]+(.+?)(?:\.|$|,)/i);
+            if (personalityMatch && !collectedInfo.personality) {
+              collectedInfo.personality = personalityMatch[1].trim();
+            }
+          }
+          
+          console.log('[ChatWithAssistant] 📝 CollectedInfo atualizado:', Object.keys(collectedInfo).length, 'campos', collectedInfo);
 
           // Construir contexto do sistema para o assistente
           const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.
@@ -3792,15 +3856,18 @@ Você deve seguir este roteiro (de forma natural e conversacional):
 **CONTEXTO ATUAL:**
 ${agent ? `- Agente: ${agent.name} (ID: ${agent.id})` : '- Novo agente (ainda não criado)'}
 ${existingConfig ? `- Já existe uma configuração para este agente` : '- Este é um agente novo, sem configuração ainda'}
-${existingCompanyInfo ? `
+
 **INFORMAÇÕES JÁ COLETADAS:**
-- Nome da empresa: ${existingCompanyInfo.name || 'Não informado'}
-- Ramo: ${existingCompanyInfo.type || 'Não informado'}
-- Endereço: ${existingCompanyInfo.fullAddress || existingCompanyInfo.street || 'Não informado'}
-- Telefone: ${existingCompanyInfo.phone || 'Não informado'}
-- Horário: ${existingCompanyInfo.businessHours || 'Não informado'}
-- Formas de pagamento: ${Array.isArray(existingCompanyInfo.paymentMethods) ? existingCompanyInfo.paymentMethods.join(', ') : (existingCompanyInfo.paymentMethods || 'Não informado')}
-` : ''}
+- Nome da empresa: ${collectedInfo.businessName || 'Não informado'}
+- Ramo: ${collectedInfo.businessType || 'Não informado'}
+- Endereço: ${collectedInfo.street ? `${collectedInfo.street}${collectedInfo.streetNumber ? ', ' + collectedInfo.streetNumber : ''}${collectedInfo.neighborhood ? ', ' + collectedInfo.neighborhood : ''}${collectedInfo.city ? ', ' + collectedInfo.city : ''}${collectedInfo.state ? ', ' + collectedInfo.state : ''}${collectedInfo.zipCode ? ' - CEP: ' + collectedInfo.zipCode : ''}` : 'Não informado'}
+- Telefone: ${collectedInfo.phone || 'Não informado'}
+- Horário: ${collectedInfo.businessHours || 'Não informado'}
+- Personalidade: ${collectedInfo.personality || 'Não informado'}
+- Público-alvo: ${collectedInfo.audience || 'Não informado'}
+- Finalidade: ${collectedInfo.purpose || 'Não informado'}
+
+**IMPORTANTE:** Use essas informações coletadas! NÃO pergunte novamente sobre informações que JÁ foram coletadas. Se o nome da empresa já foi informado, NÃO pergunte novamente.
 
 **DIRETRIZES IMPORTANTES:**
 - Siga o roteiro acima, mas de forma natural e conversacional
@@ -3814,18 +3881,20 @@ ${existingCompanyInfo ? `
 - Se o usuário tiver dúvidas sobre alternativas, explique de forma clara
 - Use o nome do usuário quando apropriado
 - Seja empático e compreensivo
-- **CRÍTICO - GERAÇÃO DE PROMPT:** Quando coletar TODAS as informações necessárias (especialmente nome da empresa, endereço completo, telefone, horário), você DEVE perguntar explicitamente: "Perfeito! Tenho todas as informações necessárias. Posso gerar o prompt do sistema agora?" ou "Tenho tudo que preciso. Posso gerar o prompt agora?" ou "Ótimo! Posso gerar o prompt do sistema para você?" 
+- **CRÍTICO - NÃO REPETIR PERGUNTAS:** Se uma informação JÁ está na seção "INFORMAÇÕES JÁ COLETADAS" acima, NUNCA pergunte novamente. Use a informação que já foi coletada.
+- **CRÍTICO - GERAÇÃO DE PROMPT:** Quando tiver informações suficientes (especialmente nome da empresa OU finalidade do agente), você DEVE perguntar explicitamente: "Perfeito! Tenho informações suficientes. Posso gerar o prompt do sistema agora?" ou "Tenho o que preciso. Posso gerar o prompt agora?" ou "Ótimo! Posso gerar o prompt do sistema para você?" 
 - **NUNCA diga que vai gerar o prompt** - você apenas PERGUNTA se pode gerar
 - **NUNCA mostre o prompt gerado na conversa** - isso será feito pelo sistema quando o usuário clicar no botão "Gerar Prompt"
 - **NUNCA diga "Vou gerar agora" ou "Gerando..."** - apenas pergunte e aguarde a confirmação do usuário
-- Quando o usuário confirmar (sim, pode, ok, etc.), você deve apenas agradecer brevemente e informar que o botão aparecerá - NÃO diga que vai gerar
+- Quando o usuário confirmar (sim, pode, ok, etc.), você deve apenas agradecer brevemente - NÃO diga que vai gerar
 - Se o usuário já tem configuração, ofereça atualizar ou revisar
 
 **IMPORTANTE:**
 - Você DEVE seguir o roteiro, mas de forma humanizada
 - Você DEVE ser INTELIGENTE e interpretar múltiplas informações de uma vez
 - Você DEVE confirmar o que entendeu antes de continuar perguntando
-- Você DEVE coletar TODAS as informações antes de perguntar se pode gerar
+- Você DEVE usar as informações já coletadas - NÃO pergunte novamente
+- Você NÃO precisa coletar TODAS as informações - pode gerar com informações suficientes
 - Você DEVE SEMPRE perguntar explicitamente se pode gerar o prompt - NUNCA assuma
 - Você DEVE aguardar confirmação do usuário antes de finalizar
 - Você DEVE entender contexto e permitir adicionar informações a qualquer momento`;
