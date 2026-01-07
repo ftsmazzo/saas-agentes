@@ -7,7 +7,7 @@ import crypto from "crypto";
 import { createEvolutionInstance, deleteEvolutionInstance } from "../evolution-integration";
 import { cloneWorkflowForTenant } from "../n8n-integration";
 import { sendActivationEmail } from "../email";
-import { findChatwootInboxByName, createChatwootAgent, createOrUpdateChatwootAgentBot, connectAgentBotToInbox, createChatwootWebhook } from "../chatwoot-integration";
+import { findChatwootInboxByName, createChatwootAgent, createOrUpdateChatwootAgentBot, connectAgentBotToInbox } from "../chatwoot-integration";
 
 const stripeApiKey = process.env.STRIPE_SANDBOX_SECRET_KEY || process.env.STRIPE_SECRET_KEY || "sk_test_dummy";
 if (stripeApiKey === "sk_test_dummy") {
