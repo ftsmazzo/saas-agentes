@@ -3758,6 +3758,7 @@ ${existingCompanyInfo ? `
           });
         }
       }),
+  }),
 
   // ========== ROTAS DE INTERAÇÕES E ANÁLISE ==========
   
