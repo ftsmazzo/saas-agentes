@@ -589,7 +589,7 @@ async function handlePlanUpgrade(session: Stripe.Checkout.Session) {
     .set({
       currentPlanId: plan.id,
       stripeSubscriptionId: subscriptionId || tenant.stripeSubscriptionId || undefined,
-      subscriptionStatus: subscriptionId ? 'active' as const : tenant.subscriptionStatus,
+      subscriptionStatus: subscriptionId ? ('active' as const) : (tenant.subscriptionStatus || undefined),
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, parseInt(tenantId)));
@@ -685,7 +685,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   await db.update(tenants)
     .set({
       currentPlanId: plan.id,
-      subscriptionStatus: subscription.status as any,
+      subscriptionStatus: (subscription.status === 'active' || subscription.status === 'past_due' || subscription.status === 'canceled' || subscription.status === 'incomplete' || subscription.status === 'trialing') 
+        ? (subscription.status as 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing')
+        : undefined,
       updatedAt: new Date(),
     })
     .where(eq(tenants.id, tenant.id));
