@@ -4179,19 +4179,57 @@ ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir a
 - Você DEVE aceitar respostas como "não sei", "depois", etc.
 - Você DEVE sempre retornar o prompt atualizado em construção
 
-**FORMATO DE RESPOSTA:**
-Sua resposta deve ter duas partes SEPARADAS claramente:
-1. **Mensagem para o usuário**: Continue a conversa naturalmente (esta parte será mostrada ao usuário)
-2. **PROMPT_ATUALIZADO**: (Aqui você coloca o prompt completo atualizado com as novas informações)
+**FORMATO DE RESPOSTA OBRIGATÓRIO:**
+Sua resposta DEVE ter EXATAMENTE duas partes separadas por uma linha em branco:
 
-**IMPORTANTE SOBRE O PROMPT_ATUALIZADO:**
-- Deve ser o prompt COMPLETO seguindo TODAS as 8 seções do template
-- Deve incluir TODAS as seções: 1. Identidade, 2. Contexto, 3. Responsabilidades, 4. Diretrizes, 5. Regras, 6. Fluxo, 7. Casos Especiais, 8. Formato
-- Deve incluir TODAS as informações coletadas até agora
-- Se faltar informação, use "(a definir)" ou "(informação pendente)" mas mantenha TODAS as seções
-- NUNCA retorne apenas a primeira seção - SEMPRE retorne o prompt COMPLETO
-- O prompt deve ter pelo menos 1000 caracteres para ser válido
-- SEMPRE termine com a seção 8 (Formato de Saída)
+1. **Mensagem conversacional** (será mostrada ao usuário)
+2. **PROMPT_ATUALIZADO:** seguido do prompt COMPLETO
+
+**EXEMPLO EXATO DO FORMATO:**
+```
+Ótimo! Vou atualizar o prompt com essas informações.
+
+PROMPT_ATUALIZADO:
+# **1. Identidade e Propósito**
+Você é [nome], agente de IA da [empresa]...
+
+## **2. Contexto e Conhecimento**
+[conteúdo completo]
+
+## **3. Responsabilidades e Tarefas**
+[conteúdo completo]
+
+## **4. Diretrizes de Comportamento**
+[conteúdo completo]
+
+## **5. Regras e Restrições**
+[conteúdo completo]
+
+## **6. Fluxo de Trabalho**
+[conteúdo completo]
+
+## **7. Tratamento de Casos Especiais**
+[conteúdo completo]
+
+## **8. Formato de Saída**
+[conteúdo completo]
+```
+
+**REGRAS CRÍTICAS SOBRE O PROMPT_ATUALIZADO:**
+- SEMPRE retorne o prompt COMPLETO com TODAS as 8 seções, mesmo que algumas estejam incompletas
+- NUNCA retorne apenas a seção 1 - isso é um ERRO GRAVE
+- Se faltar informação em alguma seção, use "(a definir)" mas mantenha a estrutura completa
+- O prompt COMPLETO deve ter no mínimo 1500 caracteres
+- SEMPRE inclua todas estas seções nesta ordem:
+  1. Identidade e Propósito
+  2. Contexto e Conhecimento  
+  3. Responsabilidades e Tarefas
+  4. Diretrizes de Comportamento
+  5. Regras e Restrições
+  6. Fluxo de Trabalho
+  7. Tratamento de Casos Especiais
+  8. Formato de Saída
+- Se você retornar apenas a primeira seção, o sistema não funcionará corretamente
 
 **EXEMPLO DE FORMATO:**
 \`\`\`
@@ -4232,8 +4270,8 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
             body: JSON.stringify({
               model: 'gpt-4o', // Usando GPT-4o para melhor capacidade
               messages: openaiMessages,
-              temperature: 0.8,
-              max_tokens: 2000,
+              temperature: 0.7, // Reduzir um pouco para respostas mais consistentes
+              max_tokens: 4000, // Aumentar para permitir prompt completo
             }),
           });
 
