@@ -322,10 +322,7 @@ export default function AgentConfigAssistantV3({
     }
 
     // Verificar se a última mensagem do assistente foi perguntando sobre número do endereço
-    const lastAssistantMessage = messages.length > 0 && messages[messages.length - 1].role === 'assistant' 
-      ? messages[messages.length - 1].content.toLowerCase() 
-      : '';
-    
+    // Reutilizar lastAssistantMessage já declarada acima
     const isAskingForStreetNumber = lastAssistantMessage.includes('número do endereço') || 
                                      lastAssistantMessage.includes('número') ||
                                      lastAssistantMessage.includes('numero');
