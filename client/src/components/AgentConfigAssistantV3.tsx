@@ -283,35 +283,68 @@ export default function AgentConfigAssistantV3({
       }
     }
     
-    // Extrair informações da mensagem
-    const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
-    if (JSON.stringify(updatedInfo) !== JSON.stringify(collectedInfo)) {
-      setCollectedInfo(updatedInfo);
-    }
-
     // Verificar se é CEP e buscar automaticamente
     const cepMatch = userMessage.match(/\b\d{5}-?\d{3}\b/);
-    if (cepMatch && !updatedInfo.street) {
+    if (cepMatch && !collectedInfo.street) {
       const cep = cepMatch[0].replace(/\D/g, '');
       if (cep.length === 8) {
         setIsLoadingCEP(true);
-        const cepData = await fetchCEP(cep);
-        setIsLoadingCEP(false);
-        
-        if (cepData && !cepData.erro) {
-          setCollectedInfo((prev) => ({
-            ...prev,
-            street: cepData.logradouro || prev.street,
-            neighborhood: cepData.bairro || prev.neighborhood,
-            city: cepData.localidade || prev.city,
-            state: cepData.uf || prev.state,
-            zipCode: cep,
-          }));
-          addMessage('assistant', `✅ CEP encontrado! Preenchi: ${cepData.logradouro || ''}, ${cepData.bairro || ''}, ${cepData.localidade || ''} - ${cepData.uf || ''}\n\nQual é o número do endereço?`);
+        try {
+          const cepData = await fetchCEP(cep);
+          setIsLoadingCEP(false);
+          
+          if (cepData && !cepData.erro) {
+            setCollectedInfo((prev) => ({
+              ...prev,
+              street: cepData.logradouro || prev.street,
+              neighborhood: cepData.bairro || prev.neighborhood,
+              city: cepData.localidade || prev.city,
+              state: cepData.uf || prev.state,
+              zipCode: cep,
+            }));
+            addMessage('assistant', `✅ CEP encontrado! Preenchi: ${cepData.logradouro || ''}, ${cepData.bairro || ''}, ${cepData.localidade || ''} - ${cepData.uf || ''}\n\nQual é o número do endereço?`);
+            setUserInput('');
+            return;
+          } else {
+            setIsLoadingCEP(false);
+            addMessage('assistant', '❌ CEP não encontrado. Por favor, verifique o CEP ou informe o endereço manualmente.');
+            setUserInput('');
+            return;
+          }
+        } catch (error) {
+          setIsLoadingCEP(false);
+          console.error('Erro ao buscar CEP:', error);
+          addMessage('assistant', '❌ Erro ao buscar CEP. Por favor, tente novamente ou informe o endereço manualmente.');
           setUserInput('');
           return;
         }
       }
+    }
+
+    // Verificar se a última mensagem do assistente foi perguntando sobre número do endereço
+    const lastAssistantMessage = messages.length > 0 && messages[messages.length - 1].role === 'assistant' 
+      ? messages[messages.length - 1].content.toLowerCase() 
+      : '';
+    
+    const isAskingForStreetNumber = lastAssistantMessage.includes('número do endereço') || 
+                                     lastAssistantMessage.includes('número') ||
+                                     lastAssistantMessage.includes('numero');
+    
+    // Se o assistente perguntou sobre número e o usuário digitou apenas números, extrair como número
+    if (isAskingForStreetNumber && !collectedInfo.streetNumber) {
+      const numberOnly = userMessage.replace(/\D/g, '');
+      if (numberOnly.length > 0 && numberOnly.length <= 10) {
+        setCollectedInfo((prev) => ({
+          ...prev,
+          streetNumber: numberOnly,
+        }));
+      }
+    }
+
+    // Extrair informações da mensagem
+    const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
+    if (JSON.stringify(updatedInfo) !== JSON.stringify(collectedInfo)) {
+      setCollectedInfo(updatedInfo);
     }
 
     setUserInput('');
