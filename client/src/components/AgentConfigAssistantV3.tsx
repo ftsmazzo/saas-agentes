@@ -332,44 +332,6 @@ export default function AgentConfigAssistantV3({
       }
     }
     
-    // Verificar se é CEP e buscar automaticamente
-    const cepMatch = userMessage.match(/\b\d{5}-?\d{3}\b/);
-    if (cepMatch && !collectedInfo.street) {
-      const cep = cepMatch[0].replace(/\D/g, '');
-      if (cep.length === 8) {
-        setIsLoadingCEP(true);
-        try {
-          const cepData = await fetchCEP(cep);
-          setIsLoadingCEP(false);
-          
-          if (cepData && !cepData.erro) {
-            setCollectedInfo((prev) => ({
-              ...prev,
-              street: cepData.logradouro || prev.street,
-              neighborhood: cepData.bairro || prev.neighborhood,
-              city: cepData.localidade || prev.city,
-              state: cepData.uf || prev.state,
-              zipCode: cep,
-            }));
-            addMessage('assistant', `✅ CEP encontrado! Preenchi: ${cepData.logradouro || ''}, ${cepData.bairro || ''}, ${cepData.localidade || ''} - ${cepData.uf || ''}`);
-            setUserInput('');
-            return;
-          } else {
-            setIsLoadingCEP(false);
-            addMessage('assistant', '❌ CEP não encontrado. Por favor, verifique o CEP ou informe o endereço manualmente.');
-            setUserInput('');
-            return;
-          }
-        } catch (error) {
-          setIsLoadingCEP(false);
-          console.error('Erro ao buscar CEP:', error);
-          addMessage('assistant', '❌ Erro ao buscar CEP. Por favor, tente novamente ou informe o endereço manualmente.');
-          setUserInput('');
-          return;
-        }
-      }
-    }
-
     // Extrair informações da mensagem
     const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
     
