@@ -204,15 +204,64 @@ export default function AgentConfigAssistantV3({
     setMessages((prev) => [...prev, newMessage]);
   };
 
-  // Extrair informações da mensagem do usuário
+  // Extrair informações da mensagem do usuário de forma mais inteligente
   const extractInfoFromMessage = (message: string, currentInfo: CollectedInfo): CollectedInfo => {
     const lower = message.toLowerCase();
     const updated = { ...currentInfo };
 
-    // Nome da empresa
-    if (!updated.businessName && (lower.includes('empresa') || lower.includes('negócio') || lower.includes('nome'))) {
-      const match = message.match(/(?:empresa|negócio|nome)[\s:]+(.+?)(?:\.|$|,)/i);
-      if (match) updated.businessName = match[1].trim();
+    // Nome da empresa - múltiplos padrões
+    if (!updated.businessName) {
+      // Padrão 1: "empresa X", "negócio X", "nome X"
+      const match1 = message.match(/(?:empresa|negócio|nome|chama)[\s:]+(.+?)(?:\.|$|,|é|será)/i);
+      if (match1) {
+        const name = match1[1].trim();
+        // Evitar pegar palavras muito curtas ou comuns
+        if (name.length > 2 && !['a', 'o', 'de', 'da', 'do', 'em', 'no', 'na'].includes(name.toLowerCase())) {
+          updated.businessName = name;
+        }
+      }
+      // Padrão 2: "X é minha empresa", "X é o negócio"
+      const match2 = message.match(/(.+?)\s+(?:é|será|chama)\s+(?:minha|meu|o|a)\s+(?:empresa|negócio)/i);
+      if (match2 && !updated.businessName) {
+        updated.businessName = match2[1].trim();
+      }
+    }
+
+    // Tipo de negócio/ramo
+    if (!updated.businessType) {
+      const typeMatch = message.match(/(?:ramo|tipo|atividade|setor|área)[\s:]+(.+?)(?:\.|$|,)/i);
+      if (typeMatch) {
+        updated.businessType = typeMatch[1].trim();
+      }
+      // Padrões comuns: "sou de X", "trabalho com X", "vendo X"
+      const typeMatch2 = message.match(/(?:sou de|trabalho com|vendo|vendo|atendo|atua em)\s+(.+?)(?:\.|$|,)/i);
+      if (typeMatch2 && !updated.businessType) {
+        updated.businessType = typeMatch2[1].trim();
+      }
+    }
+
+    // Público-alvo
+    if (!updated.audience) {
+      const audienceMatch = message.match(/(?:público|clientes|atende|atender|falar com)[\s:]+(.+?)(?:\.|$|,)/i);
+      if (audienceMatch) {
+        updated.audience = audienceMatch[1].trim();
+      }
+    }
+
+    // Personalidade/tom
+    if (!updated.personality) {
+      const personalityMatch = message.match(/(?:tom|personalidade|tom de voz|ser|quero que seja)[\s:]+(.+?)(?:\.|$|,)/i);
+      if (personalityMatch) {
+        updated.personality = personalityMatch[1].trim();
+      }
+    }
+
+    // Finalidade/objetivo
+    if (!updated.purpose) {
+      const purposeMatch = message.match(/(?:objetivo|finalidade|propósito|vai|serve para)[\s:]+(.+?)(?:\.|$|,)/i);
+      if (purposeMatch) {
+        updated.purpose = purposeMatch[1].trim();
+      }
     }
 
     // CEP
