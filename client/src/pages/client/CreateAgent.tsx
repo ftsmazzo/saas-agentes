@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Sparkles
 } from "lucide-react";
-import AgentConfigAssistantV3 from "@/components/AgentConfigAssistantV3";
+import AgentConfigAssistant from "@/components/AgentConfigAssistant";
 
 export default function CreateAgentPage() {
   const [, setLocation] = useLocation();
