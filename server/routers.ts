@@ -97,6 +97,22 @@ async function deleteAgentCompletely(agent: db.Agent): Promise<{ success: boolea
     }
   }
 
+  // 3.5. Deletar webhook do Chatwoot (formato padronizado)
+  const n8nApiUrl = process.env.N8N_API_URL;
+  if (n8nApiUrl && agent.tenantId) {
+    const agentWebhookUrl = `${n8nApiUrl}/webhook/tenant_${agent.tenantId}/agent_${agent.id}`;
+    try {
+      const deleted = await deleteChatwootWebhookByUrl(agentWebhookUrl);
+      if (deleted) {
+        console.log(`[Delete Agent] ✅ Webhook Chatwoot "${agentWebhookUrl}" deletado`);
+      } else {
+        console.log(`[Delete Agent] ⚠️ Webhook Chatwoot "${agentWebhookUrl}" não encontrado`);
+      }
+    } catch (error: any) {
+      console.warn(`[Delete Agent] ⚠️ Erro ao deletar webhook Chatwoot (não crítico):`, error.message);
+    }
+  }
+
   // 4. Deletar inbox do Chatwoot
   if (agent.chatwootInboxId) {
     try {
@@ -217,21 +233,35 @@ async function deleteTenantCompletely(tenant: db.Tenant): Promise<{ success: boo
     console.warn(`[Delete] ⚠️ Erro ao deletar Agent Bot (não crítico):`, error.message);
   }
 
-  // 3.7. Deletar webhook do Chatwoot criado pelo N8N
+  // 3.7. Deletar webhooks do Chatwoot (formato novo: tenant_${tenantId}/agent_${agentId})
   const n8nApiUrl = process.env.N8N_API_URL;
   if (n8nApiUrl) {
+    // Deletar webhook de cada agente (formato padronizado)
+    for (const agent of agents) {
+      if (agent.id) {
+        const agentWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}/agent_${agent.id}`;
+        try {
+          const deleted = await deleteChatwootWebhookByUrl(agentWebhookUrl);
+          if (deleted) {
+            console.log(`[Delete] ✅ Webhook Chatwoot "${agentWebhookUrl}" deletado (agente ${agent.id})`);
+          } else {
+            console.log(`[Delete] ⚠️ Webhook Chatwoot "${agentWebhookUrl}" não encontrado (pode já ter sido deletado)`);
+          }
+        } catch (error: any) {
+          console.warn(`[Delete] ⚠️ Erro ao deletar webhook Chatwoot para agente ${agent.id}:`, error.message);
+        }
+      }
+    }
+    
+    // Deletar webhook formato antigo (compatibilidade)
     const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
     try {
       const deleted = await deleteChatwootWebhookByUrl(tenantWebhookUrl);
       if (deleted) {
-        console.log(`[Delete] ✅ Webhook Chatwoot "${tenantWebhookUrl}" deletado`);
-      } else {
-        console.log(`[Delete] ⚠️ Webhook Chatwoot "${tenantWebhookUrl}" não encontrado (pode já ter sido deletado ou não foi criado)`);
+        console.log(`[Delete] ✅ Webhook Chatwoot formato antigo "${tenantWebhookUrl}" deletado`);
       }
     } catch (error: any) {
-      const errorMsg = `Chatwoot Webhook: ${error.message}`;
-      console.error(`[Delete] ❌ Erro ao deletar webhook Chatwoot:`, errorMsg);
-      // Não adicionar como erro crítico, apenas logar
+      // Não é erro crítico
     }
   }
 
