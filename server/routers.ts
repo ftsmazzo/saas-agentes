@@ -3804,24 +3804,51 @@ ${existingCompanyInfo ? `
           }
 
           const data = await response.json();
-          const assistantMessage = data.choices[0].message.content.trim();
+          
+          if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            console.error('[ChatWithAssistant] ❌ Resposta inválida da OpenAI:', data);
+            throw new Error('Resposta inválida da OpenAI');
+          }
+
+          const assistantMessage = data.choices[0].message.content?.trim();
+          
+          if (!assistantMessage) {
+            console.error('[ChatWithAssistant] ❌ Mensagem vazia da OpenAI');
+            throw new Error('Mensagem vazia recebida da OpenAI');
+          }
+
+          console.log('[ChatWithAssistant] ✅ Resposta recebida da OpenAI:', {
+            messageLength: assistantMessage.length,
+            preview: assistantMessage.substring(0, 100),
+          });
 
           // Salvar conversa no banco
           try {
+            const messagesToSave = [
+              ...input.messages.slice(-10).map((msg: any) => ({
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp || new Date().toISOString(),
+              })),
+              { 
+                role: 'assistant', 
+                content: assistantMessage, 
+                timestamp: new Date().toISOString() 
+              },
+            ];
+
             await db.createOrUpdateAssistantConversation({
               tenantId: tenant.id,
               agentId: agent?.id,
               conversationId: conversationId,
-              messages: [
-                ...input.messages.slice(-10), // Últimas 10 mensagens
-                { role: 'assistant', content: assistantMessage, timestamp: new Date().toISOString() },
-              ],
-              collectedInfo: collectedInfo,
+              messages: messagesToSave,
+              collectedInfo: collectedInfo || {},
               isComplete: false,
               promptGenerated: false,
             });
+            console.log('[ChatWithAssistant] 💾 Conversa salva no banco');
           } catch (error: any) {
-            console.error('[Assistant] Erro ao salvar conversa:', error);
+            console.error('[ChatWithAssistant] ⚠️ Erro ao salvar conversa (não crítico):', error.message);
             // Não falhar a requisição se não conseguir salvar
           }
 
@@ -3830,18 +3857,27 @@ ${existingCompanyInfo ? `
           const shouldShowGenerateButton = (messageLower.includes('gerar') || messageLower.includes('criar') || messageLower.includes('configurar')) && 
             (messageLower.includes('prompt') || messageLower.includes('sistema') || messageLower.includes('agora'));
 
-          return {
+          const result = {
             message: assistantMessage,
             success: true,
             conversationId: conversationId,
             shouldShowGenerateButton: shouldShowGenerateButton,
-            collectedInfo: collectedInfo,
+            collectedInfo: collectedInfo || {},
           };
+
+          console.log('[ChatWithAssistant] ✅ Retornando resposta:', {
+            messageLength: assistantMessage.length,
+            conversationId: conversationId,
+            shouldShowGenerateButton: shouldShowGenerateButton,
+          });
+
+          return result;
         } catch (error: any) {
-          console.error('[OpenAI Chat] Erro ao conversar:', error);
+          console.error('[ChatWithAssistant] ❌ Erro ao conversar:', error);
+          console.error('[ChatWithAssistant] ❌ Stack:', error.stack);
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Erro ao conversar com assistente: ${error.message}`,
+            message: `Erro ao conversar com assistente: ${error.message || 'Erro desconhecido'}`,
           });
         }
       }),
