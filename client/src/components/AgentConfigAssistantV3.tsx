@@ -313,8 +313,10 @@ export default function AgentConfigAssistantV3({
     addMessage('user', userMessage);
     
     // Verificar se a última mensagem do assistente foi perguntando se pode gerar o prompt
-    const lastAssistantMessage = messages.length > 0 && messages[messages.length - 1].role === 'assistant' 
-      ? messages[messages.length - 1].content.toLowerCase() 
+    // Pegar as últimas 2 mensagens do assistente para ter mais contexto
+    const assistantMessages = messages.filter(m => m.role === 'assistant').slice(-2);
+    const lastAssistantMessage = assistantMessages.length > 0 
+      ? assistantMessages[assistantMessages.length - 1].content.toLowerCase() 
       : '';
     
     // Verificar se assistente perguntou sobre gerar (mais flexível)
@@ -334,7 +336,7 @@ export default function AgentConfigAssistantV3({
     if (assistantAskedToGenerate) {
       const userMessageLower = userMessage.toLowerCase().trim();
       
-      // Detecção de confirmação - aceitar várias formas
+      // Detecção de confirmação - aceitar várias formas (MUITO MAIS FLEXÍVEL)
       const isConfirmingGenerate = 
         // Confirmações diretas e curtas
         userMessageLower === 'sim' || 
@@ -355,16 +357,17 @@ export default function AgentConfigAssistantV3({
         userMessageLower.includes('vamos gerar') ||
         userMessageLower.includes('pode gerar o prompt') ||
         userMessageLower.includes('gerar o prompt') ||
-        userMessageLower.includes('gerar agora');
+        userMessageLower.includes('gerar agora') ||
+        userMessageLower.includes('pode') && lastAssistantMessage.includes('gerar');
       
-      // Se o usuário confirmou E tem nome da empresa, mostrar o botão IMEDIATAMENTE
-      if (isConfirmingGenerate && collectedInfo.businessName) {
-        console.log('[Chat] ✅ Usuário confirmou geração. Mostrando botão...');
+      // Se o usuário confirmou, mostrar o botão IMEDIATAMENTE (mesmo sem businessName)
+      if (isConfirmingGenerate) {
+        console.log('[Chat] ✅ Usuário confirmou geração. Mostrando botão...', {
+          userMessage: userMessageLower,
+          hasBusinessName: !!collectedInfo.businessName,
+          collectedInfo
+        });
         setShouldShowGenerateButton(true);
-        // Adicionar mensagem confirmando que o botão apareceu
-        setTimeout(() => {
-          addMessage('assistant', 'Perfeito! O botão "Gerar e Salvar Configurações" apareceu abaixo. Clique nele para finalizar a configuração do seu agente.');
-        }, 500);
       }
     }
     
@@ -462,6 +465,11 @@ export default function AgentConfigAssistantV3({
       setMessages([]);
       setCollectedInfo({});
       setHasStarted(false);
+      setShouldShowGenerateButton(false);
+      setConversationId(null);
+      // Limpar localStorage também
+      const storageKey = `assistant-messages-${agentId || 'new'}`;
+      localStorage.removeItem(storageKey);
       const welcomeMessage = `👋 Olá${userName ? `, ${userName}` : ''}! Como posso ajudar você hoje?`;
       addMessage('assistant', welcomeMessage);
     }
@@ -551,10 +559,15 @@ export default function AgentConfigAssistantV3({
         {/* Botão de gerar prompt (só aparece quando usuário confirmar explicitamente) */}
         {shouldShowGenerateButton && (
           <div className="mt-4 pt-4 border-t">
+            <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                ✅ <strong>Pronto!</strong> Clique no botão abaixo para gerar e salvar o prompt do sistema do seu agente.
+              </p>
+            </div>
             <Button
               onClick={handleGeneratePrompt}
               disabled={isProcessing || generatePromptMutation.isPending}
-              className="w-full"
+              className="w-full bg-primary hover:bg-primary/90"
               size="lg"
             >
               {generatePromptMutation.isPending ? (
@@ -565,10 +578,15 @@ export default function AgentConfigAssistantV3({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Gerar e Salvar Configurações
+                  Gerar e Salvar Configurações do Agente
                 </>
               )}
             </Button>
+            {!collectedInfo.businessName && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                ⚠️ Atenção: Nome da empresa não foi informado. O prompt será gerado com informações disponíveis.
+              </p>
+            )}
           </div>
         )}
       </CardContent>
