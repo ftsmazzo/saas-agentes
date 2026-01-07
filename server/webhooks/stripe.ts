@@ -555,7 +555,7 @@ async function handlePlanUpgrade(session: Stripe.Checkout.Session) {
   // Buscar plano pelo planId no metadata ou pelo priceId da subscription
   let plan;
   if (session.metadata?.planId) {
-    plan = await db.getPlanById(parseInt(session.metadata.planId));
+    plan = await getPlanById(parseInt(session.metadata.planId));
   } else {
     // Buscar subscription no Stripe para pegar o priceId atual
     const subscriptionId = session.subscription as string;
