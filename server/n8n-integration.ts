@@ -15,20 +15,31 @@ export interface WorkflowInfo {
 }
 
 /**
- * Clona workflow template para um tenant específico
+ * Clona workflow template para um agente específico
+ * @param tenantId - ID do tenant (para compatibilidade e queries)
+ * @param tenantName - Nome do tenant/empresa
+ * @param evolutionInstanceName - Nome da instância Evolution (ex: agent_123)
+ * @param agentId - ID do agente (opcional, usado para webhook path. Se não fornecido, usa tenantId para compatibilidade)
+ * @param workflowNamePrefix - Prefixo para o nome do workflow (opcional, padrão: nome do tenant)
  */
 export async function cloneWorkflowForTenant(
   tenantId: number,
   tenantName: string,
-  evolutionInstanceName: string
+  evolutionInstanceName: string,
+  agentId?: number,
+  workflowNamePrefix?: string
 ): Promise<WorkflowInfo> {
   if (!process.env.N8N_API_URL || !process.env.N8N_API_KEY || !process.env.N8N_TEMPLATE_WORKFLOW_ID) {
     throw new Error("N8N_API_URL, N8N_API_KEY e N8N_TEMPLATE_WORKFLOW_ID devem estar configurados no .env");
   }
   
+  // Determinar webhook path: usar agentId se disponível, senão usar tenantId (compatibilidade)
+  const webhookPath = agentId ? `agent_${agentId}` : `tenant_${tenantId}`;
+  const baseWorkflowName = workflowNamePrefix || tenantName;
+  const expectedWorkflowName = agentId ? `${baseWorkflowName} - Agente ${agentId}` : `${baseWorkflowName} - Agente`;
+  
   try {
-    // Verificar se já existe workflow para este tenant (evitar duplicação)
-    const expectedWorkflowName = `${tenantName} - Agente`;
+    // Verificar se já existe workflow para este agente (evitar duplicação)
     console.log(`[N8N] Verificando se já existe workflow: "${expectedWorkflowName}"...`);
     try {
       const workflowsResponse = await n8nApi.get("/workflows");
@@ -39,7 +50,7 @@ export async function cloneWorkflowForTenant(
         console.log(`[N8N] ⚠️ Workflow já existe: ${existingWorkflow.id}. Retornando existente.`);
         return {
           workflowId: existingWorkflow.id,
-          webhookUrl: `${process.env.N8N_API_URL}/webhook/tenant_${tenantId}`
+          webhookUrl: `${process.env.N8N_API_URL}/webhook/${webhookPath}`
         };
       }
     } catch (error: any) {
@@ -54,15 +65,16 @@ export async function cloneWorkflowForTenant(
     const template = templateResponse.data.data || templateResponse.data;
 
     const modifiedWorkflow = {
-      name: `${tenantName} - Agente`,
+      name: expectedWorkflowName,
       nodes: template.nodes.map((node: any) => {
         if (node.type === 'n8n-nodes-base.webhook') {
           // N8N adiciona /webhook automaticamente, então usamos apenas o path sem /webhook
+          // Usar agentId se disponível, senão usar tenantId (compatibilidade)
           return {
             ...node,
             parameters: {
               ...node.parameters,
-              path: `tenant_${tenantId}`
+              path: webhookPath
             }
           };
         }
@@ -163,7 +175,7 @@ export async function cloneWorkflowForTenant(
 
     return {
       workflowId: newWorkflowId,
-      webhookUrl: `${process.env.N8N_API_URL}/webhook/tenant_${tenantId}`
+      webhookUrl: `${process.env.N8N_API_URL}/webhook/${webhookPath}`
     };
   } catch (error: any) {
     console.error("[N8N] Erro ao clonar workflow:", error.response?.data || error.message);

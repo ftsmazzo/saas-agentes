@@ -321,13 +321,14 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
           if (!n8nApiUrl) {
             console.warn(`[Provisioning] ⚠️ N8N_API_URL não configurado, pulando criação de webhook`);
           } else {
-            const tenantWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}`;
+            // Usar agentId no webhook (NOVO - suporta múltiplos agentes)
+            const agentWebhookUrl = `${n8nApiUrl}/webhook/agent_${agent.id}`;
             const botName = `Agente ${companyName || `Tenant ${tenant.id}`}`;
             
-            // Criar Agent Bot
+            // Criar Agent Bot com webhook usando agentId
             const agentBot = await createOrUpdateChatwootAgentBot(
               botName,
-              tenantWebhookUrl,
+              agentWebhookUrl, // Usar agentId ao invés de tenantId
               `Agent bot para ${companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
             );
             
@@ -364,7 +365,8 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
                 if (chatwootUrl && chatwootToken && chatwootAccountId) {
                   await axios.post(createWebhookWorkflowUrl, {
                     tenantId: tenant.id,
-                    webhookUrl: tenantWebhookUrl,
+                    agentId: agent.id, // Incluir agentId para referência
+                    webhookUrl: agentWebhookUrl, // Usar agentId no webhook
                     chatwootAccountId,
                     chatwootUrl,
                     chatwootToken,
@@ -375,7 +377,7 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
                     timeout: 30000,
                   });
                   
-                  console.log(`[Provisioning] ✅ Webhook criado no Chatwoot via N8N workflow`);
+                  console.log(`[Provisioning] ✅ Webhook criado no Chatwoot via N8N workflow: ${agentWebhookUrl}`);
                 } else {
                   console.warn(`[Provisioning] ⚠️ Variáveis do Chatwoot não configuradas, pulando criação de webhook`);
                 }

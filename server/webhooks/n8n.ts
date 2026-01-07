@@ -5,7 +5,7 @@ import { calculateCost, recordUsageTransaction, UsageData, checkCreditsAvailable
 
 /**
  * Webhook para receber dados do N8N
- * Rota: /api/webhooks/n8n/:tenantId
+ * Rota: /api/webhooks/n8n/:identifier (aceita agent_${agentId} ou tenant_${tenantId})
  */
 export async function handleN8NWebhook(req: Request, res: Response) {
   console.log(`[N8N Webhook] 🎯 HANDLER CHAMADO: ${req.method} ${req.originalUrl}`);
@@ -14,14 +14,45 @@ export async function handleN8NWebhook(req: Request, res: Response) {
   console.log(`[N8N Webhook] 📦 Body.data (tipo: ${typeof req.body?.data}):`, req.body?.data);
   
   try {
-    const tenantId = parseInt(req.params.tenantId);
+    // Identificar se é agent_${agentId} ou tenant_${tenantId}
+    const identifier = req.params.identifier || req.params.tenantId; // Compatibilidade com rota antiga
+    let tenantId: number;
+    let agentId: number | null = null;
     
-    if (!tenantId || isNaN(tenantId)) {
-      console.error(`[N8N Webhook] ❌ tenantId inválido: ${req.params.tenantId}`);
-      return res.status(400).json({ error: "tenantId inválido" });
+    if (identifier.startsWith('agent_')) {
+      // Novo formato: agent_${agentId}
+      agentId = parseInt(identifier.replace('agent_', ''));
+      if (!agentId || isNaN(agentId)) {
+        console.error(`[N8N Webhook] ❌ agentId inválido: ${identifier}`);
+        return res.status(400).json({ error: "agentId inválido" });
+      }
+      
+      // Buscar tenantId do agente
+      const agent = await db.getAgentById(agentId);
+      if (!agent) {
+        console.error(`[N8N Webhook] ❌ Agente não encontrado: ${agentId}`);
+        return res.status(404).json({ error: "Agente não encontrado" });
+      }
+      
+      tenantId = agent.tenantId;
+      console.log(`[N8N Webhook] ✅ Identificado como agente ${agentId} do tenant ${tenantId}`);
+    } else if (identifier.startsWith('tenant_')) {
+      // Formato antigo: tenant_${tenantId} (compatibilidade)
+      tenantId = parseInt(identifier.replace('tenant_', ''));
+      if (!tenantId || isNaN(tenantId)) {
+        console.error(`[N8N Webhook] ❌ tenantId inválido: ${identifier}`);
+        return res.status(400).json({ error: "tenantId inválido" });
+      }
+      console.log(`[N8N Webhook] ✅ Identificado como tenant ${tenantId} (formato antigo)`);
+    } else {
+      // Tentar parse direto (compatibilidade com formato antigo sem prefixo)
+      tenantId = parseInt(identifier);
+      if (!tenantId || isNaN(tenantId)) {
+        console.error(`[N8N Webhook] ❌ Identificador inválido: ${identifier}`);
+        return res.status(400).json({ error: "Identificador inválido. Use agent_${agentId} ou tenant_${tenantId}" });
+      }
+      console.log(`[N8N Webhook] ✅ Identificado como tenant ${tenantId} (formato numérico direto)`);
     }
-    
-    console.log(`[N8N Webhook] ✅ tenantId válido: ${tenantId}`);
 
     // Validar payload
     const payloadSchema = z.object({

@@ -681,10 +681,13 @@ export const appRouter = router({
           // 4. Clonar workflow N8N
           console.log('🔧 [STEP 5] Clonando workflow N8N...');
           try {
+            // Para o primeiro agente criado durante provisionamento, ainda usar tenantId no webhook (compatibilidade)
+            // Mas criar o agente primeiro para ter o agentId
             const workflowResult = await cloneWorkflowForTenant(
               tenant.id,
               input.companyName,
               evolutionInstanceName
+              // Não passar agentId aqui - será criado depois e o webhook será atualizado na ativação
             );
             
             await db.updateTenant(tenant.id, {
@@ -1238,7 +1241,7 @@ export const appRouter = router({
         if (evolutionData?.instanceName) {
           try {
             console.log(`[CreateAgent] 🔄 Clonando workflow N8N para agente ${agent.id}...`);
-            workflowData = await cloneWorkflowForTenant(agent.id, input.agentName, evolutionData.instanceName);
+            workflowData = await cloneWorkflowForTenant(tenant.id, input.agentName, evolutionData.instanceName, agent.id, input.agentName);
             console.log(`[CreateAgent] ✅ Workflow N8N clonado: ${workflowData.workflowId}`);
           } catch (error: any) {
             console.error(`[CreateAgent] ❌ Erro ao clonar workflow:`, error);
@@ -1733,7 +1736,37 @@ export const appRouter = router({
             }
           }
 
-          // 2. Reconectar Agent Bot ao inbox (se houver inbox e Agent Bot compartilhado)
+          // 2. Criar webhook no Chatwoot usando agentId (NOVO)
+          const n8nApiUrl = process.env.N8N_API_URL;
+          const createWebhookWorkflowUrl = process.env.N8N_CREATE_WEBHOOK_WORKFLOW_URL;
+          
+          if (n8nApiUrl && createWebhookWorkflowUrl) {
+            // URL do webhook usando agentId
+            const agentWebhookUrl = `${n8nApiUrl}/webhook/agent_${agent.id}`;
+            
+            try {
+              const axios = (await import('axios')).default;
+              await axios.post(createWebhookWorkflowUrl, {
+                tenantId: tenant.id,
+                agentId: agent.id, // Incluir agentId para referência
+                webhookUrl: agentWebhookUrl, // URL com agentId
+                chatwootAccountId: process.env.CHATWOOT_ACCOUNT_ID,
+                chatwootUrl: process.env.CHATWOOT_URL,
+                chatwootToken: process.env.CHATWOOT_API_TOKEN,
+                action: 'activate',
+                timestamp: new Date().toISOString(),
+              }, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000,
+              });
+              
+              console.log(`[Activate Agent] ✅ Webhook criado no Chatwoot: ${agentWebhookUrl}`);
+            } catch (error: any) {
+              console.warn(`[Activate Agent] ⚠️ Erro ao criar webhook (não crítico):`, error.message);
+            }
+          }
+
+          // 3. Reconectar Agent Bot ao inbox (se houver inbox e Agent Bot compartilhado)
           if (agent.chatwootInboxId && tenant.chatwootAgentBotId) {
             try {
               await connectAgentBotToInbox(agent.chatwootInboxId, tenant.chatwootAgentBotId);
@@ -1743,7 +1776,7 @@ export const appRouter = router({
             }
           }
 
-          // 3. Atualizar status no banco
+          // 4. Atualizar status no banco
           await db.updateAgent(agent.id, {
             isActive: true,
             status: 'active' as const,
@@ -1753,8 +1786,8 @@ export const appRouter = router({
             tenantId: tenant.id,
             eventType: 'agent_activated',
             severity: 'info',
-            message: `Agente "${agent.name}" (ID: ${agent.id}) foi ativado`,
-            metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name }),
+            message: `Agente "${agent.name}" (ID: ${agent.id}) foi ativado. Webhook: agent_${agent.id}`,
+            metadata: JSON.stringify({ agentId: agent.id, agentName: agent.name, webhookPath: `agent_${agent.id}` }),
           });
 
           return {
