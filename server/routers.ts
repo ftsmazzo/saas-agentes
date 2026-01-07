@@ -3741,7 +3741,15 @@ ${personalityDescriptions[input.personality || 'professional']}
           }
 
           // Usar informações coletadas da conversa anterior ou do input
-          const collectedInfo = input.collectedInfo || previousConversation?.collectedInfo || existingCompanyInfo || {};
+          // Garantir que sempre seja um objeto válido
+          let collectedInfo: any = {};
+          if (input.collectedInfo && typeof input.collectedInfo === 'object') {
+            collectedInfo = input.collectedInfo;
+          } else if (previousConversation?.collectedInfo && typeof previousConversation.collectedInfo === 'object') {
+            collectedInfo = previousConversation.collectedInfo;
+          } else if (existingCompanyInfo && typeof existingCompanyInfo === 'object') {
+            collectedInfo = existingCompanyInfo;
+          }
           console.log('[ChatWithAssistant] 📝 CollectedInfo:', Object.keys(collectedInfo).length, 'campos');
 
           // Construir contexto do sistema para o assistente
