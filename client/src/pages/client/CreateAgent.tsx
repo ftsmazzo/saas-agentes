@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Sparkles
 } from "lucide-react";
-import AgentConfigAssistant from "@/components/AgentConfigAssistant";
+import AgentConfigAssistantV4 from "@/components/AgentConfigAssistantV4";
 
 export default function CreateAgentPage() {
   const [, setLocation] = useLocation();
@@ -134,7 +134,7 @@ export default function CreateAgentPage() {
             </CardContent>
           </Card>
         ) : (
-          <AgentConfigAssistant
+          <AgentConfigAssistantV4
             agentId={agentId}
             onComplete={handleAssistantComplete}
             existingConfig={agentConfig}

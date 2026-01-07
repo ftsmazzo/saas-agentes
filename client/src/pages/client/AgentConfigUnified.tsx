@@ -32,7 +32,7 @@ import {
   Eye,
   X
 } from "lucide-react";
-import AgentConfigAssistant from "@/components/AgentConfigAssistant";
+import AgentConfigAssistantV4 from "@/components/AgentConfigAssistantV4";
 import ModelSelector from "@/components/ModelSelector";
 
 // Tools disponíveis baseados no workflow N8N
@@ -312,7 +312,7 @@ export default function AgentConfigUnifiedPage() {
         {/* Se não houver configuração OU não houver systemPrompt, mostrar assistente diretamente */}
         {(!config || !config.systemPrompt) && (
           <div className="mb-6">
-            <AgentConfigAssistant
+            <AgentConfigAssistantV4
               agentId={agentIdNum}
               existingConfig={config}
               onComplete={() => {
@@ -363,7 +363,7 @@ export default function AgentConfigUnifiedPage() {
         {/* Assistente de IA (quando usuário clica para editar) */}
         {showAssistant && !assistantComplete && (
           <div className="mb-6">
-            <AgentConfigAssistant
+            <AgentConfigAssistantV4
               agentId={agentIdNum}
               existingConfig={config}
               onComplete={() => {
