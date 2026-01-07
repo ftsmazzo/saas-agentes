@@ -4180,9 +4180,27 @@ ${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir a
 - Você DEVE sempre retornar o prompt atualizado em construção
 
 **FORMATO DE RESPOSTA:**
-Sua resposta deve ter duas partes:
-1. **Mensagem para o usuário**: Continue a conversa naturalmente
+Sua resposta deve ter duas partes SEPARADAS claramente:
+1. **Mensagem para o usuário**: Continue a conversa naturalmente (esta parte será mostrada ao usuário)
 2. **PROMPT_ATUALIZADO**: [Aqui você coloca o prompt completo atualizado com as novas informações]
+
+**IMPORTANTE SOBRE O PROMPT_ATUALIZADO:**
+- Deve ser o prompt COMPLETO, não apenas fragmentos
+- Deve seguir o template fornecido acima
+- Deve incluir TODAS as informações coletadas até agora
+- Se faltar informação, use "[a definir]" ou "[informação pendente]"
+- NUNCA retorne apenas "**" ou markdown vazio
+- O prompt deve ter pelo menos 200 caracteres para ser válido
+
+**EXEMPLO DE FORMATO:**
+```
+[Mensagem conversacional para o usuário aqui]
+
+PROMPT_ATUALIZADO:
+# **1. Identidade e Propósito**
+Você é **[Nome do Agente]**, agente de IA da **[Nome da Empresa]**...
+[resto do prompt completo]
+```
 
 Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.`;
 
@@ -4234,16 +4252,40 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
           
           // Extrair prompt atualizado da resposta (se houver)
           let updatedPromptDraft = currentPromptDraft;
-          const promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:\n\n|$)/i);
-          if (promptMatch) {
-            updatedPromptDraft = promptMatch[1].trim();
-          } else if (currentPromptDraft === '') {
-            // Se não há prompt ainda e a IA não marcou, tentar extrair do contexto
-            // Por enquanto, deixar a IA construir na próxima interação
+          
+          // Tentar extrair o prompt de diferentes formatos
+          let promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:\n\n|$)/i);
+          if (!promptMatch) {
+            // Tentar formato alternativo com --- ou ```
+            promptMatch = assistantMessage.match(/---\s*PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:---|$)/i);
+          }
+          if (!promptMatch) {
+            // Tentar formato com ``` ou markdown
+            promptMatch = assistantMessage.match(/```[\s\S]*?PROMPT_ATUALIZADO:\s*([\s\S]*?)```/i);
+          }
+          
+          if (promptMatch && promptMatch[1]) {
+            const extractedPrompt = promptMatch[1].trim();
+            // Validar que não é apenas markdown vazio ou caracteres especiais
+            if (extractedPrompt.length > 10 && !extractedPrompt.match(/^[\*\-\s]+$/)) {
+              updatedPromptDraft = extractedPrompt;
+            }
+          }
+          
+          // Se o prompt draft ainda está vazio ou inválido, manter o anterior
+          if (!updatedPromptDraft || updatedPromptDraft.length < 10) {
+            updatedPromptDraft = currentPromptDraft;
           }
 
           // Remover a marcação do prompt da mensagem para o usuário
-          const userMessage = assistantMessage.replace(/PROMPT_ATUALIZADO:[\s\S]*/i, '').trim();
+          let userMessage = assistantMessage.replace(/PROMPT_ATUALIZADO:[\s\S]*/i, '').trim();
+          userMessage = userMessage.replace(/---\s*PROMPT_ATUALIZADO:[\s\S]*/i, '').trim();
+          userMessage = userMessage.replace(/```[\s\S]*?PROMPT_ATUALIZADO:[\s\S]*?```/i, '').trim();
+          
+          // Se a mensagem ficou vazia ou muito curta, usar a mensagem original sem o prompt
+          if (!userMessage || userMessage.length < 5) {
+            userMessage = assistantMessage.split(/PROMPT_ATUALIZADO:/i)[0].trim();
+          }
 
           // Salvar conversa no banco
           const messagesToSave = [
@@ -4259,13 +4301,24 @@ Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.
             },
           ];
 
+          // Garantir que promptDraft não seja inválido (apenas markdown ou muito curto)
+          let finalPromptDraft = updatedPromptDraft;
+          if (!finalPromptDraft || 
+              finalPromptDraft.length < 10 || 
+              finalPromptDraft.match(/^[\*\-\s]+$/) || 
+              finalPromptDraft === '**' ||
+              finalPromptDraft.trim() === '**') {
+            // Se o prompt é inválido, manter o anterior ou deixar null
+            finalPromptDraft = currentPromptDraft || null;
+          }
+
           await db.createOrUpdateAssistantConversation({
             tenantId: tenant.id,
             agentId: agent?.id,
             conversationId: conversationId,
             messages: messagesToSave,
             collectedInfo: {},
-            promptDraft: updatedPromptDraft,
+            promptDraft: finalPromptDraft || undefined,
             isComplete: false,
             promptGenerated: false,
           });
