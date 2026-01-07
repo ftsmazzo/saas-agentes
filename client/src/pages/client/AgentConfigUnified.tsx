@@ -215,12 +215,25 @@ export default function AgentConfigUnifiedPage() {
       return;
     }
 
+    // Validar JSON do companyInfo se preenchido
+    if (formData.companyInfo && formData.companyInfo.trim()) {
+      try {
+        JSON.parse(formData.companyInfo);
+      } catch (error) {
+        toast.error("❌ JSON inválido nas informações da empresa", {
+          description: "Por favor, corrija o formato JSON antes de salvar.",
+          duration: 5000,
+        });
+        return;
+      }
+    }
+
     // Preparar dados para atualização, removendo campos vazios
     const updateData: any = {
       agentId: agentIdNum,
-      systemPrompt: formData.systemPrompt,
-      welcomeMessage: formData.welcomeMessage,
-      companyInfo: formData.companyInfo,
+      systemPrompt: formData.systemPrompt.trim(),
+      welcomeMessage: formData.welcomeMessage.trim(),
+      companyInfo: formData.companyInfo.trim() || null,
       openaiModel: formData.openaiModel,
       enableHumanHandoff: formData.enableHumanHandoff,
       enableAudioTranscription: formData.enableAudioTranscription,
@@ -403,7 +416,14 @@ export default function AgentConfigUnifiedPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="systemPrompt">Instruções para o Agente</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="systemPrompt">Instruções para o Agente (System Prompt)</Label>
+                    {config?.systemPrompt && (
+                      <Badge variant="outline" className="text-xs">
+                        Editável
+                      </Badge>
+                    )}
+                  </div>
                   <Textarea
                     id="systemPrompt"
                     value={formData.systemPrompt}
@@ -411,15 +431,12 @@ export default function AgentConfigUnifiedPage() {
                       setFormData({ ...formData, systemPrompt: e.target.value })
                     }
                     placeholder="O prompt do sistema será gerado automaticamente pelo assistente de IA..."
-                    rows={10}
-                    className="resize-none font-mono text-sm"
-                    readOnly={!!config?.systemPrompt}
+                    rows={12}
+                    className="resize-y font-mono text-sm"
                   />
-                  {config?.systemPrompt && (
-                    <p className="text-sm text-muted-foreground">
-                      ℹ️ O prompt do sistema foi gerado automaticamente e não pode ser editado diretamente. Use o assistente de IA para reconfigurar.
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground">
+                    ℹ️ Você pode editar o prompt do sistema diretamente. Alterações serão salvas quando você clicar em "Salvar Configurações".
+                  </p>
                 </div>
 
                 {/* Mensagem de Boas-Vindas e Company Info são preenchidos automaticamente pelo assistente de IA */}
@@ -442,19 +459,36 @@ export default function AgentConfigUnifiedPage() {
                   </div>
                 )}
 
-                {config?.companyInfo && (
-                  <div className="space-y-2">
-                    <Label htmlFor="companyInfo">Informações da Empresa</Label>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-2">
-                        As informações da empresa foram preenchidas automaticamente pelo assistente de IA:
-                      </p>
-                      <pre className="text-xs font-mono bg-background p-3 rounded border overflow-auto">
-                        {formData.companyInfo || '{}'}
-                      </pre>
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="companyInfo">Informações da Empresa (JSON)</Label>
+                  <Textarea
+                    id="companyInfo"
+                    value={formData.companyInfo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, companyInfo: e.target.value })
+                    }
+                    placeholder='{"name": "Nome da Empresa", "type": "Tipo", "street": "Endereço", ...}'
+                    rows={8}
+                    className="resize-y font-mono text-sm"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    ℹ️ Informações da empresa em formato JSON. Você pode editar diretamente. Certifique-se de manter o formato JSON válido.
+                  </p>
+                  {formData.companyInfo && (() => {
+                    try {
+                      JSON.parse(formData.companyInfo);
+                      return null;
+                    } catch {
+                      return (
+                        <Alert className="mt-2">
+                          <AlertDescription className="text-red-600">
+                            ⚠️ JSON inválido. Por favor, corrija o formato antes de salvar.
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    }
+                  })()}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
