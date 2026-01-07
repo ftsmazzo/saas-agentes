@@ -73,80 +73,58 @@ export default function AgentConfigAssistantV3({
 
   const userName = (user?.name || tenant?.companyName || '').split(' ')[0] || '';
 
+  const getConversationQuery = trpc.clientPanel.getAssistantConversation.useQuery(
+    { agentId: agentId },
+    { enabled: !hasStarted && !!agentId, retry: false }
+  );
+
   // Carregar conversa anterior ou configuração existente
   useEffect(() => {
-    if (!hasStarted && agentId) {
-      // Tentar carregar conversa anterior do banco
-      trpc.clientPanel.getAssistantConversation.query({ agentId })
-        .then((data) => {
-          if (data?.conversation) {
-            const conv = data.conversation;
-            setConversationId(conv.conversationId);
-            if (conv.messages && Array.isArray(conv.messages)) {
-              setMessages(conv.messages.map((msg: any) => ({
-                ...msg,
-                timestamp: new Date(msg.timestamp || Date.now()),
-              })));
-            }
-            if (conv.collectedInfo) {
-              setCollectedInfo(conv.collectedInfo);
-            }
-            setHasStarted(true);
-            return;
-          }
-          
-          // Se não tem conversa, carregar config existente
-          if (existingConfig?.companyInfo) {
-            try {
-              const companyInfo = JSON.parse(existingConfig.companyInfo);
-              setCollectedInfo({
-                businessName: companyInfo.name || '',
-                businessType: companyInfo.type || '',
-                street: companyInfo.street || '',
-                streetNumber: companyInfo.streetNumber || '',
-                neighborhood: companyInfo.neighborhood || '',
-                city: companyInfo.city || '',
-                state: companyInfo.state || '',
-                zipCode: companyInfo.zipCode || '',
-                phone: companyInfo.phone || '',
-                businessHours: companyInfo.businessHours || '',
-                paymentMethods: companyInfo.paymentMethods || [],
-                personality: companyInfo.personality || '',
-                additionalInfo: companyInfo.additionalInfo || '',
-              });
-            } catch (e) {
-              console.error('Erro ao carregar config existente:', e);
-            }
-          }
-          setHasStarted(true);
-        })();
-      } else {
-        // Se não tem conversa, carregar config existente
-        if (existingConfig?.companyInfo) {
-          try {
-            const companyInfo = JSON.parse(existingConfig.companyInfo);
-            setCollectedInfo({
-              businessName: companyInfo.name || '',
-              businessType: companyInfo.type || '',
-              street: companyInfo.street || '',
-              streetNumber: companyInfo.streetNumber || '',
-              neighborhood: companyInfo.neighborhood || '',
-              city: companyInfo.city || '',
-              state: companyInfo.state || '',
-              zipCode: companyInfo.zipCode || '',
-              phone: companyInfo.phone || '',
-              businessHours: companyInfo.businessHours || '',
-              paymentMethods: companyInfo.paymentMethods || [],
-              personality: companyInfo.personality || '',
-              additionalInfo: companyInfo.additionalInfo || '',
-            });
-          } catch (e) {
-            console.error('Erro ao carregar config existente:', e);
-          }
+    if (!hasStarted && agentId && getConversationQuery.data) {
+      const data = getConversationQuery.data;
+      if (data?.conversation) {
+        const conv = data.conversation;
+        setConversationId(conv.conversationId);
+        if (conv.messages && Array.isArray(conv.messages)) {
+          setMessages(conv.messages.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp || Date.now()),
+          })));
+        }
+        if (conv.collectedInfo) {
+          setCollectedInfo(conv.collectedInfo);
         }
         setHasStarted(true);
+        return;
       }
-    } else if (!hasStarted && !agentId) {
+    }
+    
+    // Se não tem conversa, carregar config existente
+    if (!hasStarted && existingConfig?.companyInfo) {
+      try {
+        const companyInfo = JSON.parse(existingConfig.companyInfo);
+        setCollectedInfo({
+          businessName: companyInfo.name || '',
+          businessType: companyInfo.type || '',
+          street: companyInfo.street || '',
+          streetNumber: companyInfo.streetNumber || '',
+          neighborhood: companyInfo.neighborhood || '',
+          city: companyInfo.city || '',
+          state: companyInfo.state || '',
+          zipCode: companyInfo.zipCode || '',
+          phone: companyInfo.phone || '',
+          businessHours: companyInfo.businessHours || '',
+          paymentMethods: companyInfo.paymentMethods || [],
+          personality: companyInfo.personality || '',
+          additionalInfo: companyInfo.additionalInfo || '',
+        });
+      } catch (e) {
+        console.error('Erro ao carregar config existente:', e);
+      }
+    }
+    
+    if (!hasStarted) {
       setHasStarted(true);
     }
   }, [existingConfig, hasStarted, agentId, getConversationQuery.data]);
