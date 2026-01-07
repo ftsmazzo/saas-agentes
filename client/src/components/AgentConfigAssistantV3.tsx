@@ -302,7 +302,7 @@ export default function AgentConfigAssistantV3({
               state: cepData.uf || prev.state,
               zipCode: cep,
             }));
-            addMessage('assistant', `✅ CEP encontrado! Preenchi: ${cepData.logradouro || ''}, ${cepData.bairro || ''}, ${cepData.localidade || ''} - ${cepData.uf || ''}\n\nQual é o número do endereço?`);
+            addMessage('assistant', `✅ CEP encontrado! Preenchi: ${cepData.logradouro || ''}, ${cepData.bairro || ''}, ${cepData.localidade || ''} - ${cepData.uf || ''}`);
             setUserInput('');
             return;
           } else {
@@ -324,22 +324,7 @@ export default function AgentConfigAssistantV3({
     // Extrair informações da mensagem primeiro
     let updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
     
-    // Verificar se a última mensagem do assistente foi perguntando sobre número do endereço
-    // Reutilizar lastAssistantMessage já declarada acima
-    const isAskingForStreetNumber = lastAssistantMessage.includes('número do endereço') || 
-                                     lastAssistantMessage.includes('número') ||
-                                     lastAssistantMessage.includes('numero');
-    
-    // Se o assistente perguntou sobre número e o usuário digitou apenas números, extrair como número
-    if (isAskingForStreetNumber && !updatedInfo.streetNumber) {
-      const numberOnly = userMessage.replace(/\D/g, '');
-      if (numberOnly.length > 0 && numberOnly.length <= 10) {
-        updatedInfo = {
-          ...updatedInfo,
-          streetNumber: numberOnly,
-        };
-      }
-    }
+    // Número do endereço removido - deixar o assistente lidar com isso na conversa
 
     // Atualizar estado com todas as informações coletadas
     setCollectedInfo(updatedInfo);
@@ -393,13 +378,10 @@ export default function AgentConfigAssistantV3({
     const selectedPersonality = collectedInfo.personality || 'professional';
     const mappedPersonality = personalityMap[selectedPersonality.toLowerCase()] || 'professional';
 
-    // Construir endereço completo incluindo número
+    // Construir endereço completo
     const addressParts = [];
     if (collectedInfo.street) {
       addressParts.push(collectedInfo.street);
-      if (collectedInfo.streetNumber) {
-        addressParts.push(`nº ${collectedInfo.streetNumber}`);
-      }
     }
     if (collectedInfo.neighborhood) addressParts.push(collectedInfo.neighborhood);
     if (collectedInfo.city) addressParts.push(collectedInfo.city);
