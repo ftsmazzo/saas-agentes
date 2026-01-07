@@ -1328,22 +1328,40 @@ export const appRouter = router({
         }
 
         // 5. Atualizar agente com dados dos recursos provisionados
-        if (evolutionData || workflowData || chatwootInboxId || agentBotId) {
-          try {
-            await db.update(agents)
-              .set({
-                evolutionInstanceName: evolutionData?.instanceName || null,
-                evolutionApiKey: evolutionData?.apiKey || null,
-                n8nWorkflowId: workflowData?.workflowId || null,
-                chatwootInboxId: chatwootInboxId || null,
-                // TODO: Adicionar campo chatwootAgentBotId na tabela agents se necessário
-                // Por enquanto, vamos salvar no tenant para compatibilidade
-              })
-              .where(eq(agents.id, agent.id));
-            console.log(`[CreateAgent] ✅ Agente atualizado com recursos provisionados`);
-          } catch (error: any) {
-            console.error(`[CreateAgent] ⚠️ Erro ao atualizar agente (não crítico):`, error.message);
+        // IMPORTANTE: Sempre atualizar, mesmo se alguns valores forem null
+        // Isso garante que os dados sejam salvos no banco
+        try {
+          const updateData: any = {};
+          
+          if (evolutionData?.instanceName) {
+            updateData.evolutionInstanceName = evolutionData.instanceName;
           }
+          if (evolutionData?.apiKey) {
+            updateData.evolutionApiKey = evolutionData.apiKey;
+          }
+          if (workflowData?.workflowId) {
+            updateData.n8nWorkflowId = workflowData.workflowId;
+          }
+          if (chatwootInboxId) {
+            updateData.chatwootInboxId = chatwootInboxId;
+          }
+          
+          // Atualizar apenas se houver dados para atualizar
+          if (Object.keys(updateData).length > 0) {
+            await db.updateAgent(agent.id, updateData);
+            console.log(`[CreateAgent] ✅ Agente atualizado com recursos provisionados:`, updateData);
+          } else {
+            console.warn(`[CreateAgent] ⚠️ Nenhum recurso provisionado para atualizar`);
+          }
+        } catch (error: any) {
+          console.error(`[CreateAgent] ❌ Erro ao atualizar agente:`, error);
+          await db.createPlatformLog({
+            tenantId: tenant.id,
+            eventType: 'agent_update_failed',
+            severity: 'error',
+            message: `Falha ao atualizar dados do agente ${agent.id}: ${error.message}`,
+          });
+          // Não falhar criação, mas logar erro crítico
         }
 
         await db.createPlatformLog({
@@ -3534,6 +3552,18 @@ ${personalityDescriptions[input.personality || 'professional']}
             personality: input.personality || 'professional',
             additionalInfo: input.additionalInfo || '',
           });
+
+          // Atualizar nome do agente com o nome do negócio
+          if (agent && input.businessName) {
+            try {
+              await db.updateAgent(agent.id, {
+                name: input.businessName,
+              });
+              console.log(`[GeneratePrompt] ✅ Nome do agente atualizado para: ${input.businessName}`);
+            } catch (error: any) {
+              console.warn(`[GeneratePrompt] ⚠️ Erro ao atualizar nome do agente (não crítico):`, error.message);
+            }
+          }
 
           // Se já existe config, atualizar. Se não, criar.
           if (isUpdate && existingConfig && agent) {
