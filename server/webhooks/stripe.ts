@@ -76,16 +76,25 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         sessionId: session.id,
         tenantId: session.metadata?.tenantId,
         creditsAmount: session.metadata?.creditsAmount,
+        allMetadata: JSON.stringify(session.metadata),
       });
       try {
         await handleExtraCreditsPurchase(session);
         console.log("[Stripe Webhook] ✅ Créditos extras processados com sucesso");
       } catch (error: any) {
         console.error("[Stripe Webhook] ❌ Erro ao processar compra de créditos extras:", error);
+        console.error("[Stripe Webhook] ❌ Stack trace:", error.stack);
         await createPlatformLog({
+          tenantId: session.metadata?.tenantId ? parseInt(session.metadata.tenantId) : undefined,
           eventType: "extra_credits_failed",
+          severity: "error",
           message: `Failed to process extra credits purchase: ${error.message}`,
-          metadata: JSON.stringify({ sessionId: session.id, error: error.message }),
+          metadata: JSON.stringify({ 
+            sessionId: session.id, 
+            error: error.message,
+            stack: error.stack,
+            metadata: session.metadata,
+          }),
         });
       }
     } else {
@@ -731,32 +740,62 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  console.log(`[Extra Credits] 📋 Metadata recebido:`, JSON.stringify(session.metadata, null, 2));
+  
   const tenantId = session.metadata?.tenantId;
   const creditsAmount = session.metadata?.creditsAmount;
 
+  console.log(`[Extra Credits] 🔍 Valores extraídos:`, {
+    tenantId,
+    creditsAmount,
+    tenantIdType: typeof tenantId,
+    creditsAmountType: typeof creditsAmount,
+  });
+
   if (!tenantId || !creditsAmount) {
-    throw new Error("Missing tenantId or creditsAmount in session metadata");
+    const errorMsg = `Missing tenantId or creditsAmount in session metadata. tenantId: ${tenantId}, creditsAmount: ${creditsAmount}`;
+    console.error(`[Extra Credits] ❌ ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
-  const creditsToAdd = parseInt(creditsAmount);
+  const tenantIdNum = parseInt(tenantId.toString());
+  const creditsToAdd = parseInt(creditsAmount.toString());
+  
+  console.log(`[Extra Credits] 🔢 Valores convertidos:`, {
+    tenantIdNum,
+    creditsToAdd,
+    tenantIdIsNaN: isNaN(tenantIdNum),
+    creditsIsNaN: isNaN(creditsToAdd),
+  });
+
+  if (isNaN(tenantIdNum) || tenantIdNum <= 0) {
+    throw new Error(`Invalid tenantId: ${tenantId}`);
+  }
+
   if (isNaN(creditsToAdd) || creditsToAdd <= 0) {
-    throw new Error("Invalid creditsAmount");
+    throw new Error(`Invalid creditsAmount: ${creditsAmount}`);
   }
 
-  console.log(`[Extra Credits] Adicionando ${creditsToAdd} créditos extras para tenant ${tenantId}`);
+  console.log(`[Extra Credits] ✅ Adicionando ${creditsToAdd} créditos extras para tenant ${tenantIdNum}`);
 
   // Buscar ou criar registro de créditos
+  console.log(`[Extra Credits] 🔍 Buscando créditos existentes para tenant ${tenantIdNum}...`);
   const existingCredits = await db
     .select()
     .from(tenantCredits)
-    .where(eq(tenantCredits.tenantId, parseInt(tenantId)))
+    .where(eq(tenantCredits.tenantId, tenantIdNum))
     .limit(1);
+
+  console.log(`[Extra Credits] 📊 Créditos existentes encontrados:`, existingCredits.length > 0 ? 'Sim' : 'Não');
 
   if (existingCredits[0]) {
     // Adicionar créditos extras ao saldo atual
     const oldCredits = existingCredits[0].currentCredits || 0;
-    console.log(`[Extra Credits] 💾 Atualizando créditos para tenant ${tenantId}...`);
-    console.log(`[Extra Credits] 📊 Saldo anterior: ${oldCredits}, Créditos a adicionar: ${creditsToAdd}`);
+    const oldTotalPurchased = existingCredits[0].totalCreditsPurchased || 0;
+    
+    console.log(`[Extra Credits] 💾 Atualizando créditos para tenant ${tenantIdNum}...`);
+    console.log(`[Extra Credits] 📊 Saldo anterior: ${oldCredits}, Total comprado anterior: ${oldTotalPurchased}`);
+    console.log(`[Extra Credits] ➕ Créditos a adicionar: ${creditsToAdd}`);
     
     const updateResult = await db
       .update(tenantCredits)
@@ -765,31 +804,69 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
         totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${creditsToAdd}`,
         updatedAt: new Date(),
       })
-      .where(eq(tenantCredits.tenantId, parseInt(tenantId)))
+      .where(eq(tenantCredits.tenantId, tenantIdNum))
       .returning();
 
+    if (!updateResult || updateResult.length === 0) {
+      throw new Error(`Update não retornou nenhum registro para tenant ${tenantIdNum}`);
+    }
+
     const newCredits = updateResult[0]?.currentCredits || 0;
-    console.log(`[Extra Credits] ✅ Créditos atualizados. Novo saldo: ${newCredits} (era ${oldCredits}, adicionou ${creditsToAdd})`);
+    const newTotalPurchased = updateResult[0]?.totalCreditsPurchased || 0;
+    
+    console.log(`[Extra Credits] ✅ Créditos atualizados!`);
+    console.log(`[Extra Credits] 📊 Novo saldo: ${newCredits} (era ${oldCredits}, adicionou ${creditsToAdd})`);
+    console.log(`[Extra Credits] 📊 Novo total comprado: ${newTotalPurchased} (era ${oldTotalPurchased}, adicionou ${creditsToAdd})`);
+    
+    // Verificar se a atualização funcionou corretamente
+    if (Math.abs(newCredits - (oldCredits + creditsToAdd)) > 0.01) {
+      console.error(`[Extra Credits] ⚠️ ATENÇÃO: Novo saldo (${newCredits}) não corresponde ao esperado (${oldCredits + creditsToAdd})`);
+    }
+    
+    // Buscar novamente para confirmar
+    const verifyCredits = await db
+      .select()
+      .from(tenantCredits)
+      .where(eq(tenantCredits.tenantId, tenantIdNum))
+      .limit(1);
+    
+    if (verifyCredits[0]) {
+      console.log(`[Extra Credits] 🔍 Verificação: Saldo no banco após update: ${verifyCredits[0].currentCredits}`);
+      if (verifyCredits[0].currentCredits !== newCredits) {
+        console.error(`[Extra Credits] ❌ ERRO CRÍTICO: Saldo retornado (${newCredits}) diferente do saldo no banco (${verifyCredits[0].currentCredits})!`);
+      }
+    }
   } else {
     // Criar registro inicial
-    await db.insert(tenantCredits).values({
-      tenantId: parseInt(tenantId),
+    console.log(`[Extra Credits] 🆕 Criando registro inicial de créditos para tenant ${tenantIdNum}...`);
+    const insertResult = await db.insert(tenantCredits).values({
+      tenantId: tenantIdNum,
       currentCredits: creditsToAdd,
       totalCreditsPurchased: creditsToAdd,
-    });
+    }).returning();
 
-    console.log(`[Extra Credits] ✅ Registro de créditos criado. Saldo inicial: ${creditsToAdd}`);
+    if (!insertResult || insertResult.length === 0) {
+      throw new Error(`Insert não retornou nenhum registro para tenant ${tenantIdNum}`);
+    }
+
+    console.log(`[Extra Credits] ✅ Registro de créditos criado. Saldo inicial: ${insertResult[0]?.currentCredits || creditsToAdd}`);
   }
 
   // Criar log
+  console.log(`[Extra Credits] 📝 Criando log de plataforma...`);
   await createPlatformLog({
-    tenantId: parseInt(tenantId),
+    tenantId: tenantIdNum,
     eventType: "extra_credits_purchased",
+    severity: "info",
     message: `${creditsToAdd} créditos extras comprados`,
     metadata: JSON.stringify({
       sessionId: session.id,
       creditsAmount: creditsToAdd,
       amountPaid: session.amount_total ? (session.amount_total / 100).toFixed(2) : '0.00',
+      oldCredits: existingCredits[0]?.currentCredits || 0,
+      newCredits: existingCredits[0] ? (existingCredits[0].currentCredits + creditsToAdd) : creditsToAdd,
     }),
   });
+  
+  console.log(`[Extra Credits] ✅✅✅ Processo completo finalizado com sucesso para tenant ${tenantIdNum}!`);
 }
