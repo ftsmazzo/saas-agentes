@@ -3663,42 +3663,53 @@ ${personalityDescriptions[input.personality || 'professional']}
         // Buscar agente específico ou primeiro agente
         let agent: db.Agent | undefined;
         if (input.agentId) {
+          console.log('[ChatWithAssistant] 🔍 Buscando agente por ID:', input.agentId);
           agent = await db.getAgentById(input.agentId);
           if (!agent || agent.tenantId !== tenant.id) {
+            console.error('[ChatWithAssistant] ❌ Agente não encontrado ou não pertence ao tenant');
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
           }
+          console.log('[ChatWithAssistant] ✅ Agente encontrado:', agent.id, agent.name);
         } else {
+          console.log('[ChatWithAssistant] 🔍 Buscando primeiro agente do tenant:', tenant.id);
           agent = await db.getFirstAgentByTenantId(tenant.id);
+          console.log('[ChatWithAssistant] ✅ Primeiro agente:', agent?.id || 'não encontrado');
         }
 
         // Gerar ou usar conversationId
         const conversationId = input.conversationId || `conv_${tenant.id}_${agent?.id || 'new'}_${Date.now()}`;
+        console.log('[ChatWithAssistant] 💬 ConversationId:', conversationId);
 
         // Buscar conversa anterior se conversationId foi fornecido
         let previousConversation: any = null;
         if (input.conversationId) {
+          console.log('[ChatWithAssistant] 🔍 Buscando conversa anterior por conversationId');
           previousConversation = await db.getAssistantConversationByConversationId(input.conversationId);
         } else if (agent) {
-          // Tentar buscar última conversa do agente
+          console.log('[ChatWithAssistant] 🔍 Buscando última conversa do agente:', agent.id);
           previousConversation = await db.getAssistantConversationByAgentId(agent.id);
         }
+        console.log('[ChatWithAssistant] 📋 Conversa anterior:', previousConversation ? 'encontrada' : 'não encontrada');
 
         // Buscar configuração existente do agente
         let existingConfig: any = null;
         let existingCompanyInfo: any = null;
         if (agent) {
+          console.log('[ChatWithAssistant] 🔍 Buscando configuração do agente:', agent.id);
           existingConfig = await db.getAgentConfigByAgentId(agent.id);
           if (existingConfig?.companyInfo) {
             try {
               existingCompanyInfo = JSON.parse(existingConfig.companyInfo);
+              console.log('[ChatWithAssistant] ✅ CompanyInfo carregado');
             } catch (e) {
-              console.error('Erro ao parsear companyInfo:', e);
+              console.error('[ChatWithAssistant] ⚠️ Erro ao parsear companyInfo:', e);
             }
           }
         }
 
         // Usar informações coletadas da conversa anterior ou do input
         const collectedInfo = input.collectedInfo || previousConversation?.collectedInfo || existingCompanyInfo || {};
+        console.log('[ChatWithAssistant] 📝 CollectedInfo:', Object.keys(collectedInfo).length, 'campos');
 
         // Construir contexto do sistema para o assistente
         const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts e configuração de agentes de IA.
