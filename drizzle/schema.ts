@@ -526,6 +526,9 @@ export const assistantConversations = pgTable("assistantConversations", {
   // Informações coletadas
   collectedInfo: jsonb("collectedInfo"), // Objeto com informações coletadas
   
+  // Prompt em construção (construção incremental)
+  promptDraft: text("promptDraft"), // Prompt sendo construído incrementalmente durante a conversa
+  
   // Estado da conversa
   isComplete: boolean("isComplete").default(false), // Se já gerou o prompt
   promptGenerated: boolean("promptGenerated").default(false), // Se o prompt foi gerado

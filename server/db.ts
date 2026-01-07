@@ -607,6 +607,7 @@ export async function createOrUpdateAssistantConversation(
     conversationId: string;
     messages: any[];
     collectedInfo?: any;
+    promptDraft?: string; // Prompt em construção
     isComplete?: boolean;
     promptGenerated?: boolean;
   }
@@ -628,6 +629,7 @@ export async function createOrUpdateAssistantConversation(
         .set({
           messages: data.messages as any,
           collectedInfo: data.collectedInfo as any,
+          promptDraft: data.promptDraft !== undefined ? data.promptDraft : existing.promptDraft,
           isComplete: data.isComplete ?? existing.isComplete,
           promptGenerated: data.promptGenerated ?? existing.promptGenerated,
           completedAt: data.isComplete && !existing.isComplete ? new Date() : existing.completedAt,
@@ -653,6 +655,7 @@ export async function createOrUpdateAssistantConversation(
           conversationId: data.conversationId,
           messages: data.messages as any,
           collectedInfo: data.collectedInfo as any,
+          promptDraft: data.promptDraft || null,
           isComplete: data.isComplete ?? false,
           promptGenerated: data.promptGenerated ?? false,
           completedAt: data.isComplete ? new Date() : null,

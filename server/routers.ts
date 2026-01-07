@@ -4030,6 +4030,339 @@ ${existingConfig ? `- Já existe uma configuração para este agente` : '- Este 
           });
         }
       }),
+
+    /**
+     * Construir prompt incrementalmente durante conversa (V4 - Nova Arquitetura)
+     * A IA constrói o prompt passo a passo durante a conversa, sem roteiro rígido
+     */
+    buildPromptIncrementally: protectedProcedure
+      .input(z.object({
+        agentId: z.number().optional(),
+        conversationId: z.string().optional(),
+        messages: z.array(z.object({
+          role: z.enum(['user', 'assistant', 'system']),
+          content: z.string(),
+        })),
+        userName: z.string().optional(),
+        currentPromptDraft: z.string().optional(), // Prompt atual em construção
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          let tenant = ctx.tenant;
+          
+          if (!tenant && ctx.user) {
+            tenant = await db.getTenantByUserId(ctx.user.id);
+          }
+          
+          if (!tenant) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
+          }
+
+          // Buscar ou criar agente
+          let agent: db.Agent | undefined;
+          if (input.agentId) {
+            agent = await db.getAgentById(input.agentId);
+            if (!agent || agent.tenantId !== tenant.id) {
+              throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+            }
+          } else {
+            // Buscar primeiro agente do tenant
+            const agents = await db.getAgentsByTenantId(tenant.id);
+            agent = agents[0];
+          }
+
+          // Gerar ou usar conversationId
+          const conversationId = input.conversationId || `conv_${tenant.id}_${agent?.id || 'new'}_${Date.now()}`;
+          
+          // Buscar conversa anterior se conversationId foi fornecido
+          let previousConversation: any = null;
+          if (input.conversationId) {
+            previousConversation = await db.getAssistantConversationByConversationId(input.conversationId);
+          } else if (agent) {
+            previousConversation = await db.getAssistantConversationByAgentId(agent.id);
+          }
+
+          // Prompt atual em construção (do banco ou do input)
+          const currentPromptDraft = input.currentPromptDraft || previousConversation?.promptDraft || '';
+
+          // Template base do prompt (estrutura)
+          const promptTemplate = `# **1. Identidade e Propósito**
+Você é **[Nome do Agente]**, agente de IA da **[Nome da Empresa]**. [Definir personalidade e propósito]
+
+Seu propósito é:
+* [Listar objetivos principais: atender, vender, orientar, agendar, etc.]
+
+---
+
+## **2. Contexto e Conhecimento**
+Você atua na **[Empresa]** em **[Cidade - Estado]** apoiando:
+* [Tipos de clientes]
+
+[Informações relevantes sobre a empresa]
+
+Você tem acesso a:
+* [Listar tools disponíveis, se houver]
+
+---
+
+## **3. Responsabilidades e Tarefas**
+Você deve:
+* [Listar responsabilidades específicas]
+* [Como processar diferentes tipos de solicitações]
+
+---
+
+## **4. Diretrizes de Comportamento**
+Você deve ser:
+* [Características baseadas na personalidade escolhida]
+* [Tom de voz específico]
+* [Abordagem de comunicação]
+
+---
+
+## **5. Regras e Restrições**
+
+### **Você DEVE:**
+* [Listar obrigações]
+
+### **Você NÃO DEVE:**
+* [Listar proibições]
+
+---
+
+## **6. Fluxo de Trabalho**
+
+### **CENÁRIO A — [Tipo de pergunta]**
+1. [Passo 1]
+2. [Passo 2]
+...
+
+### **CENÁRIO B — [Outro tipo]**
+...
+
+---
+
+## **7. Tratamento de Casos Especiais**
+[Como lidar com situações específicas]
+
+---
+
+## **8. Formato de Saída**
+[Como estruturar respostas - discursivo, humanizado, focado em venda/orientação]`;
+
+          // Construir contexto do sistema para a IA
+          const systemContext = `Você é o **Criador**, um assistente de IA especializado em engenharia de prompts.
+
+**SUA FUNÇÃO:**
+Você está construindo um prompt de sistema para um agente de IA através de uma conversa natural com o usuário.
+
+**TEMPLATE BASE DO PROMPT:**
+${promptTemplate}
+
+**PROMPT ATUAL EM CONSTRUÇÃO:**
+${currentPromptDraft || '(Ainda não iniciado - você vai começar a construir agora)'}
+
+**COMO FUNCIONAR:**
+1. **Conversação Natural**: Converse com o usuário de forma humanizada e inteligente. Não siga um roteiro rígido.
+2. **Construção Incremental**: A cada interação, você deve ATUALIZAR o prompt em construção usando as informações da conversa.
+3. **Flexibilidade Total**: 
+   - Se o usuário disser "não sei", "depois", "não quero informar" - aceite e continue
+   - Se faltar informação, deixe marcado como "[a definir]" ou "[informação pendente]"
+   - NUNCA trave ou insista em informações que o usuário não quer dar
+4. **Atualização do Prompt**: Sempre que o usuário fornecer informações, atualize o prompt em construção preenchendo as partes relevantes do template.
+5. **Finalização**: Quando tiver informações suficientes OU quando o usuário pedir, pergunte se pode finalizar o prompt.
+
+**IMPORTANTE:**
+- Você NÃO deve seguir um roteiro fixo de perguntas
+- Você DEVE ser conversacional e natural
+- Você DEVE construir o prompt incrementalmente durante a conversa
+- Você DEVE aceitar respostas como "não sei", "depois", etc.
+- Você DEVE sempre retornar o prompt atualizado em construção
+
+**FORMATO DE RESPOSTA:**
+Sua resposta deve ter duas partes:
+1. **Mensagem para o usuário**: Continue a conversa naturalmente
+2. **PROMPT_ATUALIZADO**: [Aqui você coloca o prompt completo atualizado com as novas informações]
+
+Quando o usuário confirmar que pode finalizar, retorne o prompt final completo.`;
+
+          // Preparar mensagens para OpenAI
+          const openaiMessages = [
+            {
+              role: 'system' as const,
+              content: systemContext,
+            },
+            ...input.messages.slice(-10), // Últimas 10 mensagens para contexto
+          ];
+
+          // Chamar OpenAI (GPT-4o)
+          const openaiApiKey = process.env.OPENAI_API_KEY;
+          if (!openaiApiKey) {
+            throw new TRPCError({ 
+              code: 'INTERNAL_SERVER_ERROR', 
+              message: 'OpenAI API key não configurada no servidor' 
+            });
+          }
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiApiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o', // Usando GPT-4o para melhor capacidade
+              messages: openaiMessages,
+              temperature: 0.8,
+              max_tokens: 2000,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('[BuildPromptIncrementally] Erro na API:', error);
+            throw new Error(error.error?.message || `Erro HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error('Resposta inválida da OpenAI');
+          }
+
+          const assistantMessage = data.choices[0].message.content?.trim() || '';
+          
+          // Extrair prompt atualizado da resposta (se houver)
+          let updatedPromptDraft = currentPromptDraft;
+          const promptMatch = assistantMessage.match(/PROMPT_ATUALIZADO:\s*([\s\S]*?)(?:\n\n|$)/i);
+          if (promptMatch) {
+            updatedPromptDraft = promptMatch[1].trim();
+          } else if (currentPromptDraft === '') {
+            // Se não há prompt ainda e a IA não marcou, tentar extrair do contexto
+            // Por enquanto, deixar a IA construir na próxima interação
+          }
+
+          // Remover a marcação do prompt da mensagem para o usuário
+          const userMessage = assistantMessage.replace(/PROMPT_ATUALIZADO:[\s\S]*/i, '').trim();
+
+          // Salvar conversa no banco
+          const messagesToSave = [
+            ...input.messages.slice(-10).map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+              timestamp: msg.timestamp || new Date().toISOString(),
+            })),
+            { 
+              role: 'assistant', 
+              content: userMessage, 
+              timestamp: new Date().toISOString() 
+            },
+          ];
+
+          await db.createOrUpdateAssistantConversation({
+            tenantId: tenant.id,
+            agentId: agent?.id,
+            conversationId: conversationId,
+            messages: messagesToSave,
+            collectedInfo: {},
+            promptDraft: updatedPromptDraft,
+            isComplete: false,
+            promptGenerated: false,
+          });
+
+          // Verificar se a IA está perguntando se pode finalizar
+          const messageLower = userMessage.toLowerCase();
+          const isAskingToFinalize = (messageLower.includes('posso finalizar') || 
+                                      messageLower.includes('posso gerar') || 
+                                      messageLower.includes('pode finalizar') ||
+                                      messageLower.includes('finalizar o prompt')) &&
+                                     (messageLower.includes('prompt') || 
+                                      messageLower.includes('agora'));
+
+          return {
+            message: userMessage,
+            conversationId: conversationId,
+            promptDraft: updatedPromptDraft,
+            shouldShowFinalizeButton: isAskingToFinalize,
+          };
+        } catch (error: any) {
+          console.error('[BuildPromptIncrementally] ❌ Erro:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error.message || 'Erro ao construir prompt incrementalmente',
+          });
+        }
+      }),
+
+    /**
+     * Finalizar prompt construído incrementalmente
+     */
+    finalizeIncrementalPrompt: protectedProcedure
+      .input(z.object({
+        agentId: z.number(),
+        conversationId: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        let tenant = ctx.tenant;
+        
+        if (!tenant && ctx.user) {
+          tenant = await db.getTenantByUserId(ctx.user.id);
+        }
+        
+        if (!tenant) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
+        }
+
+        // Buscar agente
+        const agent = await db.getAgentById(input.agentId);
+        if (!agent || agent.tenantId !== tenant.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Agente não pertence ao seu tenant' });
+        }
+
+        // Buscar conversa
+        const conversation = await db.getAssistantConversationByConversationId(input.conversationId);
+        if (!conversation || !conversation.promptDraft) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Prompt em construção não encontrado' });
+        }
+
+        const finalPrompt = conversation.promptDraft;
+
+        // Salvar prompt final no agente
+        const existingConfig = await db.getAgentConfigByAgentId(agent.id);
+        const companyInfo = conversation.collectedInfo || {};
+
+        if (existingConfig) {
+          await db.updateAgentConfigByAgentId(agent.id, {
+            systemPrompt: finalPrompt,
+            companyInfo: JSON.stringify(companyInfo),
+            welcomeMessage: `Olá! Sou o assistente virtual da ${companyInfo.businessName || agent.name}. Como posso ajudar você hoje?`,
+          });
+        } else {
+          await db.createAgentConfig({
+            agentId: agent.id,
+            systemPrompt: finalPrompt,
+            companyInfo: JSON.stringify(companyInfo),
+            welcomeMessage: `Olá! Sou o assistente virtual da ${companyInfo.businessName || agent.name}. Como posso ajudar você hoje?`,
+          });
+        }
+
+        // Marcar conversa como completa
+        await db.createOrUpdateAssistantConversation({
+          tenantId: tenant.id,
+          agentId: agent.id,
+          conversationId: input.conversationId,
+          messages: conversation.messages as any[],
+          collectedInfo: conversation.collectedInfo as any,
+          promptDraft: finalPrompt,
+          isComplete: true,
+          promptGenerated: true,
+        });
+
+        return {
+          success: true,
+          systemPrompt: finalPrompt,
+        };
+      }),
   }),
 
   // ========== ROTAS DE INTERAÇÕES E ANÁLISE ==========
