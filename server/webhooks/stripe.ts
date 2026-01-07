@@ -523,6 +523,58 @@ export async function provisionTenantFromCheckout(session: Stripe.Checkout.Sessi
     });
   }
 
+  // 7. Gerar token de ativação
+  const activationToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+  
+  await db.insert(activationTokens).values({
+    tenantId: tenant.id,
+    token: activationToken,
+    expiresAt,
+  });
+  
+  console.log(`[Provisioning] Activation token created: ${activationToken}`);
+
+  // 8. Enviar email de ativação APENAS se tudo estiver funcionando
+  // Verificar se recursos críticos foram criados
+  const finalAgentCheck = await getAgentById(agent.id);
+  const hasEvolution = finalAgentCheck?.evolutionInstanceName && finalAgentCheck?.evolutionInstanceName.startsWith('agent_');
+  const hasWorkflow = finalAgentCheck?.n8nWorkflowId;
+  const hasInbox = finalAgentCheck?.chatwootInboxId;
+  
+  if (hasEvolution && hasWorkflow && hasInbox) {
+    try {
+      await sendActivationEmail(email, activationToken, companyName);
+      console.log(`[Provisioning] ✅ Activation email sent to ${email} (tudo funcionando)`);
+      
+      await createPlatformLog({
+        tenantId: tenant.id,
+        eventType: "tenant_created",
+        message: `Tenant created and activation email sent to ${email}`,
+        metadata: JSON.stringify({ email, planId, evolution: hasEvolution, workflow: hasWorkflow, inbox: hasInbox }),
+      });
+    } catch (error: any) {
+      console.error(`[Provisioning] ❌ Erro ao enviar email:`, error);
+      await createPlatformLog({
+        tenantId: tenant.id,
+        eventType: "email_failed",
+        message: `Failed to send activation email: ${error.message}`,
+        metadata: JSON.stringify({ error: error.message }),
+      });
+    }
+  } else {
+    console.warn(`[Provisioning] ⚠️ Email NÃO enviado - recursos não estão completos:`);
+    console.warn(`[Provisioning] - Evolution: ${hasEvolution ? '✅' : '❌'}`);
+    console.warn(`[Provisioning] - Workflow: ${hasWorkflow ? '✅' : '❌'}`);
+    console.warn(`[Provisioning] - Inbox: ${hasInbox ? '✅' : '❌'}`);
+    
+    await createPlatformLog({
+      tenantId: tenant.id,
+      eventType: "email_not_sent",
+      message: `Email não enviado - recursos incompletos. Evolution: ${hasEvolution}, Workflow: ${hasWorkflow}, Inbox: ${hasInbox}`,
+      metadata: JSON.stringify({ evolution: hasEvolution, workflow: hasWorkflow, inbox: hasInbox }),
+    });
+  }
 
   return tenant;
 }
