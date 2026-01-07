@@ -3776,9 +3776,36 @@ ${existingCompanyInfo ? `
           const data = await response.json();
           const assistantMessage = data.choices[0].message.content.trim();
 
+          // Salvar conversa no banco
+          try {
+            await db.createOrUpdateAssistantConversation({
+              tenantId: tenant.id,
+              agentId: agent?.id,
+              conversationId: conversationId,
+              messages: [
+                ...input.messages.slice(-10), // Últimas 10 mensagens
+                { role: 'assistant', content: assistantMessage, timestamp: new Date().toISOString() },
+              ],
+              collectedInfo: collectedInfo,
+              isComplete: false,
+              promptGenerated: false,
+            });
+          } catch (error: any) {
+            console.error('[Assistant] Erro ao salvar conversa:', error);
+            // Não falhar a requisição se não conseguir salvar
+          }
+
+          // Verificar se o assistente está oferecendo gerar o prompt
+          const messageLower = assistantMessage.toLowerCase();
+          const shouldShowGenerateButton = (messageLower.includes('gerar') || messageLower.includes('criar') || messageLower.includes('configurar')) && 
+            (messageLower.includes('prompt') || messageLower.includes('sistema') || messageLower.includes('agora'));
+
           return {
             message: assistantMessage,
             success: true,
+            conversationId: conversationId,
+            shouldShowGenerateButton: shouldShowGenerateButton,
+            collectedInfo: collectedInfo,
           };
         } catch (error: any) {
           console.error('[OpenAI Chat] Erro ao conversar:', error);
