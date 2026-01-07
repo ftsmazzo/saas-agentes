@@ -804,6 +804,7 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
       .set({
         currentCredits: sql`${tenantCredits.currentCredits} + ${creditsToAdd}`,
         totalCreditsPurchased: sql`${tenantCredits.totalCreditsPurchased} + ${creditsToAdd}`,
+        extrasPurchased: sql`${tenantCredits.extrasPurchased} + ${creditsToAdd}`, // Rastrear extras separadamente
         updatedAt: new Date(),
       })
       .where(eq(tenantCredits.tenantId, tenantIdNum))
@@ -845,6 +846,7 @@ async function handleExtraCreditsPurchase(session: Stripe.Checkout.Session) {
       tenantId: tenantIdNum,
       currentCredits: creditsToAdd,
       totalCreditsPurchased: creditsToAdd,
+      extrasPurchased: creditsToAdd, // Todos são extras se não há registro
     }).returning();
 
     if (!insertResult || insertResult.length === 0) {

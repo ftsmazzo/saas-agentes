@@ -464,6 +464,7 @@ export const tenantCredits = pgTable("tenantCredits", {
   totalCreditsPurchased: integer("totalCreditsPurchased").default(0),
   totalCreditsUsed: integer("totalCreditsUsed").default(0),
   totalCreditsBonus: integer("totalCreditsBonus").default(0), // Bônus e resets mensais
+  extrasPurchased: integer("extrasPurchased").default(0), // Créditos extras comprados (preservados no reset mensal)
   
   // Controle de reset mensal
   lastResetDate: timestamp("lastResetDate", { withTimezone: true }),

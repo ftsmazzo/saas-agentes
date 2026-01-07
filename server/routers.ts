@@ -1968,22 +1968,8 @@ export const appRouter = router({
       }
       
       // Se há registro na tabela, usar currentCredits do banco (fonte da verdade)
-      // Calcular extras comprados: totalCreditsPurchased - monthlyCredits (se positivo)
-      // Mas isso não funciona porque totalCreditsPurchased inclui mensais também
-      // Então vamos calcular: extras = totalCreditsPurchased - (mensais já atribuídos)
-      
-      // Se lastResetDate existe e é do mês atual, mensais já foram atribuídos
-      const lastReset = credits.lastResetDate;
-      const now = new Date();
-      const isSameMonth = lastReset && 
-        lastReset.getFullYear() === now.getFullYear() && 
-        lastReset.getMonth() === now.getMonth();
-      
-      // Calcular extras: se mensais já foram atribuídos, extras = totalPurchased - monthlyCredits
-      // Se não, extras = totalPurchased (tudo são extras até os mensais serem atribuídos)
-      const extrasPurchased = isSameMonth 
-        ? Math.max(0, totalCreditsPurchased - monthlyCredits)
-        : totalCreditsPurchased; // Se mensais não foram atribuídos, tudo são extras temporariamente
+      // Usar extrasPurchased diretamente da coluna (rastreado separadamente)
+      const extrasPurchased = credits.extrasPurchased || 0;
       
       // Usar currentCredits do banco diretamente (já está correto)
       return {
@@ -1993,7 +1979,7 @@ export const appRouter = router({
         totalCreditsBonus: credits.totalCreditsBonus || 0,
         monthlyCredits: monthlyCredits,
         creditsUsedThisMonth: creditsUsedThisMonth,
-        extrasPurchased: extrasPurchased,
+        extrasPurchased: extrasPurchased, // Usar diretamente da coluna
         lastResetDate: credits.lastResetDate,
       };
     }),
