@@ -291,8 +291,15 @@ export async function handleN8NWebhook(req: Request, res: Response) {
         
         if (Array.isArray(dataArray)) {
           console.log(`[N8N Webhook] 📦 Processando ${dataArray.length} itens em lote`);
-          for (const usageData of dataArray) {
-            await handleUsageTracking(tenantId, { data: usageData });
+          for (const usageDataItem of dataArray) {
+            // Garantir que agentId está no metadata se não estiver
+            if (!usageDataItem.metadata?.agentId && defaultAgentId) {
+              usageDataItem.metadata = {
+                ...usageDataItem.metadata,
+                agentId: defaultAgentId,
+              };
+            }
+            await handleUsageTracking(tenantId, { data: usageDataItem });
           }
         } else {
           console.warn(`[N8N Webhook] ⚠️ usage_tracking_batch espera um array, recebeu:`, typeof dataArray, dataArray);
