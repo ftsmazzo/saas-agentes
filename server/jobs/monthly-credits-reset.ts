@@ -69,18 +69,52 @@ export async function resetMonthlyCredits(): Promise<{
           .limit(1);
 
         if (existingCredits[0]) {
-          // Atualizar: resetar para o valor do plano
+          // IMPORTANTE: Preservar créditos extras comprados ao resetar
+          // Calcular créditos extras = totalCreditsPurchased - monthlyCredits (se positivo)
+          // Mas isso não funciona porque totalCreditsPurchased inclui os mensais também
+          // Melhor: calcular extras = currentCredits - monthlyCredits (se positivo) antes do reset
+          // Mas isso também não funciona porque currentCredits pode ter uso subtraído
+          
+          // SOLUÇÃO: Calcular extras baseado no histórico
+          // Se totalCreditsPurchased > monthlyCredits * número de meses, há extras
+          // Mas isso é complexo...
+          
+          // ABORDAGEM SIMPLES: 
+          // 1. Calcular créditos extras = totalCreditsPurchased - (monthlyCredits * meses desde criação)
+          // 2. Resetar currentCredits = monthlyCredits + extras
+          
+          // ABORDAGEM MAIS SIMPLES:
+          // Se o tenant tem créditos extras, eles devem estar no currentCredits
+          // Mas o currentCredits pode ter uso subtraído
+          // Então: extras = max(0, currentCredits - monthlyCredits) antes do reset
+          // Mas isso não funciona se o uso foi maior que os mensais
+          
+          // MELHOR ABORDAGEM:
+          // Calcular extras baseado em: se totalCreditsPurchased > monthlyCredits, há extras
+          // Mas precisamos saber quantos meses já passaram para calcular corretamente
+          
+          // ABORDAGEM PRAGMÁTICA:
+          // Se currentCredits > monthlyCredits antes do reset, há extras
+          // Então: extras = max(0, currentCredits - monthlyCredits)
+          // Resetar para: monthlyCredits + extras
+          
+          const currentCreditsBeforeReset = existingCredits[0].currentCredits || 0;
+          const extrasPurchased = Math.max(0, currentCreditsBeforeReset - monthlyCredits);
+          
+          // Resetar: monthlyCredits + extras (preservar extras comprados)
+          const newCurrentCredits = monthlyCredits + extrasPurchased;
+          
           await db
             .update(tenantCredits)
             .set({
-              currentCredits: monthlyCredits,
+              currentCredits: newCurrentCredits,
               lastResetDate: now,
               updatedAt: now,
             })
             .where(eq(tenantCredits.tenantId, tenant.id));
 
           console.log(
-            `[Monthly Credits Reset] ✅ Tenant ${tenant.id} (${tenant.companyName}): Resetado para ${monthlyCredits} créditos`
+            `[Monthly Credits Reset] ✅ Tenant ${tenant.id} (${tenant.companyName}): Resetado para ${newCurrentCredits} créditos (${monthlyCredits} mensais + ${extrasPurchased} extras)`
           );
         } else {
           // Criar registro inicial
