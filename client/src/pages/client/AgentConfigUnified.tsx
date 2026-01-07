@@ -215,7 +215,8 @@ export default function AgentConfigUnifiedPage() {
       return;
     }
 
-    updateMutation.mutate({
+    // Preparar dados para atualização, removendo campos vazios
+    const updateData: any = {
       agentId: agentIdNum,
       systemPrompt: formData.systemPrompt,
       welcomeMessage: formData.welcomeMessage,
@@ -224,10 +225,24 @@ export default function AgentConfigUnifiedPage() {
       enableHumanHandoff: formData.enableHumanHandoff,
       enableAudioTranscription: formData.enableAudioTranscription,
       enableImageProcessing: formData.enableImageProcessing,
-      toolsConfig: JSON.stringify(formData.toolsConfig),
-      schedulingConfig: JSON.stringify(formData.schedulingConfig),
-      ragConfig: JSON.stringify(formData.ragConfig),
-    });
+    };
+
+    // Só incluir toolsConfig se não estiver vazio
+    if (formData.toolsConfig && Object.keys(formData.toolsConfig).length > 0) {
+      updateData.toolsConfig = JSON.stringify(formData.toolsConfig);
+    }
+
+    // Só incluir schedulingConfig se não estiver vazio
+    if (formData.schedulingConfig && Object.keys(formData.schedulingConfig).length > 0) {
+      updateData.schedulingConfig = JSON.stringify(formData.schedulingConfig);
+    }
+
+    // Só incluir ragConfig se não estiver vazio
+    if (formData.ragConfig && Object.keys(formData.ragConfig).length > 0) {
+      updateData.ragConfig = JSON.stringify(formData.ragConfig);
+    }
+
+    updateMutation.mutate(updateData);
   };
 
   const toggleTool = (toolId: string) => {

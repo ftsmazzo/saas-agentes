@@ -1117,23 +1117,51 @@ export const appRouter = router({
         }
 
         // Criar agente primeiro (sem integrações - serão provisionadas depois)
-        const agent = await db.createAgent({
-          tenantId: tenant.id,
-          name: input.agentName,
-          status: "active" as const,
-          isActive: false, // Será ativado depois
-        });
+        console.log(`[CreateAgent] 🚀 Criando agente para tenant ${tenant.id}...`);
+        let agent;
+        try {
+          agent = await db.createAgent({
+            tenantId: tenant.id,
+            name: input.agentName,
+            status: "active" as const,
+            isActive: false, // Será ativado depois
+          });
+          console.log(`[CreateAgent] ✅ Agente criado: ID=${agent.id}, Nome=${agent.name}`);
+        } catch (error: any) {
+          console.error(`[CreateAgent] ❌ Erro ao criar agente:`, error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao criar agente: ${error.message}`,
+          });
+        }
 
         // Criar configuração do agente usando agentId
-        await db.createAgentConfig({
-          agentId: agent.id, // Usar agentId, não tenantId
-          systemPrompt: input.systemPrompt,
-          welcomeMessage: input.welcomeMessage || "Olá! Como posso ajudá-lo hoje?",
-          companyInfo: input.companyInfo || null,
-          enableHumanHandoff: input.enableHumanHandoff,
-          enableAudioTranscription: input.enableAudioTranscription,
-          enableImageProcessing: input.enableImageProcessing,
-        });
+        console.log(`[CreateAgent] 🔧 Criando configuração para agente ${agent.id}...`);
+        try {
+          await db.createAgentConfig({
+            agentId: agent.id, // Usar agentId, não tenantId
+            systemPrompt: input.systemPrompt,
+            welcomeMessage: input.welcomeMessage || "Olá! Como posso ajudá-lo hoje?",
+            companyInfo: input.companyInfo || null,
+            enableHumanHandoff: input.enableHumanHandoff,
+            enableAudioTranscription: input.enableAudioTranscription,
+            enableImageProcessing: input.enableImageProcessing,
+          });
+          console.log(`[CreateAgent] ✅ Configuração criada para agente ${agent.id}`);
+        } catch (error: any) {
+          console.error(`[CreateAgent] ❌ Erro ao criar configuração:`, error);
+          // Se falhar ao criar config, tentar deletar o agente criado
+          try {
+            await db.deleteAgent(agent.id);
+            console.log(`[CreateAgent] 🗑️ Agente ${agent.id} deletado após falha na configuração`);
+          } catch (deleteError) {
+            console.error(`[CreateAgent] ⚠️ Erro ao deletar agente após falha:`, deleteError);
+          }
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao criar configuração do agente: ${error.message}`,
+          });
+        }
 
         await db.createPlatformLog({
           tenantId: tenant.id,
@@ -1142,6 +1170,7 @@ export const appRouter = router({
           message: `Agente "${input.agentName}" criado com sucesso`,
         });
 
+        console.log(`[CreateAgent] ✅✅✅ Agente criado com sucesso! ID=${agent.id}, Nome=${agent.name}`);
         return { 
           success: true, 
           message: "Agente criado com sucesso!",
@@ -1264,32 +1293,64 @@ export const appRouter = router({
           }
         }
 
-        // Validar features se fornecidas
-        if (input.ragConfig) {
-          const { validateFeatureForTenant } = await import("./plan-validation");
-          const validation = await validateFeatureForTenant(tenant.id, 'enableRAG');
-          if (!validation.allowed) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: validation.reason || 'RAG não está disponível no seu plano',
-            });
+        // Validar features se fornecidas (apenas se não forem vazias/null)
+        if (input.ragConfig && input.ragConfig.trim() !== '' && input.ragConfig !== 'null' && input.ragConfig !== '{}') {
+          try {
+            const ragParsed = JSON.parse(input.ragConfig);
+            // Só validar se RAG estiver realmente habilitado
+            if (ragParsed && typeof ragParsed === 'object' && ragParsed.enabled === true) {
+              const { validateFeatureForTenant } = await import("./plan-validation");
+              const validation = await validateFeatureForTenant(tenant.id, 'enableRAG');
+              if (!validation.allowed) {
+                throw new TRPCError({
+                  code: 'FORBIDDEN',
+                  message: validation.reason || 'RAG não está disponível no seu plano',
+                });
+              }
+            }
+          } catch (e) {
+            // Se não conseguir parsear, ignorar validação (pode ser string vazia ou inválida)
+            console.warn('[UpdateConfig] RAG config inválido, ignorando validação:', e);
           }
         }
 
-        if (input.schedulingConfig) {
-          const { validateFeatureForTenant } = await import("./plan-validation");
-          const validation = await validateFeatureForTenant(tenant.id, 'enableScheduling');
-          if (!validation.allowed) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: validation.reason || 'Agendamento não está disponível no seu plano',
-            });
+        if (input.schedulingConfig && input.schedulingConfig.trim() !== '' && input.schedulingConfig !== 'null' && input.schedulingConfig !== '{}') {
+          try {
+            const schedulingParsed = JSON.parse(input.schedulingConfig);
+            // Só validar se agendamento estiver realmente habilitado
+            if (schedulingParsed && typeof schedulingParsed === 'object' && schedulingParsed.enabled === true) {
+              const { validateFeatureForTenant } = await import("./plan-validation");
+              const validation = await validateFeatureForTenant(tenant.id, 'enableScheduling');
+              if (!validation.allowed) {
+                throw new TRPCError({
+                  code: 'FORBIDDEN',
+                  message: validation.reason || 'Agendamento não está disponível no seu plano',
+                });
+              }
+            }
+          } catch (e) {
+            // Se não conseguir parsear, ignorar validação
+            console.warn('[UpdateConfig] Scheduling config inválido, ignorando validação:', e);
           }
         }
         
         // Atualizar configuração usando agentId específico
+        // Remover campos vazios/null antes de atualizar
         const { agentId, ...configUpdates } = input;
-        await db.updateAgentConfigByAgentId(agent.id, configUpdates);
+        const cleanedUpdates: any = {};
+        
+        // Só incluir campos que foram realmente fornecidos e não são vazios
+        Object.keys(configUpdates).forEach(key => {
+          const value = (configUpdates as any)[key];
+          if (value !== undefined && value !== null && value !== '' && value !== 'null' && value !== '{}') {
+            cleanedUpdates[key] = value;
+          }
+        });
+        
+        // Só atualizar se houver campos para atualizar
+        if (Object.keys(cleanedUpdates).length > 0) {
+          await db.updateAgentConfigByAgentId(agent.id, cleanedUpdates);
+        }
 
         // Sincronizar configuração com N8N em background (não bloqueia)
         if (agent.n8nWorkflowId) {
