@@ -321,6 +321,9 @@ export default function AgentConfigAssistantV3({
       }
     }
 
+    // Extrair informações da mensagem primeiro
+    let updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
+    
     // Verificar se a última mensagem do assistente foi perguntando sobre número do endereço
     // Reutilizar lastAssistantMessage já declarada acima
     const isAskingForStreetNumber = lastAssistantMessage.includes('número do endereço') || 
@@ -328,21 +331,18 @@ export default function AgentConfigAssistantV3({
                                      lastAssistantMessage.includes('numero');
     
     // Se o assistente perguntou sobre número e o usuário digitou apenas números, extrair como número
-    if (isAskingForStreetNumber && !collectedInfo.streetNumber) {
+    if (isAskingForStreetNumber && !updatedInfo.streetNumber) {
       const numberOnly = userMessage.replace(/\D/g, '');
       if (numberOnly.length > 0 && numberOnly.length <= 10) {
-        setCollectedInfo((prev) => ({
-          ...prev,
+        updatedInfo = {
+          ...updatedInfo,
           streetNumber: numberOnly,
-        }));
+        };
       }
     }
 
-    // Extrair informações da mensagem
-    const updatedInfo = extractInfoFromMessage(userMessage, collectedInfo);
-    if (JSON.stringify(updatedInfo) !== JSON.stringify(collectedInfo)) {
-      setCollectedInfo(updatedInfo);
-    }
+    // Atualizar estado com todas as informações coletadas
+    setCollectedInfo(updatedInfo);
 
     setUserInput('');
     setIsProcessing(true);
@@ -356,13 +356,13 @@ export default function AgentConfigAssistantV3({
       content: msg.content,
     }));
 
-    // Chamar API de chat com informações coletadas
+    // Chamar API de chat com informações coletadas ATUALIZADAS
     chatMutation.mutate({
       agentId: agentId,
       conversationId: conversationId || undefined,
       messages: messageHistory,
       userName: userName,
-      collectedInfo: collectedInfo,
+      collectedInfo: updatedInfo, // Usar updatedInfo que tem o número incluído
     });
   };
 
