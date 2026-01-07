@@ -557,6 +557,122 @@ export async function getAllAgentConfigs(): Promise<AgentConfig[]> {
   return await db.select().from(agentConfigs);
 }
 
+// ========== ASSISTANT CONVERSATIONS OPERATIONS ==========
+
+export async function getAssistantConversationByConversationId(
+  conversationId: string
+): Promise<AssistantConversation | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  try {
+    const result = await db
+      .select()
+      .from(assistantConversations)
+      .where(eq(assistantConversations.conversationId, conversationId))
+      .limit(1);
+
+    return result[0];
+  } catch (error: any) {
+    console.error('[DB] Erro ao buscar conversa por conversationId:', error);
+    return undefined;
+  }
+}
+
+export async function getAssistantConversationByAgentId(
+  agentId: number
+): Promise<AssistantConversation | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  try {
+    const result = await db
+      .select()
+      .from(assistantConversations)
+      .where(eq(assistantConversations.agentId, agentId))
+      .orderBy(desc(assistantConversations.updatedAt))
+      .limit(1);
+
+    return result[0];
+  } catch (error: any) {
+    console.error('[DB] Erro ao buscar conversa por agentId:', error);
+    return undefined;
+  }
+}
+
+export async function createOrUpdateAssistantConversation(
+  data: {
+    tenantId: number;
+    agentId?: number;
+    conversationId: string;
+    messages: any[];
+    collectedInfo?: any;
+    isComplete?: boolean;
+    promptGenerated?: boolean;
+  }
+): Promise<AssistantConversation> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  try {
+    // Verificar se já existe
+    const existing = await getAssistantConversationByConversationId(data.conversationId);
+
+    if (existing) {
+      // Atualizar
+      console.log('[DB] Atualizando conversa existente:', data.conversationId);
+      const [updated] = await db
+        .update(assistantConversations)
+        .set({
+          messages: data.messages as any,
+          collectedInfo: data.collectedInfo as any,
+          isComplete: data.isComplete ?? existing.isComplete,
+          promptGenerated: data.promptGenerated ?? existing.promptGenerated,
+          completedAt: data.isComplete && !existing.isComplete ? new Date() : existing.completedAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(assistantConversations.conversationId, data.conversationId))
+        .returning();
+
+      if (!updated) {
+        throw new Error('Falha ao atualizar conversa');
+      }
+
+      console.log('[DB] ✅ Conversa atualizada com sucesso');
+      return updated;
+    } else {
+      // Criar novo
+      console.log('[DB] Criando nova conversa:', data.conversationId);
+      const [newConv] = await db
+        .insert(assistantConversations)
+        .values({
+          tenantId: data.tenantId,
+          agentId: data.agentId,
+          conversationId: data.conversationId,
+          messages: data.messages as any,
+          collectedInfo: data.collectedInfo as any,
+          isComplete: data.isComplete ?? false,
+          promptGenerated: data.promptGenerated ?? false,
+          completedAt: data.isComplete ? new Date() : null,
+        })
+        .returning();
+
+      if (!newConv) {
+        throw new Error('Falha ao criar conversa');
+      }
+
+      console.log('[DB] ✅ Conversa criada com sucesso');
+      return newConv;
+    }
+  } catch (error: any) {
+    console.error('[DB] ❌ Erro ao salvar/atualizar conversa:', error);
+    console.error('[DB] ❌ Stack:', error.stack);
+    throw error;
+  }
+}
+
 // ========== CONVERSATIONS AND MESSAGES OPERATIONS ==========
 
 export async function getConversationsByTenantId(
