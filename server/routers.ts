@@ -1149,6 +1149,17 @@ export const appRouter = router({
           });
         }
 
+        // Validar se já existe agente com o mesmo nome (case-insensitive)
+        const duplicateAgent = existingAgents.find(
+          agent => agent.name.toLowerCase().trim() === input.agentName.toLowerCase().trim()
+        );
+        if (duplicateAgent) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Já existe um agente com o nome "${input.agentName}". Por favor, escolha um nome diferente.`,
+          });
+        }
+
         // Criar agente primeiro (sem integrações - serão provisionadas depois)
         console.log(`[CreateAgent] 🚀 Criando agente para tenant ${tenant.id}...`);
         let agent;
