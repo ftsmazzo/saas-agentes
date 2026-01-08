@@ -31,7 +31,7 @@ export default function ClientLogin() {
       // Aguardar um pouco para garantir que o cookie foi definido
       // e então redirecionar para o painel do cliente
       setTimeout(() => {
-        window.location.href = "/client";
+        window.location.href = "/client/agents";
       }, 100);
     },
     onError: (err) => {

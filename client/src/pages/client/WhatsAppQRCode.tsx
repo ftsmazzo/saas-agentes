@@ -152,22 +152,6 @@ export default function WhatsAppQRCode() {
   return (
     <ClientLayout>
       <div className="max-w-4xl mx-auto">
-        {/* Aviso se não houver agente configurado */}
-        {!agentLoading && (!agentConfig || !agentConfig.systemPrompt) && (
-          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
-            <Bot className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800">
-              <strong>Agente não configurado ainda.</strong> Você pode conectar o WhatsApp primeiro e depois configurar o agente. 
-              <Button
-                variant="link"
-                className="p-0 h-auto ml-1 text-yellow-800 underline"
-                onClick={() => setLocation("/client/agents")}
-              >
-                Configurar agora
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold">
           {agent ? `Conectar WhatsApp - ${agent.name}` : "Conectar WhatsApp"}
@@ -225,7 +209,7 @@ export default function WhatsAppQRCode() {
               </Alert>
               
               {/* Só mostrar botões de ativar/desativar se houver agente configurado (com systemPrompt) */}
-              {agentConfig && agentConfig.systemPrompt ? (
+              {agentConfig && agentConfig.systemPrompt && (
                 isAgentActivated ? (
                   <>
                     <Button
@@ -276,27 +260,6 @@ export default function WhatsAppQRCode() {
                     )}
                   </Button>
                 )
-              ) : (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Bot className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
-                    Configure o agente primeiro para poder ativá-lo. 
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto ml-1 text-blue-800 underline"
-                      onClick={() => {
-                        // Redirecionar para primeiro agente ou lista
-                        if (agents && agents.length > 0) {
-                          setLocation(`/client/agents/${agents[0].id}/settings`);
-                        } else {
-                          setLocation("/client/agents");
-                        }
-                      }}
-                    >
-                      Configurar agora
-                    </Button>
-                  </AlertDescription>
-                </Alert>
               )}
               <Button
                 onClick={handleDisconnect}
@@ -405,21 +368,23 @@ export default function WhatsAppQRCode() {
         </Card>
       )}
 
-      {/* Instructions Card */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Como Conectar</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-            <li>Abra o WhatsApp no seu celular</li>
-            <li>Toque em <strong>Mais opções</strong> (⋮) ou <strong>Configurações</strong></li>
-            <li>Toque em <strong>Aparelhos conectados</strong></li>
-            <li>Toque em <strong>Conectar um aparelho</strong></li>
-            <li>Aponte seu celular para esta tela para escanear o código</li>
-          </ol>
-        </CardContent>
-      </Card>
+      {/* Instructions Card - Só mostrar se não estiver conectado */}
+      {!isConnected && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Como Conectar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+              <li>Abra o WhatsApp no seu celular</li>
+              <li>Toque em <strong>Mais opções</strong> (⋮) ou <strong>Configurações</strong></li>
+              <li>Toque em <strong>Aparelhos conectados</strong></li>
+              <li>Toque em <strong>Conectar um aparelho</strong></li>
+              <li>Aponte seu celular para esta tela para escanear o código</li>
+            </ol>
+          </CardContent>
+        </Card>
+      )}
     </div>
     </ClientLayout>
   );

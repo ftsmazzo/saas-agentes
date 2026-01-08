@@ -116,198 +116,183 @@ export default function AgentsPage() {
 
   return (
     <ClientLayout>
-      <div className="container mx-auto py-8 space-y-6">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Meus Agentes</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Meus Agentes</h1>
             <p className="text-muted-foreground mt-1">
-              Gerencie seus agentes de IA
+              Gerencie e configure seus agentes de IA
             </p>
           </div>
           <Link href="/client/agents/create">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Criar Novo Agente
+              Novo Agente
             </Button>
           </Link>
         </div>
 
         {/* Agents List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Agentes Configurados</CardTitle>
-            <CardDescription>
-              {agents?.length || 0} agente(s) criado(s)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!agents || agents.length === 0 ? (
-              <div className="text-center py-12">
-                <Bot className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Nenhum agente criado</h3>
-                <p className="text-muted-foreground mb-6">
-                  Crie seu primeiro agente de IA para começar
-                </p>
-                <Link href="/client/agents/create">
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Criar Primeiro Agente
-                  </Button>
-                </Link>
+        {!agents || agents.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="p-4 bg-primary/10 rounded-full mb-4">
+                <Bot className="h-12 w-12 text-primary" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                {agents.map((agent) => (
-                  <Card key={agent.id} className="border">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                              <Bot className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-semibold">{agent.name}</h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge 
-                                  variant={agent.isActive ? "default" : "secondary"}
-                                  className="gap-1"
-                                >
-                                  {agent.isActive ? (
-                                    <>
-                                      <CheckCircle2 className="h-3 w-3" />
-                                      Ativo
-                                    </>
-                                  ) : (
-                                    <>
-                                      <XCircle className="h-3 w-3" />
-                                      Inativo
-                                    </>
-                                  )}
-                                </Badge>
-                                <Badge variant="outline">
-                                  {agent.status}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {agent.description && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {agent.description}
-                            </p>
-                          )}
-
-                          <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
-                            <span>Criado em: {new Date(agent.createdAt).toLocaleDateString('pt-BR')}</span>
-                            {agent.evolutionInstanceName && (
-                              <span className="flex items-center gap-1">
-                                <MessageSquare className="h-4 w-4" />
-                                WhatsApp conectado
-                              </span>
+              <h3 className="text-xl font-semibold mb-2">Nenhum agente criado</h3>
+              <p className="text-muted-foreground mb-6 text-center max-w-md">
+                Crie seu primeiro agente de IA para começar a automatizar conversas e atender seus clientes
+              </p>
+              <Link href="/client/agents/create">
+                <Button size="lg" className="gap-2">
+                  <Plus className="h-5 w-5" />
+                  Criar Primeiro Agente
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {agents.map((agent) => (
+              <Card key={agent.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="p-2.5 bg-primary/10 rounded-lg">
+                        <Bot className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold truncate">{agent.name}</h3>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge 
+                            variant={agent.isActive ? "default" : "secondary"}
+                            className="gap-1 text-xs"
+                          >
+                            {agent.isActive ? (
+                              <>
+                                <CheckCircle2 className="h-3 w-3" />
+                                Ativo
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3 w-3" />
+                                Inativo
+                              </>
                             )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {/* Configure */}
-                          <Link href={`/client/agents/${agent.id}/settings`}>
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <Settings className="h-4 w-4" />
-                              Configurar
-                            </Button>
-                          </Link>
-
-                          {/* WhatsApp QR Code */}
-                          <Link href={`/client/agents/${agent.id}/whatsapp`}>
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <QrCode className="h-4 w-4" />
-                              WhatsApp
-                            </Button>
-                          </Link>
-
-                          {/* Activate/Deactivate */}
-                          {agent.isActive ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              onClick={() => handleDeactivate(agent.id)}
-                              disabled={deactivateMutation.isPending}
-                            >
-                              {deactivateMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Pause className="h-4 w-4" />
-                              )}
-                              Desativar
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                              onClick={() => handleActivate(agent.id)}
-                              disabled={activateMutation.isPending}
-                            >
-                              {activateMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                              Ativar
-                            </Button>
+                          </Badge>
+                          {agent.evolutionInstanceName && (
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <MessageSquare className="h-3 w-3" />
+                              Conectado
+                            </Badge>
                           )}
-
-                          {/* Delete */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="gap-2"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Deletar
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Deletar Agente</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja deletar o agente "{agent.name}"?
-                                  Esta ação não pode ser desfeita. Todos os recursos
-                                  relacionados (workflows, instâncias, configurações) serão removidos.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(agent.id, agent.name)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  {deleteMutation.isPending ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                      Deletando...
-                                    </>
-                                  ) : (
-                                    "Deletar"
-                                  )}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {agent.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {agent.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <span>Criado em {new Date(agent.createdAt).toLocaleDateString('pt-BR')}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    <Link href={`/client/agents/${agent.id}/settings`} className="flex-1 min-w-[100px]">
+                      <Button variant="outline" size="sm" className="w-full gap-2">
+                        <Settings className="h-3.5 w-3.5" />
+                        Configurar
+                      </Button>
+                    </Link>
+
+                    <Link href={`/client/agents/${agent.id}/whatsapp`} className="flex-1 min-w-[100px]">
+                      <Button variant="outline" size="sm" className="w-full gap-2">
+                        <QrCode className="h-3.5 w-3.5" />
+                        WhatsApp
+                      </Button>
+                    </Link>
+
+                    {agent.isActive ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 flex-1 min-w-[100px]"
+                        onClick={() => handleDeactivate(agent.id)}
+                        disabled={deactivateMutation.isPending}
+                      >
+                        {deactivateMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Pause className="h-3.5 w-3.5" />
+                        )}
+                        Pausar
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 flex-1 min-w-[100px]"
+                        onClick={() => handleActivate(agent.id)}
+                        disabled={activateMutation.isPending}
+                      >
+                        {activateMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5" />
+                        )}
+                        Ativar
+                      </Button>
+                    )}
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Deletar Agente</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja deletar o agente "{agent.name}"?
+                            Esta ação não pode ser desfeita. Todos os recursos
+                            relacionados (workflows, instâncias, configurações) serão removidos.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(agent.id, agent.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleteMutation.isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Deletando...
+                              </>
+                            ) : (
+                              "Deletar"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </ClientLayout>
   );

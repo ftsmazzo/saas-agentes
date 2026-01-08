@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -29,6 +30,15 @@ import MessagesPage from "./pages/client/Messages";
 import CreateAgentPage from "./pages/client/CreateAgent";
 import AgentsPage from "./pages/client/Agents";
 import ActivateAccount from "./pages/ActivateAccount";
+
+// Componente para redirecionar /client para /client/agents
+function RedirectToAgents() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation("/client/agents");
+  }, [setLocation]);
+  return null;
+}
 
 function Router() {
   return (
@@ -59,7 +69,7 @@ function Router() {
       <Route path={"/client/agents/:agentId/whatsapp"} component={WhatsAppQRCode} />
       {/* Redirecionar /client/create-agent para a página unificada com assistente */}
       <Route path={"/client/create-agent"} component={AgentConfigUnifiedPage} />
-      <Route path={"/client"} component={WhatsAppQRCode} />
+      <Route path={"/client"} component={RedirectToAgents} />
       <Route path={"/client/whatsapp"} component={WhatsAppQRCode} />
       <Route path={"/client/settings"} component={AgentConfigUnifiedPage} />
       <Route path={"/client/agent"} component={AgentConfigUnifiedPage} />

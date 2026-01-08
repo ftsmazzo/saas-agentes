@@ -80,7 +80,7 @@ export default function Home() {
           </div>
           
           {user ? (
-            <Button onClick={() => setLocation(user.role === 'admin' ? '/admin' : '/client')}>
+            <Button onClick={() => setLocation(user.role === 'admin' ? '/admin' : '/client/agents')}>
               {user.role === 'admin' ? 'Painel Admin' : 'Meu Painel'}
             </Button>
           ) : (

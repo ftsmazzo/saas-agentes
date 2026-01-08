@@ -20,8 +20,7 @@ import {
   Menu,
   X,
   Settings,
-  AlertCircle,
-  Smartphone
+  AlertCircle
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
@@ -110,7 +109,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   const navigation = [
     { name: "Agentes", href: "/client/agents", icon: Bot },
-    { name: "WhatsApp", href: "/client", icon: Smartphone },
     { name: "Mensagens", href: "/client/messages", icon: MessageSquare },
     { name: "Interações", href: "/client/interactions", icon: MessageSquare },
     { name: "Métricas", href: "/client/metrics", icon: BarChart3 },
