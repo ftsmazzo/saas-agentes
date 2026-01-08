@@ -1293,7 +1293,7 @@ export const appRouter = router({
             const n8nApiUrl = process.env.N8N_API_URL;
             if (n8nApiUrl) {
               const agentWebhookUrl = `${n8nApiUrl}/webhook/tenant_${tenant.id}/agent_${agent.id}`;
-              const botName = `Agente ${input.agentName} - ${agent.id}`;
+              const botName = input.agentName;
               
               const { createOrUpdateChatwootAgentBot, connectAgentBotToInbox } = await import("./chatwoot-integration");
               const agentBot = await createOrUpdateChatwootAgentBot(
@@ -3019,11 +3019,11 @@ export const appRouter = router({
         let agentBotCreated = false;
         if (agent.chatwootInboxId) {
           try {
-            const botName = `Agente ${tenant.companyName || `Tenant ${tenant.id}`}`;
+            const botName = agent.name;
             const agentBot = await createOrUpdateChatwootAgentBot(
               botName,
               tenantWebhookUrl,
-              `Agent bot para ${tenant.companyName || `Tenant ${tenant.id}`} - gerado automaticamente`
+              `Agent bot para ${agent.name} - gerado automaticamente`
             );
             
             // IMPORTANTE: Salvar ID e token PRIMEIRO, antes de tentar conectar
