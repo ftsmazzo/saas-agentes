@@ -1314,7 +1314,35 @@ export const appRouter = router({
               );
               
               agentBotId = agentBot.id;
-              console.log(`[CreateAgent] ✅ Agent Bot criado: ID=${agentBot.id}`);
+              console.log(`[CreateAgent] ✅ Agent Bot criado: ID=${agentBot.id}, Token=${agentBot.token ? '***' + agentBot.token.slice(-4) : 'NÃO ENCONTRADO'}`);
+              
+              // IMPORTANTE: Salvar ID e token do Agent Bot no tenant (compartilhado entre agentes)
+              // Isso é necessário para enviar mensagens via Chatwoot
+              try {
+                const updateTenantData: any = {
+                  chatwootAgentBotId: agentBot.id,
+                };
+                
+                if (agentBot.token) {
+                  updateTenantData.chatwootAgentBotToken = agentBot.token;
+                }
+                
+                await db.updateTenant(tenant.id, updateTenantData);
+                console.log(`[CreateAgent] ✅ Agent Bot salvo no tenant ${tenant.id}: ID=${agentBot.id}, Token=${agentBot.token ? '***' + agentBot.token.slice(-4) : 'NULL'}`);
+                
+                // Verificar se foi salvo corretamente
+                const updatedTenant = await db.getTenantById(tenant.id);
+                console.log(`[CreateAgent] 🔍 Verificação: chatwootAgentBotId=${updatedTenant?.chatwootAgentBotId}, chatwootAgentBotToken=${updatedTenant?.chatwootAgentBotToken ? '***' + updatedTenant.chatwootAgentBotToken.slice(-4) : 'NULL'}`);
+              } catch (saveError: any) {
+                console.error(`[CreateAgent] ❌ Erro ao salvar Agent Bot no tenant:`, saveError);
+                // Não falhar criação, mas logar erro crítico
+                await db.createPlatformLog({
+                  tenantId: tenant.id,
+                  eventType: 'agent_bot_save_failed',
+                  severity: 'error',
+                  message: `Falha ao salvar Agent Bot no tenant: ${saveError.message}`,
+                });
+              }
               
               // Conectar Agent Bot ao inbox
               try {
